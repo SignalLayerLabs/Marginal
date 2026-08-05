@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+.venv/
+.env
+*.jsonl
+.DS_Store
+!demos/killer-demo/trace.jsonl

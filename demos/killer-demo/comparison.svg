@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="230"
+ viewBox="0 0 720 230" role="img"
+ aria-label="Baseline versus MARGINAL token use">
+  <rect width="720" height="230" rx="20" fill="#0b1020"/>
+  <text x="40" y="42" fill="#ffffff"
+ font-family="Arial, sans-serif" font-size="24" font-weight="700">
+Declared token cost for the same verified fix</text>
+  <text x="40" y="88" fill="#cbd5e1"
+ font-family="Arial, sans-serif" font-size="16">Baseline</text>
+  <rect x="150" y="68" width="520" height="30"
+ rx="8" fill="#ef4444"/>
+  <text x="680" y="89" text-anchor="end" fill="#ffffff"
+ font-family="Arial, sans-serif" font-size="16">
+72,800</text>
+  <text x="40" y="148" fill="#cbd5e1"
+ font-family="Arial, sans-serif" font-size="16">MARGINAL</text>
+  <rect x="150" y="128" width="31" height="30"
+ rx="8" fill="#22c55e"/>
+  <text x="191" y="149" fill="#ffffff"
+ font-family="Arial, sans-serif" font-size="16">
+4,300</text>
+  <text x="40" y="202" fill="#86efac"
+ font-family="Arial, sans-serif" font-size="20" font-weight="700">
+94.09% fewer declared tokens · outcome preserved</text>
+</svg>

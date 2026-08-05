@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use MARGINAL in research or production evaluation, please cite this software."
+title: "MARGINAL: Compute Capital Allocation for AI Agents"
+type: software
+authors:
+  - name: BlumFinancialLab
+version: 0.1.0
+date-released: 2026-08-04
+license: Apache-2.0
+repository-code: "https://github.com/BlumFinancialLab/Marginal"
+url: "https://github.com/BlumFinancialLab/Marginal"
+keywords:
+  - artificial intelligence
+  - AI agents
+  - token optimization
+  - cost optimization
+  - agent infrastructure

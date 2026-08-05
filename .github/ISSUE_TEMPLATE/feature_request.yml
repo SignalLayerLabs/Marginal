@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose a focused improvement or integration
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What agent-compute allocation problem is currently unsolved?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed interface and behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and validation plan
+      description: Explain how quality, cost, and compatibility would be measured.
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Core constraints
+      options:
+        - label: The core can remain free of mandatory runtime dependencies.
+          required: true
+        - label: The behavior can be tested deterministically.
+          required: true

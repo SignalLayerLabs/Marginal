@@ -1,0 +1,8 @@
+include README.md LICENSE CHANGELOG.md CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md CITATION.cff benchmarks.md ACKNOWLEDGMENTS.md SUPPORT.md codemeta.json
+recursive-include src *.py py.typed
+recursive-include tests *.py
+recursive-include examples *.py
+recursive-include docs *.md
+include .github/CODEOWNERS
+recursive-include .github *.yml *.md
+recursive-include demos *.md *.html *.svg *.json *.jsonl

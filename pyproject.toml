@@ -1,0 +1,103 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "marginal-ai"
+version = "0.1.0"
+description = "Open-source compute capital allocator for AI agents: fund only actions whose expected marginal value justifies their token, cost, latency, and risk."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "BlumFinancialLab" }]
+keywords = [
+  "ai-agents",
+  "agentic-ai",
+  "llm",
+  "token-optimization",
+  "cost-optimization",
+  "ai-infrastructure",
+  "openai",
+  "anthropic",
+  "langgraph",
+  "crewai",
+  "litellm",
+  "mcp",
+  "budget",
+  "observability",
+  "finops",
+  "decision-intelligence",
+  "agent-economics",
+  "ai-finops",
+  "compute-allocation",
+  "llm-cost-optimization",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2.2",
+  "mypy>=1.17",
+  "pytest>=8.3",
+  "ruff>=0.16",
+  "twine>=6.1",
+]
+
+[project.scripts]
+marginal = "marginal.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/BlumFinancialLab/Marginal"
+Documentation = "https://github.com/BlumFinancialLab/Marginal/tree/main/docs"
+Issues = "https://github.com/BlumFinancialLab/Marginal/issues"
+Source = "https://github.com/BlumFinancialLab/Marginal"
+Changelog = "https://github.com/BlumFinancialLab/Marginal/blob/main/CHANGELOG.md"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+marginal = ["py.typed"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["src", "tests", "examples"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["src/marginal"]
+show_error_codes = true
+warn_unused_configs = true

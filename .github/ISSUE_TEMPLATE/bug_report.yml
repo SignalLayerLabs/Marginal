@@ -1,0 +1,39 @@
+name: Bug report
+description: Report reproducible incorrect behavior in MARGINAL
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not report security vulnerabilities here; follow SECURITY.md."
+  - type: input
+    id: version
+    attributes:
+      label: MARGINAL version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version and platform
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened?
+      description: Include the decision reason and smallest reproducible example.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: trace
+    attributes:
+      label: Redacted trace or logs
+      description: Remove prompts, credentials, personal data, and proprietary content.

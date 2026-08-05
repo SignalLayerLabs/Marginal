@@ -1,0 +1,217 @@
+{
+  "baseline": {
+    "calls": 9,
+    "latency_ms": 22030,
+    "tokens": 72800,
+    "usd": 0.763,
+    "verified_success": true
+  },
+  "baseline_actions": [
+    {
+      "name": "inspect the failing assertion",
+      "output": "expected 80.0",
+      "stage": "Diagnose",
+      "tokens": 1200
+    },
+    {
+      "name": "scan the entire repository",
+      "output": "README.md, pricing.py, test_pricing.py",
+      "stage": "Diagnose",
+      "tokens": 9000
+    },
+    {
+      "name": "ask two parallel reviewers",
+      "output": "reviewer-a: inspect arithmetic; reviewer-b: inspect type contract",
+      "stage": "Diagnose",
+      "tokens": 14000
+    },
+    {
+      "name": "apply the targeted one-line patch",
+      "output": "replaced subtraction with percentage multiplication",
+      "stage": "Fix",
+      "tokens": 2400
+    },
+    {
+      "name": "rewrite the complete pricing module",
+      "output": "rewrote the complete pricing module",
+      "stage": "Fix",
+      "tokens": 12000
+    },
+    {
+      "name": "ask a frontier model for an alternative patch",
+      "output": "alternative patch agreed with the targeted correction",
+      "stage": "Fix",
+      "tokens": 18000
+    },
+    {
+      "name": "run the targeted verifier",
+      "output": "targeted verifier passed",
+      "stage": "Verify",
+      "tokens": 700
+    },
+    {
+      "name": "run the full test suite",
+      "output": "full suite passed",
+      "stage": "Verify",
+      "tokens": 4500
+    },
+    {
+      "name": "request a premium model audit",
+      "output": "premium audit found no remaining defect",
+      "stage": "Verify",
+      "tokens": 11000
+    }
+  ],
+  "defect": {
+    "after": "return total * (1 - rate)",
+    "before": "return total - rate",
+    "verifier": "apply_discount(100.0, 0.20) == 80.0"
+  },
+  "demo": "marginal-killer-demo-v1",
+  "disclaimer": "Deterministic functional demonstration using declared action-cost estimates; not provider telemetry, not a production benchmark, and not a claim about every agent workload.",
+  "initial_verified_success": false,
+  "marginal": {
+    "calls": 3,
+    "latency_ms": 1230,
+    "tokens": 4300,
+    "usd": 0.026,
+    "verified_success": true
+  },
+  "marginal_actions": [
+    {
+      "name": "inspect the failing assertion",
+      "output": "expected 80.0",
+      "stage": "Diagnose"
+    },
+    {
+      "name": "apply the targeted one-line patch",
+      "output": "replaced subtraction with percentage multiplication",
+      "stage": "Fix"
+    },
+    {
+      "name": "run the targeted verifier",
+      "output": "targeted verifier passed",
+      "stage": "Verify"
+    }
+  ],
+  "savings": {
+    "calls_percent": 66.67,
+    "latency_percent": 94.42,
+    "tokens_percent": 94.09,
+    "usd_percent": 96.59
+  },
+  "scenario": "Fix a percentage-discount bug in a deterministic Python repository",
+  "stages": [
+    {
+      "candidates": [
+        {
+          "allowed": true,
+          "expected_gain": 0.22,
+          "kind": "research",
+          "name": "inspect the failing assertion",
+          "reason": "approved: marginal ROI 7.166",
+          "score": 0.1893,
+          "tokens": 1200,
+          "usd": 0.006
+        },
+        {
+          "allowed": false,
+          "expected_gain": 0.05,
+          "kind": "research",
+          "name": "scan the entire repository",
+          "reason": "rejected: marginal ROI 0.218 below 1.000",
+          "score": -0.1794,
+          "tokens": 9000,
+          "usd": 0.045
+        },
+        {
+          "allowed": false,
+          "expected_gain": 0.04,
+          "kind": "review",
+          "name": "ask two parallel reviewers",
+          "reason": "rejected: marginal ROI 0.098 below 1.000",
+          "score": -0.369,
+          "tokens": 14000,
+          "usd": 0.12
+        }
+      ],
+      "decision": "approved: marginal ROI 7.166",
+      "selected": "inspect the failing assertion",
+      "stage": "Diagnose"
+    },
+    {
+      "candidates": [
+        {
+          "allowed": true,
+          "expected_gain": 0.5,
+          "kind": "generation",
+          "name": "apply the targeted one-line patch",
+          "reason": "approved: marginal ROI 7.418",
+          "score": 0.4326,
+          "tokens": 2400,
+          "usd": 0.018
+        },
+        {
+          "allowed": false,
+          "expected_gain": 0.2,
+          "kind": "generation",
+          "name": "rewrite the complete pricing module",
+          "reason": "rejected: marginal ROI 0.561 below 1.000",
+          "score": -0.1564,
+          "tokens": 12000,
+          "usd": 0.11
+        },
+        {
+          "allowed": false,
+          "expected_gain": 0.15,
+          "kind": "generation",
+          "name": "ask a frontier model for an alternative patch",
+          "reason": "rejected: marginal ROI 0.230 below 1.000",
+          "score": -0.501,
+          "tokens": 18000,
+          "usd": 0.28
+        }
+      ],
+      "decision": "approved: marginal ROI 7.418",
+      "selected": "apply the targeted one-line patch",
+      "stage": "Fix"
+    },
+    {
+      "candidates": [
+        {
+          "allowed": true,
+          "expected_gain": 0.35,
+          "kind": "verification",
+          "name": "run the targeted verifier",
+          "reason": "approved: marginal ROI 21.394",
+          "score": 0.33364,
+          "tokens": 700,
+          "usd": 0.002
+        },
+        {
+          "allowed": false,
+          "expected_gain": 0.08,
+          "kind": "verification",
+          "name": "run the full test suite",
+          "reason": "rejected: marginal ROI 0.763 below 1.000",
+          "score": -0.0248,
+          "tokens": 4500,
+          "usd": 0.012
+        },
+        {
+          "allowed": false,
+          "expected_gain": 0.05,
+          "kind": "verification",
+          "name": "request a premium model audit",
+          "reason": "rejected: marginal ROI 0.126 below 1.000",
+          "score": -0.348,
+          "tokens": 11000,
+          "usd": 0.17
+        }
+      ],
+      "decision": "approved: marginal ROI 21.394",
+      "selected": "run the targeted verifier",
+      "stage": "Verify"
+    }
+  ]
+}
