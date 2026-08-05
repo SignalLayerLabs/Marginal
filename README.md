@@ -1,16 +1,15 @@
 <div align="center">
 
-# MARGINAL
+<img src="assets/marginal-readme-hero.png" alt="MARGINAL — Compute capital allocation for AI agents" width="100%">
 
-### Compute capital allocation for AI agents
-
-**Fund only the next action worth taking.**
+<br>
 
 [![CI](https://github.com/SignalLayerLabs/Marginal/actions/workflows/ci.yml/badge.svg)](https://github.com/SignalLayerLabs/Marginal/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/SignalLayerLabs/Marginal/actions/workflows/codeql.yml/badge.svg)](https://github.com/SignalLayerLabs/Marginal/actions/workflows/codeql.yml)
-[![Python 3.10–3.13](https://img.shields.io/badge/python-3.10--3.13-blue.svg)](https://www.python.org/)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Zero runtime dependencies](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen.svg)](pyproject.toml)
+[![Release](https://img.shields.io/github/v/release/SignalLayerLabs/Marginal?style=flat-square)](https://github.com/SignalLayerLabs/Marginal/releases)
+[![Python 3.10–3.13](https://img.shields.io/badge/python-3.10--3.13-blue.svg?style=flat-square)](https://www.python.org/)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green.svg?style=flat-square)](LICENSE)
+[![Zero runtime dependencies](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen.svg?style=flat-square)](pyproject.toml)
 
 </div>
 
