@@ -122,9 +122,7 @@ def compare_runs(
         "savings": {
             "tokens_percent": _saving(baseline_total["tokens"], marginal_total["tokens"]),
             "usd_percent": _saving(baseline_total["usd"], marginal_total["usd"]),
-            "latency_percent": _saving(
-                baseline_total["latency_ms"], marginal_total["latency_ms"]
-            ),
+            "latency_percent": _saving(baseline_total["latency_ms"], marginal_total["latency_ms"]),
             "tool_calls_percent": _saving(
                 baseline_total["tool_calls"], marginal_total["tool_calls"]
             ),

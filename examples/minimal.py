@@ -11,8 +11,10 @@ treasury = Treasury(
     policy=policy,
 )
 
+
 def expensive_step(topic: str) -> str:
     return f"researched: {topic}"
+
 
 try:
     result = budgeted_call(

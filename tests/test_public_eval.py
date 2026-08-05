@@ -11,16 +11,52 @@ def _write(path: Path, rows: list[dict]) -> None:
 def test_compare_public_runs_preserves_success_and_calculates_savings(tmp_path: Path) -> None:
     baseline_path = tmp_path / "baseline.jsonl"
     marginal_path = tmp_path / "marginal.jsonl"
-    _write(baseline_path, [
-        {"instance_id": "a", "resolved": True, "tokens": 1000, "usd": 1.0, "latency_ms": 100, "tool_calls": 10},
-        {"instance_id": "b", "resolved": False, "tokens": 2000, "usd": 2.0, "latency_ms": 200, "tool_calls": 20},
-    ])
-    _write(marginal_path, [
-        {"instance_id": "a", "resolved": True, "tokens": 500, "usd": 0.5, "latency_ms": 80, "tool_calls": 6},
-        {"instance_id": "b", "resolved": False, "tokens": 1000, "usd": 1.0, "latency_ms": 120, "tool_calls": 10},
-    ])
+    _write(
+        baseline_path,
+        [
+            {
+                "instance_id": "a",
+                "resolved": True,
+                "tokens": 1000,
+                "usd": 1.0,
+                "latency_ms": 100,
+                "tool_calls": 10,
+            },
+            {
+                "instance_id": "b",
+                "resolved": False,
+                "tokens": 2000,
+                "usd": 2.0,
+                "latency_ms": 200,
+                "tool_calls": 20,
+            },
+        ],
+    )
+    _write(
+        marginal_path,
+        [
+            {
+                "instance_id": "a",
+                "resolved": True,
+                "tokens": 500,
+                "usd": 0.5,
+                "latency_ms": 80,
+                "tool_calls": 6,
+            },
+            {
+                "instance_id": "b",
+                "resolved": False,
+                "tokens": 1000,
+                "usd": 1.0,
+                "latency_ms": 120,
+                "tool_calls": 10,
+            },
+        ],
+    )
 
-    result = compare_runs(load_runs(baseline_path), load_runs(marginal_path), bootstrap_samples=200, seed=7)
+    result = compare_runs(
+        load_runs(baseline_path), load_runs(marginal_path), bootstrap_samples=200, seed=7
+    )
 
     assert result["tasks"] == 2
     assert result["baseline"]["resolved"] == 1
@@ -49,6 +85,8 @@ def test_report_labels_results_as_measured(tmp_path: Path) -> None:
     marginal_path = tmp_path / "marginal.jsonl"
     _write(baseline_path, [{"instance_id": "a", "resolved": True, "tokens": 100}])
     _write(marginal_path, [{"instance_id": "a", "resolved": True, "tokens": 60}])
-    report = render_public_report(compare_runs(load_runs(baseline_path), load_runs(marginal_path), bootstrap_samples=20))
+    report = render_public_report(
+        compare_runs(load_runs(baseline_path), load_runs(marginal_path), bootstrap_samples=20)
+    )
     assert "Measured public benchmark comparison" in report
     assert "40.00%" in report

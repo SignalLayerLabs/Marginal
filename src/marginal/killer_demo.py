@@ -646,7 +646,7 @@ def render_killer_demo_html(result: dict[str, Any]) -> str:
             f'<div class="card"><strong>{savings["calls_percent"]:.2f}%</strong>',
             "<span>fewer calls</span></div>",
             f'<div class="card"><strong>{baseline["tokens"]:,} → ',
-            f'{marginal["tokens"]:,}</strong><span>declared tokens</span></div>',
+            f"{marginal['tokens']:,}</strong><span>declared tokens</span></div>",
             '<div class="card"><strong>FAIL → PASS</strong>',
             "<span>each execution</span></div>",
             "</div>",

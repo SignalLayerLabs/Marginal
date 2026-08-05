@@ -312,9 +312,7 @@ def test_callable_error_remains_primary_when_abort_trace_fails() -> None:
 
     account = Treasury(
         BudgetLimits(max_tokens=100),
-        policy=MarginalPolicy(
-            PolicyConfig(outcome_value_usd=10.0, minimum_roi=0.0)
-        ),
+        policy=MarginalPolicy(PolicyConfig(outcome_value_usd=10.0, minimum_roi=0.0)),
         trace_sink=AbortFailingTrace(),
     )
     action = Action(name="operation failure", kind="tool", cost=Cost(tokens=10), expected_gain=0.2)
