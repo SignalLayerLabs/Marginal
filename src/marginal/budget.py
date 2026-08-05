@@ -33,8 +33,10 @@ class BudgetLimits:
             ("max_latency_ms", self.max_latency_ms),
             ("verification_reserve_tokens", self.verification_reserve_tokens),
         )
-        for name, value in integer_fields:
-            if value is not None and (isinstance(value, bool) or not isinstance(value, int)):
+        for name, integer_value in integer_fields:
+            if integer_value is not None and (
+                isinstance(integer_value, bool) or not isinstance(integer_value, int)
+            ):
                 raise TypeError(f"{name} must be an integer")
 
         numeric_fields = (
@@ -42,12 +44,12 @@ class BudgetLimits:
             ("max_risk", self.max_risk),
             ("verification_reserve_usd", self.verification_reserve_usd),
         )
-        for name, value in numeric_fields:
-            if value is not None and (
-                isinstance(value, bool) or not isinstance(value, (int, float))
+        for name, numeric_value in numeric_fields:
+            if numeric_value is not None and (
+                isinstance(numeric_value, bool) or not isinstance(numeric_value, (int, float))
             ):
                 raise TypeError(f"{name} must be a number")
-            if value is not None and not math.isfinite(float(value)):
+            if numeric_value is not None and not math.isfinite(float(numeric_value)):
                 raise ValueError("budget values must be finite")
 
         values = (
@@ -145,12 +147,12 @@ class BudgetLedger:
                     return Decision(False, "verification reserve would be breached")
 
         if limits.max_usd is not None:
-            if projected.usd > limits.max_usd + 1e-12:
+            if projected.usd > float(limits.max_usd) + 1e-12:
                 return Decision(False, "USD budget exceeded")
             if not action.is_verification:
                 regular_usd = self._regular_usage.usd + regular_reserved.usd + action.cost.usd
-                regular_limit = limits.max_usd - limits.verification_reserve_usd
-                if regular_usd > regular_limit + 1e-12:
+                regular_usd_limit = float(limits.max_usd) - float(limits.verification_reserve_usd)
+                if regular_usd > regular_usd_limit + 1e-12:
                     return Decision(False, "verification reserve would be breached")
 
         if limits.max_latency_ms is not None and projected.latency_ms > limits.max_latency_ms:

@@ -35,7 +35,7 @@ class Treasury:
         self.policy = policy or MarginalPolicy()
         self.trace_sink = trace_sink or NullTraceSink()
         self.parent = parent
-        self._lock = parent._lock if parent is not None else threading.RLock()
+        self._lock: threading.RLock = parent._lock if parent is not None else threading.RLock()
         self._pending: dict[str, Treasury] = parent._pending if parent is not None else {}
         self._approved_count = 0
         self._denied_count = 0
