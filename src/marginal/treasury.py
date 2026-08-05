@@ -28,7 +28,7 @@ class Treasury:
         policy: MarginalPolicy | None = None,
         trace_sink: TraceSink | None = None,
         name: str = "root",
-        parent: "Treasury | None" = None,
+        parent: Treasury | None = None,
     ) -> None:
         self.name = name
         self.ledger = BudgetLedger(limits)
@@ -224,7 +224,7 @@ class Treasury:
                 }
             )
 
-    def child(self, name: str, limits: BudgetLimits) -> "Treasury":
+    def child(self, name: str, limits: BudgetLimits) -> Treasury:
         if not name.strip():
             raise ValueError("child treasury name must not be empty")
         return Treasury(
@@ -260,7 +260,7 @@ class Treasury:
             current = current.parent
         return ledgers
 
-    def _ancestors(self) -> list["Treasury"]:
+    def _ancestors(self) -> list[Treasury]:
         ancestors: list[Treasury] = []
         current = self.parent
         while current is not None:

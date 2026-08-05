@@ -1,7 +1,7 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
-from marginal.public_eval import load_runs, compare_runs, render_public_report
+from marginal.public_eval import compare_runs, load_runs, render_public_report
 
 
 def _write(path: Path, rows: list[dict]) -> None:

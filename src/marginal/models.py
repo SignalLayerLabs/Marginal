@@ -33,7 +33,7 @@ class Cost:
         object.__setattr__(self, "usd", float(self.usd))
         object.__setattr__(self, "risk", float(self.risk))
 
-    def __add__(self, other: "Cost") -> "Cost":
+    def __add__(self, other: Cost) -> Cost:
         return Cost(
             tokens=self.tokens + other.tokens,
             usd=self.usd + other.usd,

@@ -37,9 +37,8 @@ class JsonlTraceSink:
             **dict(event),
         }
         encoded = json.dumps(record, sort_keys=True, ensure_ascii=False, default=repr)
-        with self._lock:
-            with self.path.open("a", encoding="utf-8") as stream:
-                stream.write(encoded + "\n")
+        with self._lock, self.path.open("a", encoding="utf-8") as stream:
+            stream.write(encoded + "\n")
 
 
 def action_payload(action: Action) -> dict[str, Any]:

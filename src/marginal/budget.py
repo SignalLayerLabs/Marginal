@@ -77,7 +77,7 @@ class BudgetUsage:
     latency_ms: int = 0
     risk: float = 0.0
 
-    def plus(self, cost: Cost) -> "BudgetUsage":
+    def plus(self, cost: Cost) -> BudgetUsage:
         return BudgetUsage(
             tokens=self.tokens + cost.tokens,
             usd=self.usd + cost.usd,
