@@ -570,7 +570,7 @@ def _render_flow_steps(
         else:
             state_class = "excess"
             state_label = "Executed"
-            state_icon = "×"
+            state_icon = "&times;"
         rows.append(
             "".join(
                 [
@@ -2224,7 +2224,7 @@ def render_killer_demo_html(result: dict[str, Any]) -> str:
               <h3>The deterministic defect</h3>
               <p>{{SCENARIO}}</p>
               <div class="code-diff" aria-label="Patch applied by the funded action">
-                <span class="code-line removed">− {{DEFECT_BEFORE}}</span>
+                <span class="code-line removed">&minus; {{DEFECT_BEFORE}}</span>
                 <span class="code-line added">+ {{DEFECT_AFTER}}</span>
               </div>
               <div class="verifier">
