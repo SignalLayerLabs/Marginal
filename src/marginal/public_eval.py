@@ -155,11 +155,27 @@ def render_public_report(result: dict[str, Any]) -> str:
             "",
             "| Metric | Baseline | MARGINAL | Change |",
             "|---|---:|---:|---:|",
-            f"| Resolved | {baseline['resolved']}/{baseline['tasks']} | {marginal['resolved']}/{marginal['tasks']} | {quality['resolved_delta_pp']:+.2f} pp |",
-            f"| Tokens | {baseline['tokens']:,} | {marginal['tokens']:,} | {savings['tokens_percent']:.2f}% fewer |",
-            f"| USD | ${baseline['usd']:.4f} | ${marginal['usd']:.4f} | {savings['usd_percent']:.2f}% lower |",
-            f"| Latency | {baseline['latency_ms']:,} ms | {marginal['latency_ms']:,} ms | {savings['latency_percent']:.2f}% lower |",
-            f"| Tool calls | {baseline['tool_calls']} | {marginal['tool_calls']} | {savings['tool_calls_percent']:.2f}% fewer |",
+            (
+                f"| Resolved | {baseline['resolved']}/{baseline['tasks']} | "
+                f"{marginal['resolved']}/{marginal['tasks']} | "
+                f"{quality['resolved_delta_pp']:+.2f} pp |"
+            ),
+            (
+                f"| Tokens | {baseline['tokens']:,} | "
+                f"{marginal['tokens']:,} | {savings['tokens_percent']:.2f}% fewer |"
+            ),
+            (
+                f"| USD | ${baseline['usd']:.4f} | "
+                f"${marginal['usd']:.4f} | {savings['usd_percent']:.2f}% lower |"
+            ),
+            (
+                f"| Latency | {baseline['latency_ms']:,} ms | "
+                f"{marginal['latency_ms']:,} ms | {savings['latency_percent']:.2f}% lower |"
+            ),
+            (
+                f"| Tool calls | {baseline['tool_calls']} | "
+                f"{marginal['tool_calls']} | {savings['tool_calls_percent']:.2f}% fewer |"
+            ),
             "",
             f"Token savings 95% bootstrap interval: **{ci[0]:.2f}% to {ci[1]:.2f}%**.",
             f"Quality preserved within 1 pp: **{quality['preserved_within_one_pp']}**.",
