@@ -433,12 +433,6 @@ Apache License 2.0. See [LICENSE](LICENSE).
 
 ---
 
-**Suggested GitHub topics:** `ai-agents`, `agentic-ai`, `llm`, `token-optimization`,
-`cost-optimization`, `ai-infrastructure`, `openai`, `anthropic`, `langgraph`, `crewai`,
-`litellm`, `mcp`, `budget`, `observability`, `finops`, `ai-finops`,
-`agent-economics`, `compute-allocation`, `llm-cost-optimization`.
-
-
 ## Public benchmarks
 
 See [the public benchmark protocol](docs/public-benchmarks.md).
