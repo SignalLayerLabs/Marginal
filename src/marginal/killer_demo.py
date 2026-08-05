@@ -577,13 +577,13 @@ def _render_flow_steps(
                     f'<li class="flow-step {state_class}">',
                     f'<span class="step-index">{position}</span>',
                     '<span class="step-copy">',
-                    f'<strong>{html.escape(action["name"])}</strong>',
-                    f'<small>{html.escape(action["stage"])} · '
-                    f'{candidate["tokens"]:,} tokens</small>',
+                    f"<strong>{html.escape(action['name'])}</strong>",
+                    f"<small>{html.escape(action['stage'])} · "
+                    f"{candidate['tokens']:,} tokens</small>",
                     "</span>",
                     '<span class="step-cost">',
-                    f'<strong>${candidate["usd"]:.3f}</strong>',
-                    f'<small>{state_label}</small>',
+                    f"<strong>${candidate['usd']:.3f}</strong>",
+                    f"<small>{state_label}</small>",
                     "</span>",
                     f'<span class="step-state" aria-label="{state_label}">{state_icon}</span>',
                     "</li>",
@@ -605,20 +605,20 @@ def _render_allocation_rows(result: dict[str, Any]) -> str:
                     [
                         "<tr>",
                         "<td>",
-                        f'<strong>{html.escape(candidate["name"])}</strong>',
-                        f'<small>{html.escape(stage["stage"])}</small>',
+                        f"<strong>{html.escape(candidate['name'])}</strong>",
+                        f"<small>{html.escape(stage['stage'])}</small>",
                         "</td>",
                         "<td>",
-                        f'<strong>${candidate["usd"]:.3f}</strong>',
-                        f'<small>{candidate["tokens"]:,} tokens</small>',
+                        f"<strong>${candidate['usd']:.3f}</strong>",
+                        f"<small>{candidate['tokens']:,} tokens</small>",
                         "</td>",
                         "<td>",
-                        f'<strong>{candidate["expected_gain"]:.3f}</strong>',
-                        f'<small>score {candidate["score"]:.3f}</small>',
+                        f"<strong>{candidate['expected_gain']:.3f}</strong>",
+                        f"<small>score {candidate['score']:.3f}</small>",
                         "</td>",
                         "<td>",
                         f'<span class="decision-pill {state_class}">{state_label}</span>',
-                        f'<small>{html.escape(candidate["reason"])}</small>',
+                        f"<small>{html.escape(candidate['reason'])}</small>",
                         "</td>",
                         "</tr>",
                     ]
@@ -2306,15 +2306,15 @@ def render_killer_demo_html(result: dict[str, Any]) -> str:
             "marginal-project-mark.png"
         ),
         "{{DISCLAIMER}}": html.escape(result["disclaimer"]),
-        "{{TOKEN_SAVINGS}}": f'{savings["tokens_percent"]:.2f}',
-        "{{BASELINE_TOKENS}}": f'{baseline["tokens"]:,}',
-        "{{MARGINAL_TOKENS}}": f'{marginal["tokens"]:,}',
+        "{{TOKEN_SAVINGS}}": f"{savings['tokens_percent']:.2f}",
+        "{{BASELINE_TOKENS}}": f"{baseline['tokens']:,}",
+        "{{MARGINAL_TOKENS}}": f"{marginal['tokens']:,}",
         "{{BASELINE_CALLS}}": str(baseline["calls"]),
         "{{MARGINAL_CALLS}}": str(marginal["calls"]),
-        "{{BASELINE_USD}}": f'{baseline["usd"]:.3f}',
-        "{{MARGINAL_USD}}": f'{marginal["usd"]:.3f}',
-        "{{BASELINE_LATENCY}}": f'{baseline["latency_ms"] / 1000:.2f}',
-        "{{MARGINAL_LATENCY}}": f'{marginal["latency_ms"] / 1000:.2f}',
+        "{{BASELINE_USD}}": f"{baseline['usd']:.3f}",
+        "{{MARGINAL_USD}}": f"{marginal['usd']:.3f}",
+        "{{BASELINE_LATENCY}}": f"{baseline['latency_ms'] / 1000:.2f}",
+        "{{MARGINAL_LATENCY}}": f"{marginal['latency_ms'] / 1000:.2f}",
         "{{BASELINE_STEPS}}": baseline_steps,
         "{{MARGINAL_STEPS}}": marginal_steps,
         "{{ALLOCATION_ROWS}}": allocation_rows,
@@ -2326,6 +2326,7 @@ def render_killer_demo_html(result: dict[str, Any]) -> str:
     for placeholder, value in replacements.items():
         page = page.replace(placeholder, value)
     return page
+
 
 def _write_artifacts(
     output_dir: Path,
