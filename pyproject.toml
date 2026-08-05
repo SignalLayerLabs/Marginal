@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-authors = [{ name = "BlumFinancialLab" }]
+authors = [{ name = "SignalLayer Labs" }]
 keywords = [
   "ai-agents",
   "agentic-ai",
@@ -54,7 +54,7 @@ dev = [
   "build>=1.2.2",
   "mypy>=1.17",
   "pytest>=8.3",
-  "ruff>=0.16",
+  "ruff==0.15.22",
   "twine>=6.1",
 ]
 
@@ -62,11 +62,11 @@ dev = [
 marginal = "marginal.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/BlumFinancialLab/Marginal"
-Documentation = "https://github.com/BlumFinancialLab/Marginal/tree/main/docs"
-Issues = "https://github.com/BlumFinancialLab/Marginal/issues"
-Source = "https://github.com/BlumFinancialLab/Marginal"
-Changelog = "https://github.com/BlumFinancialLab/Marginal/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/SignalLayerLabs/Marginal"
+Documentation = "https://github.com/SignalLayerLabs/Marginal/tree/main/docs"
+Issues = "https://github.com/SignalLayerLabs/Marginal/issues"
+Source = "https://github.com/SignalLayerLabs/Marginal"
+Changelog = "https://github.com/SignalLayerLabs/Marginal/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

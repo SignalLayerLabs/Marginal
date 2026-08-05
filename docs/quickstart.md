@@ -3,7 +3,7 @@
 ## Install
 
 ```bash
-pip install "marginal-ai @ git+https://github.com/BlumFinancialLab/Marginal.git@v0.1.0"
+pip install "marginal-ai @ git+https://github.com/SignalLayerLabs/Marginal.git@v0.1.0"
 ```
 
 MARGINAL supports Python 3.10–3.13 and has no mandatory runtime dependencies.

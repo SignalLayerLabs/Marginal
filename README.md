@@ -6,8 +6,8 @@
 
 **Fund only the next action worth taking.**
 
-[![CI](https://github.com/BlumFinancialLab/Marginal/actions/workflows/ci.yml/badge.svg)](https://github.com/BlumFinancialLab/Marginal/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/BlumFinancialLab/Marginal/actions/workflows/codeql.yml/badge.svg)](https://github.com/BlumFinancialLab/Marginal/actions/workflows/codeql.yml)
+[![CI](https://github.com/SignalLayerLabs/Marginal/actions/workflows/ci.yml/badge.svg)](https://github.com/SignalLayerLabs/Marginal/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/SignalLayerLabs/Marginal/actions/workflows/codeql.yml/badge.svg)](https://github.com/SignalLayerLabs/Marginal/actions/workflows/codeql.yml)
 [![Python 3.10–3.13](https://img.shields.io/badge/python-3.10--3.13-blue.svg)](https://www.python.org/)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
 [![Zero runtime dependencies](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen.svg)](pyproject.toml)
@@ -78,13 +78,13 @@ provider measurement, or universal savings claim**.
 Install the tagged GitHub release:
 
 ```bash
-pip install "marginal-ai @ git+https://github.com/BlumFinancialLab/Marginal.git@v0.1.0"
+pip install "marginal-ai @ git+https://github.com/SignalLayerLabs/Marginal.git@v0.1.0"
 ```
 
 For development:
 
 ```bash
-git clone https://github.com/BlumFinancialLab/Marginal.git
+git clone https://github.com/SignalLayerLabs/Marginal.git
 cd marginal
 python -m pip install -e ".[dev]"
 ```

@@ -14,7 +14,7 @@ Contributions should preserve four properties:
 ## Development setup
 
 ```bash
-git clone https://github.com/BlumFinancialLab/Marginal.git
+git clone https://github.com/SignalLayerLabs/Marginal.git
 cd marginal
 python -m venv .venv
 source .venv/bin/activate

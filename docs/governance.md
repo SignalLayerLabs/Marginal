@@ -1,6 +1,6 @@
 # Governance
 
-MARGINAL begins as a BlumFinancialLab-led open-source project.
+MARGINAL begins as a SignalLayer Labs-led open-source project.
 
 ## Decision process
 

@@ -1,6 +1,6 @@
 # Acknowledgments
 
-MARGINAL was created by BlumFinancialLab as an independent Apache-2.0 open-source reference
+MARGINAL was created independently by SignalLayer Labs as an independent Apache-2.0 open-source reference
 implementation for agent compute capital allocation.
 
 The project’s economic framing is inspired by Siqi Zhu’s 2026 position paper,

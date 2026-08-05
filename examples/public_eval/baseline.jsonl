@@ -1,0 +1,2 @@
+{"instance_id":"public-task-1","resolved":true,"tokens":12000,"usd":0.18,"latency_ms":42000,"tool_calls":12}
+{"instance_id":"public-task-2","resolved":false,"tokens":18000,"usd":0.27,"latency_ms":61000,"tool_calls":18}

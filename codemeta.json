@@ -3,8 +3,8 @@
   "@type": "SoftwareSourceCode",
   "name": "MARGINAL",
   "description": "Open-source compute capital allocator for AI agents that funds only actions whose expected marginal value justifies token, direct cost, latency, and risk.",
-  "codeRepository": "https://github.com/BlumFinancialLab/Marginal",
-  "issueTracker": "https://github.com/BlumFinancialLab/Marginal/issues",
+  "codeRepository": "https://github.com/SignalLayerLabs/Marginal",
+  "issueTracker": "https://github.com/SignalLayerLabs/Marginal/issues",
   "license": "https://spdx.org/licenses/Apache-2.0",
   "version": "0.1.0",
   "datePublished": "2026-08-04",
@@ -12,8 +12,8 @@
   "runtimePlatform": "Python 3.10-3.13",
   "author": {
     "@type": "Organization",
-    "name": "BlumFinancialLab",
-    "url": "https://github.com/BlumFinancialLab"
+    "name": "SignalLayer Labs",
+    "url": "https://github.com/SignalLayerLabs"
   },
   "keywords": [
     "AI agents",
