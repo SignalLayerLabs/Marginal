@@ -402,6 +402,18 @@ guaranteed savings on arbitrary workloads.
 The next validation milestone is a public benchmark across real agent frameworks and task
 sets, measuring cost per verified outcome rather than cost alone.
 
+## Roadmap
+
+MARGINAL `v0.1.0` established the dependency-free reference allocator. Development is now
+focused on **v0.2 — Universal Agent Foundation**: one shared protocol and local runtime for
+Codex, Claude Code, GitHub Copilot, OpenCode, and future compatible development agents.
+
+The next measured milestone is a paired Codex evaluation comparing the same model, tasks,
+tools, limits, and verifier with and without MARGINAL, using real token telemetry and
+quality-preservation criteria.
+
+[View the full product roadmap →](ROADMAP.md)
+
 ## Documentation
 
 - [Quickstart](docs/quickstart.md)
