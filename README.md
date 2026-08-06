@@ -17,6 +17,8 @@
 
 MARGINAL is an open-source decision, accounting, and evidence layer for AI agents. It evaluates proposed model calls, tool calls, searches, retries, reviewers, and sub-agents before they run, then accounts for what actually happened.
 
+> **Hard budgets prevent bankruptcy. MARGINAL optimizes investment returns.**
+
 > **Hard budgets ask “can we afford this?” MARGINAL also asks “is this worth funding?”**
 
 Version `0.2.0` adds the **Learning Loop Foundation**: Shadow Mode, a versioned Decision Ledger, explicit privacy profiles, measured outcome contracts, versioned value estimators, policy replay, and a universal engine-neutral runtime for future Codex, Claude Code, GitHub Copilot, OpenCode, and other adapters.
