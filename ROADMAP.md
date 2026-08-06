@@ -4,7 +4,7 @@ MARGINAL's North Star is simple:
 
 > **Install MARGINAL once, keep using your AI development agent normally, and reduce avoidable token consumption without sacrificing verified quality.**
 
-MARGINAL is being developed as one universal, local compute-governance product for the main AI development agents. A single core, protocol, installer, policy system, and reporting experience will support Codex, Claude Code, GitHub Copilot, OpenCode, and future compatible runtimes through thin engine adapters.
+MARGINAL is being developed as one universal, local compute-governance product for the main AI development agents. A single core, protocol, installer, policy system, learning loop, and reporting experience will support Codex, Claude Code, GitHub Copilot, OpenCode, and future compatible runtimes through thin engine adapters.
 
 This roadmap is milestone-driven rather than date-driven. It communicates product direction and measurable outcomes. GitHub Issues and pull requests should track implementation-level work.
 
@@ -14,10 +14,11 @@ This roadmap is milestone-driven rather than date-driven. It communicates produc
 2. **Thin adapters:** engine-specific behavior stays outside the decision core.
 3. **Quality first:** token reduction is valuable only when verified quality is preserved.
 4. **Measured claims:** public savings claims must use real runtime or provider telemetry.
-5. **Local first:** prompts and source code are not uploaded or logged by default.
-6. **Simple installation:** supported agents should require no manual code changes.
-7. **Transparent capabilities:** observe-only and enforcement integrations must be clearly distinguished.
-8. **Small core:** the provider-neutral core keeps zero mandatory runtime dependencies.
+5. **Learning without overclaiming:** observational associations are not described as causal value.
+6. **Local first:** prompts and source code are not uploaded or logged by default.
+7. **Simple installation:** supported agents should require no manual code changes.
+8. **Transparent capabilities:** observe-only and enforcement integrations must be clearly distinguished.
+9. **Small core:** the provider-neutral core keeps zero mandatory runtime dependencies.
 
 ## Status legend
 
@@ -25,7 +26,7 @@ This roadmap is milestone-driven rather than date-driven. It communicates produc
 |---|---|
 | **Planned** | Scope is defined, but implementation has not started. |
 | **In progress** | Implementation is actively underway. |
-| **Validation** | Implementation is complete, but benchmark or compatibility evidence is still pending. |
+| **Validation** | Implementation exists, but final CI, release, integration, or benchmark evidence is pending. |
 | **Complete** | All exit criteria have been met and supporting evidence is available. |
 
 ## Milestones at a glance
@@ -33,11 +34,11 @@ This roadmap is milestone-driven rather than date-driven. It communicates produc
 | Milestone | Status | Primary outcome |
 |---|---|---|
 | **v0.1 — Reference Allocator Foundation** | Complete | Provider-neutral allocation, accounting, tracing, demos, and first release |
-| **v0.2 — Universal Agent Foundation** | In progress | Shared protocol and runtime for every supported development agent |
+| **v0.2 — Learning Loop Foundation** | Validation | Universal protocol, non-blocking observation, versioned evidence, outcomes, replay, and estimators |
 | **v0.3 — Codex Reference Integration** | Planned | Real Codex integration and measured paired benchmark |
 | **v0.4 — Multi-Engine Developer Preview** | Planned | Codex, OpenCode, Claude Code, and GitHub Copilot compatibility |
 | **v0.5 — One-Command Universal Installation** | Planned | Automatic detection, installation, diagnostics, and rollback |
-| **v0.6 — Adaptive Allocation** | Planned | Context-aware value estimation and dynamic compute pricing |
+| **v0.6 — Adaptive and Causal Allocation** | Planned | Calibrated learning, context-carry economics, exploration, and regret measurement |
 | **v0.7 — Ecosystem and Operational Scale** | Planned | Additional engines, persistent runtimes, observability, and team controls |
 
 ---
@@ -74,34 +75,54 @@ Evidence: [`CHANGELOG.md`](CHANGELOG.md), [`docs/architecture.md`](docs/architec
 
 ---
 
-## v0.2 — Universal Agent Foundation
+## v0.2 — Learning Loop Foundation
 
-**Status:** In progress
+**Status:** Validation
 
-**Objective:** Create the shared architecture that lets every supported development agent use the same MARGINAL decision engine, telemetry model, and safety guarantees.
+**Objective:** Create the shared, versioned learning-loop foundation that lets every supported development agent use the same MARGINAL decisions, evidence model, accounting, and safety guarantees.
 
-### Deliverables
+### Delivered in the release candidate
 
-- [ ] Publish MARGINAL Universal Agent Protocol v1
-- [ ] Define versioned normalized event, decision, capability, and outcome schemas
-- [ ] Add capability negotiation for observe, modify, deny, stop, and verification control
-- [ ] Add token usage v2 with input, cached input, output, reasoning, and total token fields
-- [ ] Add trace schema v2 with run, task, trajectory, action, policy, estimator, and model identity
-- [ ] Add state-aware fingerprints and configurable deduplication scopes
-- [ ] Add `shadow`, `recommend`, and `enforce` operating modes
-- [ ] Add explicit settlement for failed, partial, unknown, and measured usage
-- [ ] Add conservative built-in policy profiles: Quality First, Balanced, Token Saver, and Strict Budget
-- [ ] Add a local session runtime and state store
-- [ ] Define the shared adapter SDK and conformance test suite
-- [ ] Preserve a dependency-free provider-neutral core
+- [x] Publish MARGINAL Universal Agent Protocol v1
+- [x] Define normalized event, decision, capability, outcome, token-usage, and ledger schemas
+- [x] Add capability negotiation for observe, modify, deny, stop, and verification control
+- [x] Add additive token usage v2 for uncached input, cached input, output, reasoning, and total tokens
+- [x] Add Decision Ledger v2 with run, task, trajectory, action, policy, estimator, engine, and model identity
+- [x] Classify evidence fields as safe-by-default, pseudonymous, or potentially sensitive
+- [x] Add `LOCAL_FULL` and keyed `SAFE_TELEMETRY` operational ledger profiles
+- [x] Add separate grouped `AGGREGATE_EXPORT` output with no identifiers or timestamps
+- [x] Suppress aggregate groups smaller than five records by default with a configurable threshold
+- [x] Publish recursively strict JSON Schemas for safe event-level telemetry and aggregate exports
+- [x] Add local 256-bit key generation, restrictive permission checks, race-safe exports, and safe export CLI
+- [x] Add strict ledger parsing, monotonic sequence validation, and task/outcome correlation checks
+- [x] Add state-aware fingerprints and configurable deduplication scopes
+- [x] Add `shadow`, `recommend`, and `enforce` operating modes
+- [x] Preserve concurrent Shadow Mode observations with separate reservation identities
+- [x] Add explicit failed-action settlement for measured, estimated, and unavailable usage
+- [x] Keep failed actions retryable while accounting for consumed resources
+- [x] Add conservative fallback settlement when failure usage extraction itself fails
+- [x] Add Quality First, Balanced, Token Saver, and Strict Budget reference profiles
+- [x] Add a provider-neutral local `UniversalRuntime`
+- [x] Add explicit task outcomes and separate action-level realized-gain observations
+- [x] Add versioned estimator identities, uncertainty, confidence, sample size, provenance, and registry
+- [x] Add deterministic training-data fingerprints for online observations
+- [x] Add non-causal policy replay and CLI ledger validation/reporting
+- [x] Add protocol and schema conformance tests, executable examples, and aligned documentation
+- [x] Preserve the dependency-free provider-neutral runtime core
 
 ### Exit criteria
 
-- The protocol and schemas are versioned and documented.
-- A reference simulated adapter passes all conformance tests.
-- Existing v0.1 behavior remains backward compatible or has an explicit migration path.
-- Shadow mode can observe a complete agent session without changing its behavior.
-- The core still has zero mandatory runtime dependencies.
+- [x] Protocols and schemas are versioned and documented.
+- [x] Privacy profiles, field classification, key handling, small-group suppression, export boundaries, and limitations are documented.
+- [x] The provider-neutral reference runtime passes focused protocol and lifecycle tests.
+- [x] Shadow Mode can observe complete action lifecycles without blocking caller behavior.
+- [x] Existing v0.1 constructors and enforced execution paths remain covered by regression tests.
+- [x] The package metadata and public documentation describe the implemented v0.2 behavior consistently.
+- [x] The runtime core still has zero mandatory dependencies.
+- [ ] Ruff, mypy strict, the full repository test suite, package build, and Twine validation pass in the canonical GitHub checkout and CI.
+- [ ] `v0.2.0` is tagged and released from the canonical repository.
+
+The release remains in **Validation** until the final two exit criteria are satisfied. Vendor-specific adapters and measured production savings are intentionally not part of v0.2.
 
 ---
 
@@ -146,7 +167,7 @@ Evidence: [`CHANGELOG.md`](CHANGELOG.md), [`docs/architecture.md`](docs/architec
 - [ ] Build an OpenCode adapter
 - [ ] Build a Claude Code adapter
 - [ ] Build a GitHub Copilot CLI or coding-agent adapter where official control surfaces permit it
-- [ ] Reuse the same protocol, policy profiles, telemetry, and reports across all adapters
+- [ ] Reuse the same protocol, policy profiles, telemetry, ledger, and reports across all adapters
 - [ ] Publish an engine capability matrix
 - [ ] Add adapter-specific compatibility and end-to-end tests
 - [ ] Clearly label each integration as Observe, Tool Enforcement, or Full Compute Enforcement
@@ -158,7 +179,7 @@ Evidence: [`CHANGELOG.md`](CHANGELOG.md), [`docs/architecture.md`](docs/architec
 - At least four development-agent environments, including Codex, pass protocol conformance tests.
 - No adapter contains duplicated economic decision logic.
 - Every supported engine has documented capabilities and limitations.
-- The same policy profile produces comparable decision traces across engines.
+- The same policy profile produces comparable decision records across engines.
 - At least two engines support real action enforcement.
 
 ---
@@ -175,7 +196,7 @@ Evidence: [`CHANGELOG.md`](CHANGELOG.md), [`docs/architecture.md`](docs/architec
 - [ ] Automatically detect supported agents and their versions
 - [ ] Install only the required adapters
 - [ ] Create safe backups before changing agent configuration
-- [ ] Enable Quality First and shadow mode by default
+- [ ] Enable Quality First and Shadow Mode by default
 - [ ] Add `marginal status`
 - [ ] Add `marginal doctor`
 - [ ] Add `marginal profile`
@@ -195,31 +216,33 @@ Evidence: [`CHANGELOG.md`](CHANGELOG.md), [`docs/architecture.md`](docs/architec
 
 ---
 
-## v0.6 — Adaptive Allocation
+## v0.6 — Adaptive and Causal Allocation
 
 **Status:** Planned
 
-**Objective:** Replace static expected-gain assumptions with contextual, uncertainty-aware estimates learned from real agent trajectories.
+**Objective:** Learn calibrated action value from real trajectories while distinguishing prediction, association, and causal evidence.
 
 ### Deliverables
 
-- [ ] Add contextual value estimation by task, phase, engine, model, evidence, and repository state
-- [ ] Attach uncertainty, confidence, sample size, and provenance to value estimates
-- [ ] Add a calibrated task belief state updated by tests, errors, reviews, and verifier evidence
+- [ ] Train and validate contextual estimators on real engine trajectories
+- [ ] Add a calibrated task belief state updated by deterministic evidence
 - [ ] Estimate context-carry cost across future model turns
 - [ ] Add dynamic token shadow pricing based on scarcity and projected remaining work
-- [ ] Add controlled, budgeted exploration for counterfactual learning
+- [ ] Add controlled, budgeted exploration with propensity logging
 - [ ] Prevent exploration for unsafe or irreversible actions
-- [ ] Add estimator calibration and drift reports
-- [ ] Compare adaptive policies against fixed reference policies
+- [ ] Add off-policy evaluation appropriate to logged propensities
+- [ ] Add estimator calibration, drift, and regret reports
+- [ ] Compare adaptive policies against fixed reference policies on held-out runs
+- [ ] Define explicit evidence standards before making causal marginal-value claims
 - [ ] Preserve deterministic policy modes for reproducibility and regulated use cases
 
 ### Exit criteria
 
-- Predicted value and observed outcomes have published calibration evidence.
+- Predicted action value and observed outcomes have published calibration evidence.
 - Adaptive allocation improves token cost per verified task over the fixed reference policy on held-out runs.
 - Quality remains within the predefined non-inferiority margin.
 - Exploration behavior is bounded, reproducible, and separately accounted.
+- Any causal claim includes a documented identification strategy and assumptions.
 
 ---
 
@@ -276,6 +299,7 @@ MARGINAL will be evaluated on the combined outcome, not token savings alone:
 - regressions and recoveries;
 - tool and sub-agent calls;
 - latency and direct cost;
+- estimator calibration and decision regret;
 - variance across repeated runs;
 - installation success and rollback reliability;
 - capability coverage by engine.

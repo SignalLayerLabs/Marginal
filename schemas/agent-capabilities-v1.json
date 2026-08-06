@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SignalLayerLabs/Marginal/schemas/agent-capabilities-v1.json",
+  "title": "MARGINAL Agent Capabilities v1",
+  "type": "object",
+  "required": [
+    "observe_model_usage",
+    "block_actions",
+    "modify_actions",
+    "stop_agent",
+    "control_model_turns",
+    "record_outcomes"
+  ],
+  "properties": {
+    "observe_model_usage": {"type": "boolean"},
+    "block_actions": {"type": "boolean"},
+    "modify_actions": {"type": "boolean"},
+    "stop_agent": {"type": "boolean"},
+    "control_model_turns": {"type": "boolean"},
+    "record_outcomes": {"type": "boolean"},
+    "level": {"enum": ["observe", "control", "full"]}
+  },
+  "additionalProperties": false
+}

@@ -10,4 +10,7 @@ build/
 .env
 *.jsonl
 .DS_Store
-!demos/killer-demo/trace.jsonl
+
+# MARGINAL local privacy keys
+*.privacy.key
+.marginal/

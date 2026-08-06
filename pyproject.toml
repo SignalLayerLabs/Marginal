@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "marginal-ai"
-version = "0.1.0"
-description = "Open-source compute capital allocator for AI agents: fund only actions whose expected marginal value justifies their token, cost, latency, and risk."
+version = "0.2.0"
+description = "Universal learning-loop and compute-governance foundation for economically disciplined AI agents."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
@@ -32,6 +32,11 @@ keywords = [
   "ai-finops",
   "compute-allocation",
   "llm-cost-optimization",
+  "decision-ledger",
+  "agent-governance",
+  "shadow-mode",
+  "privacy-preserving-telemetry",
+  "pseudonymization",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -54,6 +59,7 @@ dev = [
   "build>=1.2.2",
   "mypy>=1.17",
   "pytest>=8.3",
+  "jsonschema>=4.23",
   "ruff==0.15.22",
   "twine>=6.1",
 ]
@@ -76,7 +82,7 @@ include-package-data = true
 where = ["src"]
 
 [tool.setuptools.package-data]
-marginal = ["py.typed"]
+marginal = ["py.typed", "schemas/*.json"]
 
 [tool.pytest.ini_options]
 addopts = "-ra"

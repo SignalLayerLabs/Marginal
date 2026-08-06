@@ -1,48 +1,48 @@
 # Benchmarking
 
-## Killer demo
+## Demonstrations versus measured benchmarks
 
-`marginal killer-demo --output killer-demo-output` runs an end-to-end coding workflow
-against a generated buggy repository. It compares a run-everything baseline with MARGINAL's
-funded action in each diagnose, fix, and verification stage. Both paths must pass the same
-deterministic verifier. The generated HTML, Markdown, SVG, JSON, and JSONL trace make every
-decision inspectable.
+The Killer Demo and bundled synthetic benchmark test allocator behavior with declared costs. They do not measure a provider and are not universal savings claims.
 
-The committed result is available in [`demos/killer-demo`](../demos/killer-demo/RESULTS.md).
-Its token, USD, and latency values are declared action-cost estimates used to exercise the
-allocator; they are not provider telemetry.
+## Required paired protocol
 
-It demonstrates the mechanism, but it is not a production benchmark or a claim that all
-workloads will save 94.09%.
+A real benchmark should keep constant:
 
-## Bundled synthetic benchmark
+- task and dataset version;
+- model and provider version;
+- system and user prompt;
+- tools and permissions;
+- repository state;
+- time and token limits;
+- verifier;
+- task order and retry policy.
 
-`marginal demo` runs five deterministic task scenarios. Each contains three actions needed
-for a verified outcome and two low-value redundant actions. The baseline executes every
-action. MARGINAL uses the reference policy and executes only actions that clear the economic
-threshold.
+Compare baseline and MARGINAL on matched task IDs. Do not drop failures or impute missing runs. Benchmark rows are parsed strictly: boolean and numeric strings are rejected rather than coerced.
 
-The benchmark tests accounting, policy behavior, reserves, and reproducibility. It is not
-evidence that every real agent will save the same percentage.
+## Required metrics
 
-## Required production metrics
-
-Real evaluations should report:
-
-- task and verifier definition;
-- model and provider versions;
-- success rate with confidence intervals;
-- input, output, cached, and reasoning tokens where available;
+- resolution rate and confidence interval;
+- quality non-inferiority margin defined before results;
+- uncached input, cached input, non-reasoning output, reasoning, and total tokens where available;
 - direct cost and latency;
 - tool and sub-agent calls;
-- denied-action reasons;
-- cost per verified successful outcome;
-- quality difference against an uncontrolled baseline.
+- regressions and recoveries;
+- cost per verified successful task;
+- policy and estimator identities, including learned-state fingerprint;
+- denied and recommended reason distribution;
+- raw paired result files.
 
-Savings without preserved quality are not optimization.
 
-## Benchmark contribution rules
+The bundled comparator exposes `--confidence-level`, `--quality-margin-pp`, `--bootstrap-samples`, and `--seed`. Record these values with the raw inputs. Its efficiency section reports tokens and USD per resolved task; a zero-resolved condition is reported as unavailable rather than divided by zero.
 
-A contributed benchmark must be runnable, pinned to a dataset version, free from hidden
-manual steps, and explicit about synthetic or simulated values. Raw result files should be
-included or reproducibly generated.
+## Shadow evaluation
+
+Shadow Mode is ideal for integration safety, estimator calibration, and false-denial analysis, but does not itself produce realized token savings because all actions still execute.
+
+## Replay
+
+Replay is useful for policy sensitivity analysis. It cannot model state changes from actions a different policy would have denied. Replay output must remain labeled estimated and non-causal. Malformed ledger authorization records are rejected.
+
+## Causal evaluation
+
+Causal marginal-value work requires an identification strategy, such as controlled randomization, paired trajectories, valid propensity logging, or another justified design. Historical success association alone is insufficient.

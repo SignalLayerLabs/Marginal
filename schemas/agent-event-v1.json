@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SignalLayerLabs/Marginal/schemas/agent-event-v1.json",
+  "title": "MARGINAL Agent Event v1",
+  "type": "object",
+  "required": ["protocol_version", "engine", "session_id", "task_id", "event_type"],
+  "properties": {
+    "protocol_version": {"const": "1.0"},
+    "engine": {"type": "string", "minLength": 1},
+    "session_id": {"type": "string", "minLength": 1},
+    "task_id": {"type": "string", "minLength": 1},
+    "event_type": {
+      "enum": [
+        "session.start",
+        "session.end",
+        "action.before",
+        "action.after",
+        "action.failed",
+        "outcome"
+      ]
+    },
+    "action": {
+      "oneOf": [
+        {"$ref": "#/$defs/agent_action"},
+        {"type": "null"}
+      ]
+    },
+    "state": {"type": "object"},
+    "metadata": {"type": "object"}
+  },
+  "$defs": {
+    "cost": {
+      "type": "object",
+      "required": ["tokens", "usd", "latency_ms", "risk"],
+      "properties": {
+        "tokens": {"type": "integer", "minimum": 0},
+        "usd": {"type": "number", "minimum": 0},
+        "latency_ms": {"type": "integer", "minimum": 0},
+        "risk": {"type": "number", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "token_usage": {
+      "type": "object",
+      "required": [
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens",
+        "reasoning_tokens",
+        "total_tokens"
+      ],
+      "properties": {
+        "input_tokens": {"type": "integer", "minimum": 0},
+        "cached_input_tokens": {"type": "integer", "minimum": 0},
+        "output_tokens": {"type": "integer", "minimum": 0},
+        "reasoning_tokens": {"type": "integer", "minimum": 0},
+        "total_tokens": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "agent_action": {
+      "type": "object",
+      "required": [
+        "action_id",
+        "name",
+        "kind",
+        "estimated_cost",
+        "current_success_probability",
+        "is_verification",
+        "state_hash",
+        "phase",
+        "retry_number",
+        "deduplication_scope",
+        "metadata"
+      ],
+      "properties": {
+        "action_id": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "kind": {"type": "string", "minLength": 1},
+        "estimated_cost": {"$ref": "#/$defs/cost"},
+        "token_usage": {
+          "oneOf": [
+            {"$ref": "#/$defs/token_usage"},
+            {"type": "null"}
+          ]
+        },
+        "expected_gain": {
+          "oneOf": [
+            {"type": "number", "minimum": 0, "maximum": 1},
+            {"type": "null"}
+          ]
+        },
+        "current_success_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "is_verification": {"type": "boolean"},
+        "state_hash": {"type": "string"},
+        "phase": {"type": "string"},
+        "retry_number": {"type": "integer", "minimum": 0},
+        "deduplication_scope": {
+          "enum": ["exact", "once_per_state", "once_per_phase", "allow_retry"]
+        },
+        "metadata": {"type": "object"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

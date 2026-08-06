@@ -1,83 +1,76 @@
 # Architecture
 
-MARGINAL separates description, ranking, reservation, execution, and settlement.
-
 ```text
-Candidate actions
-    │
-    ├─► hard child and parent budgets
-    ├─► pending reservations
-    ├─► duplicate and stopping checks
-    ├─► ValueEstimator.estimate
-    └─► MarginalPolicy.evaluate
-              │
-       rank by marginal score
-              │
-       reserve best candidate
-              │
-       execute callable
-          ┌───┴────┐
-       success   failure
-          │          │
-     settle actual  abort
-          │          │
-       committed   released
-          └────┬─────┘
-          append trace
+AI development agent
+        │ native hook/event
+        ▼
+thin engine adapter
+        │ AgentAction / AgentEvent
+        ▼
+UniversalRuntime
+        │ Action
+        ▼
+Treasury ──► MarginalPolicy ──► ValueEstimator
+   │              │                    │
+   │ applied      │ recommendation     │ versioned estimate + state fingerprint
+   ▼              ▼                    ▼
+reserve → execute → settle / abort / failure settlement
+   │
+   └──► JsonlDecisionLedger ──► privacy profile ──► outcome / replay / export
 ```
 
-## Modules
+## Module boundaries
 
 - `models.py`: immutable provider-neutral values;
-- `budget.py`: hard constraints, reservations, settlement, and accounting;
-- `estimator.py`: transparent expected-gain estimates;
-- `policy.py`: economic scoring and explanations;
-- `fingerprint.py`: deterministic action and call identity;
-- `treasury.py`: lifecycle, ranking, hierarchy, and atomic coordination;
-- `adapters.py`: guarded sync and async Python or SDK calls;
-- `trace.py`: append-only JSONL evidence;
-- `cli.py`: trace validation, reporting, and demonstration;
-- `benchmark.py`: deterministic synthetic scenarios.
+- `modes.py`: Shadow, Recommend, and Enforce semantics;
+- `budget.py`: hard limits, reservations, settlement, and accounting;
+- `estimator.py`: transparent versioned value estimates and learned-state identity;
+- `registry.py`: estimator name/version resolution;
+- `policy.py`: deterministic economic scoring and reason codes;
+- `profiles.py`: transparent reference policy configurations;
+- `fingerprint.py`: deterministic core action and call identity;
+- `treasury.py`: mode-aware lifecycle, hierarchy, atomic coordination, and evidence;
+- `adapters.py`: guarded sync/async execution and failure usage settlement;
+- `outcomes.py`: verified task outcome contract;
+- `ledger.py`: strict schema-versioned evidence and privacy-aware export orchestration;
+- `privacy.py`: field classification, keyed pseudonymization, strict sanitization, and aggregate grouping;
+- `protocol.py`: universal adapter contract, directives, and capability negotiation;
+- `runtime.py`: normalized local engine-session lifecycle;
+- `replay.py`: non-causal off-policy decision replay;
+- `trace.py`: legacy trace sinks and deterministic fan-out;
+- `cli.py`: trace, ledger, privacy export, replay, benchmark, and demo commands.
 
-## Authorization lifecycle
+## Shadow authorization
 
-`authorize` evaluates an action and reserves its estimated cost across the child ledger and
-every ancestor. The root and its children share one re-entrant lock, preventing concurrent
-fan-out from oversubscribing a parent budget. Pending fingerprints also retain their owning
-treasury, preventing cross-sibling settlement or cancellation.
+Shadow Mode still creates reservations, including unchecked reservations for would-deny actions. This lets later recommendations observe pending demand while the external agent continues unchanged.
 
-Committed usage remains separate from reserved usage. `Treasury.summary()` exposes both.
+Concurrent semantic duplicates receive unique internal reservation identities. The semantic fingerprint remains in evidence and duplicate recommendations, while each actual execution is separately reserved and settled.
 
-## Settlement lifecycle
+Settlement records actual usage and violations without raising a caller-visible overrun.
 
-`commit` replaces every reservation in the hierarchy with actual usage. All levels are
-updated consistently. If actual usage exceeds one or more limits, a `BudgetOverrun` is
-raised only after the spend is recorded and traced.
+## Enforced authorization
 
-`abort` releases every reservation without recording spend. The sync and async wrappers call
-it automatically when the guarded callable raises.
+Enforce Mode preserves v0.1 behavior: affordability and policy denial prevent execution; reservations are transactional; actual overruns are recorded before `BudgetOverrun` is raised.
 
-Trace writes participate in the authorization transaction: a failed authorization trace rolls
-back reservations and counters. Abort releases state before tracing; if tracing also fails, the
-guarded callable's original exception is re-raised with the trace failure chained as its cause.
-Settlement remains fail-truthful: once external work has occurred, accounting is never rolled
-back merely because a trace sink fails.
+## Failure boundary
 
-## Candidate ranking
+No observed spend releases a reservation. Measured failed spend is committed without marking the action as successfully completed. If failure usage extraction fails, the reserved estimate is settled conservatively and the original execution exception remains primary.
 
-`fund_best` evaluates all supplied candidates under the same locked state. Allowed candidates
-are ordered by:
+## Evidence boundary
 
-1. marginal score;
-2. capped expected gain;
-3. lower estimated cost value;
-4. deterministic fingerprint tie-break.
+`record_outcome` records task evidence. `observe_value` records explicit action-level realized gain. The separation prevents causal credit from being assigned merely because an action appeared in a successful trajectory.
 
-Only the selected candidate is reserved. The full candidate evaluation is emitted as a
-`candidate_ranking` trace event.
+Decision Ledger writes are strict JSON and sequence-safe within one process. Composite sink fan-out and multiple processes are not an atomic distributed transaction; deployments needing that property must provide an external transactional sink.
 
-## Extension boundaries
+## Privacy boundary
 
-Applications can replace the estimator or policy without changing actions, budgets,
-wrappers, or traces. Framework adapters should translate native events into `Action` and
-`Cost` rather than adding provider logic to the core.
+`JsonlDecisionLedger` constructs the complete event, validates task/outcome consistency, then
+applies the configured profile before serialization. `local_full` preserves the event.
+`safe_telemetry` uses a strict allowlist, field-separated HMAC pseudonyms, and UTC-day timestamp
+generalization. Unknown custom fields are dropped. `aggregate_export` is not accepted by the
+operational sink; it reads a completed ledger, suppresses groups below a configurable threshold
+of five by default, and writes grouped generalized rows through a separate file with overwrite
+protection.
+
+Keys remain local and are not part of a trace transaction. Losing a key prevents future stable
+correlation but does not make existing pseudonyms anonymous.

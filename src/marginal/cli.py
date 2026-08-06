@@ -1,4 +1,4 @@
-"""Command-line interface for MARGINAL traces and demos."""
+"""Command-line interface for MARGINAL traces, ledgers, replay, and demos."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ def summarize_trace(events: list[dict[str, Any]]) -> dict[str, Any]:
                 approved += 1
             else:
                 denied += 1
-        elif event.get("event") == "commit":
+        elif event.get("event") in {"commit", "failure_settlement"}:
             committed += 1
             usage.update(event.get("usage", {}))
     return {
@@ -57,40 +57,141 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    report = subparsers.add_parser("report", help="summarize a MARGINAL JSONL trace")
+    report = subparsers.add_parser("report", help="summarize a v0.1 MARGINAL JSONL trace")
     report.add_argument("trace", type=Path)
     report.add_argument("--json", action="store_true", dest="as_json")
 
-    validate = subparsers.add_parser("validate", help="validate a MARGINAL JSONL trace")
+    validate = subparsers.add_parser("validate", help="validate a v0.1 MARGINAL JSONL trace")
     validate.add_argument("trace", type=Path)
+
+    ledger_report = subparsers.add_parser(
+        "ledger-report", help="summarize a MARGINAL decision ledger v2"
+    )
+    ledger_report.add_argument("ledger", type=Path)
+    ledger_report.add_argument("--json", action="store_true", dest="as_json")
+
+    ledger_validate = subparsers.add_parser(
+        "ledger-validate", help="validate a MARGINAL decision ledger v2"
+    )
+    ledger_validate.add_argument("ledger", type=Path)
+
+    ledger_export = subparsers.add_parser(
+        "ledger-export",
+        help="export a decision ledger with a privacy-preserving profile",
+    )
+    ledger_export.add_argument("source", type=Path)
+    ledger_export.add_argument("destination", type=Path)
+    ledger_export.add_argument(
+        "--privacy-profile",
+        required=True,
+        choices=["safe_telemetry", "aggregate_export"],
+    )
+    ledger_export.add_argument("--privacy-key-file", type=Path)
+    ledger_export.add_argument(
+        "--minimum-group-size",
+        type=int,
+        default=5,
+        help=(
+            "suppress aggregate groups smaller than this count (default: 5; aggregate_export only)"
+        ),
+    )
+
+    replay = subparsers.add_parser(
+        "replay", help="re-evaluate ledger decisions with a reference policy profile"
+    )
+    replay.add_argument("ledger", type=Path)
+    replay.add_argument(
+        "--profile",
+        choices=["quality-first", "balanced", "token-saver", "strict-budget"],
+        default="balanced",
+    )
+    replay.add_argument("--json", action="store_true", dest="as_json")
 
     subparsers.add_parser("demo", help="run the deterministic bundled benchmark")
 
     killer = subparsers.add_parser(
-        "killer-demo",
-        help="run the end-to-end compute allocation demonstration",
+        "killer-demo", help="run the end-to-end compute allocation demonstration"
     )
-    public_eval = subparsers.add_parser(
-        "public-eval",
-        help="compare matched baseline and MARGINAL public-benchmark runs",
-    )
-    public_eval.add_argument("baseline", type=Path)
-    public_eval.add_argument("marginal", type=Path)
-    public_eval.add_argument("--json", action="store_true", dest="as_json")
-    public_eval.add_argument("--bootstrap-samples", type=int, default=2_000)
-
     killer.add_argument(
         "--output",
         type=Path,
         default=Path("killer-demo-output"),
         help="directory for HTML, Markdown, JSON, SVG, and trace artifacts",
     )
+
+    public_eval = subparsers.add_parser(
+        "public-eval", help="compare matched baseline and MARGINAL public-benchmark runs"
+    )
+    public_eval.add_argument("baseline", type=Path)
+    public_eval.add_argument("marginal", type=Path)
+    public_eval.add_argument("--json", action="store_true", dest="as_json")
+    public_eval.add_argument("--bootstrap-samples", type=int, default=2_000)
+    public_eval.add_argument("--confidence-level", type=float, default=0.95)
+    public_eval.add_argument("--quality-margin-pp", type=float, default=1.0)
+    public_eval.add_argument("--seed", type=int, default=42)
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
+
+    if args.command == "ledger-export":
+        from .ledger import export_decision_ledger
+
+        try:
+            exported = export_decision_ledger(
+                args.source,
+                args.destination,
+                privacy_profile=args.privacy_profile,
+                privacy_key_path=args.privacy_key_file,
+                minimum_group_size=args.minimum_group_size,
+            )
+        except (OSError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(f"exported {exported} records to {args.destination} with {args.privacy_profile}")
+        return 0
+
+    if args.command in {"ledger-report", "ledger-validate"}:
+        from .ledger import read_decision_ledger, summarize_decision_ledger
+
+        try:
+            records = read_decision_ledger(args.ledger)
+        except (OSError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        if args.command == "ledger-validate":
+            print(f"valid decision ledger: {len(records)} events")
+            return 0
+        summary = summarize_decision_ledger(records)
+        if args.as_json:
+            print(json.dumps(summary, sort_keys=True))
+        else:
+            print("MARGINAL decision ledger report")
+            print(f"Events: {summary['events']}")
+            print(f"Authorizations: {summary['authorizations']}")
+            print(f"Recommended allowed: {summary['recommended_allowed']}")
+            print(f"Applied allowed: {summary['applied_allowed']}")
+            print(f"Non-blocking overrides: {summary['nonblocking_overrides']}")
+            print(f"Outcomes: {summary['outcomes']}")
+            print(f"Privacy profiles: {', '.join(summary['privacy_profiles'])}")
+        return 0
+
+    if args.command == "replay":
+        from .profiles import build_policy
+        from .replay import render_replay_report, replay_ledger
+
+        try:
+            replay_result = replay_ledger(args.ledger, build_policy(args.profile))
+        except (OSError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        if args.as_json:
+            print(json.dumps(replay_result.to_dict(), sort_keys=True))
+        else:
+            print(render_replay_report(replay_result), end="")
+        return 0
 
     if args.command == "demo":
         from .benchmark import render_markdown, run_benchmark
@@ -102,34 +203,39 @@ def main(argv: Sequence[str] | None = None) -> int:
         from .public_eval import compare_runs, load_runs, render_public_report
 
         try:
-            result = compare_runs(
+            report = compare_runs(
                 load_runs(args.baseline),
                 load_runs(args.marginal),
                 bootstrap_samples=args.bootstrap_samples,
+                confidence_level=args.confidence_level,
+                quality_margin_pp=args.quality_margin_pp,
+                seed=args.seed,
             )
         except (OSError, ValueError) as exc:
             print(str(exc), file=sys.stderr)
             return 1
         if args.as_json:
-            print(json.dumps(result, sort_keys=True))
+            print(json.dumps(report, sort_keys=True))
         else:
-            print(render_public_report(result), end="")
+            print(render_public_report(report), end="")
         return 0
 
     if args.command == "killer-demo":
         from .killer_demo import run_killer_demo
 
-        result = run_killer_demo(args.output)
-        savings = result["savings"]
-        print("MARGINAL Killer Demo")
-        token_summary = (
-            f"Declared tokens: {result['baseline']['tokens']:,} → "
-            f"{result['marginal']['tokens']:,} "
-            f"({savings['tokens_percent']:.2f}% fewer)"
-        )
-        print(token_summary)
-        print("Verified outcome: preserved")
-        print(f"Artifacts: {args.output.resolve()}")
+        demo_result = run_killer_demo(args.output)
+        if "savings" in demo_result:
+            savings = demo_result["savings"]
+            print("MARGINAL Killer Demo")
+            print(
+                f"Declared tokens: {demo_result['baseline']['tokens']:,} -> "
+                f"{demo_result['marginal']['tokens']:,} "
+                f"({savings['tokens_percent']:.2f}% fewer)"
+            )
+            print("Verified outcome: preserved")
+            print(f"Artifacts: {args.output.resolve()}")
+        else:
+            print("MARGINAL Killer Demo completed")
         return 0
 
     try:

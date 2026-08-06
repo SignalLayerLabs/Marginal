@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SignalLayerLabs/Marginal/schemas/aggregate-export-v1.json",
+  "title": "MARGINAL Aggregate Privacy Export Record v1",
+  "description": "Grouped, generalized decision or outcome data with no identifiers, timestamps, free text, metadata, model identity, verifier details, or tool arguments.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "privacy_profile",
+    "record_type",
+    "action_kind",
+    "cost_bucket",
+    "gain_bucket",
+    "recommendation",
+    "applied_decision",
+    "reason_code",
+    "outcome_class",
+    "count",
+    "minimum_group_size"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "privacy_profile": {
+      "const": "aggregate_export"
+    },
+    "record_type": {
+      "enum": [
+        "decision",
+        "outcome"
+      ]
+    },
+    "action_kind": {
+      "type": "string",
+      "pattern": "^[a-z0-9_.-]{1,64}$"
+    },
+    "cost_bucket": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "unknown"
+      ]
+    },
+    "gain_bucket": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "unknown"
+      ]
+    },
+    "recommendation": {
+      "enum": [
+        "allow",
+        "deny",
+        "unknown",
+        "not_applicable"
+      ]
+    },
+    "applied_decision": {
+      "enum": [
+        "allow",
+        "deny",
+        "unknown",
+        "not_applicable"
+      ]
+    },
+    "reason_code": {
+      "type": "string",
+      "pattern": "^[A-Z0-9_]{1,64}$|^not_applicable$"
+    },
+    "outcome_class": {
+      "enum": [
+        "verified_success",
+        "verified_failure",
+        "positive_reward",
+        "non_positive_reward",
+        "unknown",
+        "not_applicable"
+      ]
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "minimum_group_size": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Configured k-threshold; groups with fewer source records are suppressed."
+    }
+  },
+  "additionalProperties": false
+}

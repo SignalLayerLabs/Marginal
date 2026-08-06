@@ -5,4 +5,9 @@ recursive-include examples *.py
 recursive-include docs *.md
 include .github/CODEOWNERS
 recursive-include .github *.yml *.md
-recursive-include demos *.md *.html *.svg *.json *.jsonl
+
+include ROADMAP.md
+recursive-include schemas *.json
+recursive-include demos *.md *.json *.html *.svg *.jsonl
+
+recursive-include assets *.png

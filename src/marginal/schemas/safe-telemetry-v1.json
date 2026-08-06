@@ -1,0 +1,392 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SignalLayerLabs/Marginal/schemas/safe-telemetry-v1.json",
+  "title": "MARGINAL Safe Telemetry Record v1",
+  "description": "Strict event-level telemetry with keyed pseudonyms, generalized timestamps, allowlisted labels and numeric fields, and no free-form content.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "privacy_profile",
+    "event_id",
+    "sequence",
+    "timestamp",
+    "run_id",
+    "event"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "2.0"
+    },
+    "privacy_profile": {
+      "const": "safe_telemetry"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^psn_[0-9a-f]{32}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T00:00:00\\+00:00$"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^psn_[0-9a-f]{32}$"
+    },
+    "task_id": {
+      "$ref": "#/$defs/pseudonym"
+    },
+    "trajectory_id": {
+      "$ref": "#/$defs/pseudonym"
+    },
+    "action_id": {
+      "$ref": "#/$defs/pseudonym"
+    },
+    "engine_instance": {
+      "$ref": "#/$defs/pseudonym"
+    },
+    "engine": {
+      "enum": [
+        "aider",
+        "claude-code",
+        "cline",
+        "codex",
+        "continue",
+        "gemini-cli",
+        "github-copilot",
+        "opencode",
+        "roo-code",
+        "other"
+      ]
+    },
+    "event": {
+      "enum": [
+        "abort",
+        "authorization",
+        "candidate_ranking",
+        "commit",
+        "custom",
+        "estimator_observation",
+        "failure_settlement",
+        "outcome",
+        "session_end",
+        "session_start"
+      ]
+    },
+    "mode": {
+      "enum": [
+        "shadow",
+        "recommend",
+        "enforce",
+        "unknown"
+      ]
+    },
+    "budget_overrun": {
+      "type": "boolean"
+    },
+    "realized_gain": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "policy": {
+      "$ref": "#/$defs/identity"
+    },
+    "estimator": {
+      "$ref": "#/$defs/identity"
+    },
+    "action": {
+      "$ref": "#/$defs/action"
+    },
+    "decision": {
+      "$ref": "#/$defs/decision"
+    },
+    "outcome": {
+      "$ref": "#/$defs/outcome"
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "usage": {
+      "$ref": "#/$defs/numeric_usage"
+    },
+    "reserved": {
+      "$ref": "#/$defs/numeric_usage"
+    }
+  },
+  "$defs": {
+    "pseudonym": {
+      "type": "string",
+      "pattern": "^(?:psn_[0-9a-f]{32})?$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(?:v?\\d+(?:\\.\\d+){0,3}(?:[-+][0-9A-Za-z.-]{1,24})?|unknown|unversioned)$"
+    },
+    "numeric_usage": {
+      "type": "object",
+      "properties": {
+        "tokens": {
+          "type": "number",
+          "minimum": 0
+        },
+        "usd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "latency_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "risk": {
+          "type": "number",
+          "minimum": 0
+        },
+        "input_tokens": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cached_input_tokens": {
+          "type": "number",
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reasoning_tokens": {
+          "type": "number",
+          "minimum": 0
+        },
+        "total_tokens": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "identity": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "$ref": "#/$defs/version"
+        }
+      },
+      "additionalProperties": false
+    },
+    "action": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "command",
+            "file_read",
+            "file_write",
+            "generation",
+            "llm",
+            "model_call",
+            "reasoning",
+            "research",
+            "review",
+            "search",
+            "subagent",
+            "test",
+            "tool",
+            "verification",
+            "other"
+          ]
+        },
+        "expected_gain": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "current_success_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "is_verification": {
+          "type": "boolean"
+        },
+        "retry_number": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deduplication_scope": {
+          "enum": [
+            "exact",
+            "once_per_state",
+            "once_per_phase",
+            "allow_retry",
+            "unknown"
+          ]
+        },
+        "cost": {
+          "$ref": "#/$defs/numeric_usage"
+        },
+        "estimated_cost": {
+          "$ref": "#/$defs/numeric_usage"
+        },
+        "token_usage": {
+          "$ref": "#/$defs/numeric_usage"
+        },
+        "fingerprint": {
+          "$ref": "#/$defs/pseudonym"
+        },
+        "action_id": {
+          "$ref": "#/$defs/pseudonym"
+        },
+        "state_hash": {
+          "$ref": "#/$defs/pseudonym"
+        }
+      },
+      "additionalProperties": false
+    },
+    "decision": {
+      "type": "object",
+      "properties": {
+        "allowed": {
+          "type": "boolean"
+        },
+        "recommended": {
+          "type": "boolean"
+        },
+        "score": {
+          "type": "number"
+        },
+        "expected_gain": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "estimated_cost_value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "uncertainty": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "reason_code": {
+          "enum": [
+            "APPROVED",
+            "BUDGET_REJECTED",
+            "DENY",
+            "DUPLICATE_ACTION",
+            "DUPLICATE_PENDING",
+            "EXPECTED_GAIN_REJECTED",
+            "FUNDED",
+            "MARGINAL_ROI_REJECTED",
+            "OTHER",
+            "PARENT_BUDGET_REJECTED",
+            "RECOMMEND_OVERRIDE",
+            "SHADOW_OVERRIDE",
+            "TARGET_REACHED",
+            "UNSPECIFIED"
+          ]
+        },
+        "recommendation_reason_code": {
+          "enum": [
+            "APPROVED",
+            "BUDGET_REJECTED",
+            "DENY",
+            "DUPLICATE_ACTION",
+            "DUPLICATE_PENDING",
+            "EXPECTED_GAIN_REJECTED",
+            "FUNDED",
+            "MARGINAL_ROI_REJECTED",
+            "OTHER",
+            "PARENT_BUDGET_REJECTED",
+            "RECOMMEND_OVERRIDE",
+            "SHADOW_OVERRIDE",
+            "TARGET_REACHED",
+            "UNSPECIFIED"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "shadow",
+            "recommend",
+            "enforce",
+            "unknown"
+          ]
+        },
+        "directive": {
+          "enum": [
+            "allow",
+            "deny",
+            "modify",
+            "defer",
+            "reuse",
+            "stop",
+            "force_verify",
+            "unknown"
+          ]
+        },
+        "recommended_directive": {
+          "enum": [
+            "allow",
+            "deny",
+            "modify",
+            "defer",
+            "reuse",
+            "stop",
+            "force_verify",
+            "unknown"
+          ]
+        },
+        "estimator_version": {
+          "$ref": "#/$defs/version"
+        }
+      },
+      "additionalProperties": false
+    },
+    "outcome": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "$ref": "#/$defs/pseudonym"
+        },
+        "trajectory_id": {
+          "$ref": "#/$defs/pseudonym"
+        },
+        "reward": {
+          "type": "number"
+        },
+        "resolved": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "candidate": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/action"
+        },
+        "decision": {
+          "$ref": "#/$defs/decision"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

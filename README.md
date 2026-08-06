@@ -15,102 +15,121 @@
 
 ---
 
-MARGINAL is an open-source decision and accounting layer for AI agents. It evaluates
-proposed model calls, tool calls, searches, retries, reviewers, and sub-agents before they
-run, then funds only actions whose expected marginal value justifies their direct cost,
-token scarcity, latency, and risk.
+MARGINAL is an open-source decision, accounting, and evidence layer for AI agents. It evaluates proposed model calls, tool calls, searches, retries, reviewers, and sub-agents before they run, then accounts for what actually happened.
 
 > **Hard budgets ask “can we afford this?” MARGINAL also asks “is this worth funding?”**
 
-MARGINAL does not compress prompts or replace an agent framework. It removes entire
-low-value actions before they consume tokens.
+Version `0.2.0` adds the **Learning Loop Foundation**: Shadow Mode, a versioned Decision Ledger, explicit privacy profiles, measured outcome contracts, versioned value estimators, policy replay, and a universal engine-neutral runtime for future Codex, Claude Code, GitHub Copilot, OpenCode, and other adapters.
+
+MARGINAL does not compress prompts or replace an agent framework. It can eliminate entire low-value actions before they consume tokens, or observe them without interference while evidence is collected.
 
 ## Why this exists
 
-Agent runtimes commonly execute the next step because it appears in a workflow, because a
-model requested it, or because a hard limit has not yet been reached. Those mechanisms do
-not compare the expected improvement of the next action with its total economic cost.
+Agent runtimes commonly execute the next step because it appears in a workflow, a model requested it, or a hard limit has not yet been reached. Those mechanisms answer whether work is permitted; they do not compare the expected improvement of the next action with its total economic cost.
 
-MARGINAL adds that missing allocation layer:
+MARGINAL adds that allocation layer while keeping execution and evidence explicit:
 
 - rank candidate actions by marginal value;
-- reserve budget at authorization time;
-- protect a verification reserve;
-- prevent duplicate and concurrent double-spend;
-- account for actual usage, including overruns;
-- release reservations when execution fails;
-- enforce parent and child budgets atomically;
-- produce provider-neutral JSONL evidence;
-- work with synchronous and asynchronous Python callables;
-- keep zero mandatory runtime dependencies.
+- reserve budget before execution and settle actual usage afterward;
+- protect verification capacity;
+- prevent concurrent double-spend and state-insensitive duplicates;
+- observe recommendations without blocking through Shadow Mode;
+- record versioned policy, estimator, cost, failure, and outcome evidence;
+- protect quasi-identifiers and free text through explicit privacy profiles;
+- support provider-neutral synchronous, asynchronous, and engine-adapter integrations;
+- keep the runtime core free of mandatory dependencies.
 
-## Killer demo: same verified fix, 94.09% fewer declared tokens
+## What changed in v0.2
 
-The bundled end-to-end demo creates a real buggy Python micro-repository, executes the
-same diagnose → fix → verify workflow twice, and checks the final result with a deterministic
-verifier. The baseline runs every search, reviewer, rewrite, and audit. MARGINAL funds only
-the highest-value action in each stage.
+### Shadow Mode
 
-[![Killer demo: baseline versus MARGINAL](demos/killer-demo/comparison.svg)](demos/killer-demo/RESULTS.md)
+Shadow Mode evaluates every proposed action but never blocks it:
 
-| Metric | Run everything | MARGINAL | Savings |
-|---|---:|---:|---:|
-| Declared tokens | 72,800 | 4,300 | **94.09%** |
-| Calls | 9 | 3 | **66.67%** |
-| Estimated USD | $0.763 | $0.026 | **96.59%** |
-| Estimated latency | 22,030 ms | 1,230 ms | **94.42%** |
-| Verified outcome | PASS | PASS | preserved |
-
-```bash
-marginal killer-demo --output killer-demo-output
+```text
+agent proposes action
+        ↓
+MARGINAL recommends allow or deny
+        ↓
+action still executes
+        ↓
+actual cost and verified outcome are recorded
 ```
 
-The command produces a standalone HTML report, GitHub-ready Markdown, SVG comparison,
-structured JSON, and the complete provider-neutral decision trace. This is a deterministic
-functional demonstration using declared action-cost estimates, **not a production benchmark,
-provider measurement, or universal savings claim**.
+This is the safe default for collecting evidence before enforcement.
 
-[Open the full allocation report →](demos/killer-demo/RESULTS.md)
+### Decision Ledger
+
+`JsonlDecisionLedger` records schema-versioned, append-only evidence with:
+
+- run, task, trajectory, engine, and model identity;
+- policy and estimator versions;
+- recommended versus applied decisions;
+- estimated and actual costs;
+- failures, overruns, observations, and outcomes;
+- deterministic sequence numbers for replay and audit.
+
+Prompts and model outputs are not recorded by default. That alone is not sufficient for safe
+sharing: task IDs, action names, model identity, repository metadata, verifier details, and
+error text can still reveal sensitive information.
+
+### Privacy profiles
+
+Every Decision Ledger field is treated as safe-by-default, pseudonymous, or potentially
+sensitive. MARGINAL provides three explicit profiles:
+
+- `LOCAL_FULL` preserves the complete operational ledger on a trusted local filesystem;
+- `SAFE_TELEMETRY` removes free text and metadata, pseudonymizes identifiers with a local
+  HMAC-SHA-256 key, and generalizes exact timestamps;
+- `generate_local_identifier(...)` creates opaque random local IDs when correlation with
+  external names is unnecessary;
+- `AGGREGATE_EXPORT` creates grouped generalized rows with no identifiers or timestamps and
+  suppresses groups smaller than five records by default.
+
+`aggregate_export` is a separate export path, not an operational ledger mode. Its default
+minimum group size is five and can be raised for more conservative sharing. Pseudonymization
+is not anonymization; inspect data before sharing it. See [Privacy profiles](docs/privacy.md).
+
+### Versioned Value Estimator
+
+`ValueEstimator` now returns `ValueEstimate` objects with expected gain, uncertainty, confidence, sample size, provenance, and a stable estimator identity. Explicit caller estimates remain supported, and historical observations can be contextualized by engine, phase, task type, language, and model.
+
+MARGINAL does **not** infer that every action caused a successful task. Action-level realized gain must be supplied explicitly through `Treasury.observe_value(...)`.
+
+### Universal Agent Protocol
+
+`AgentAction`, `AgentEvent`, `AgentDecision`, `AgentCapabilities`, and `UniversalRuntime` provide the shared contract for thin engine adapters. Engine-specific code translates native events; the economic policy remains in one core.
+
+The versioned JSON contracts ship inside the installed package as well as in the repository:
+
+```python
+from marginal import available_schemas, load_schema
+
+print(available_schemas())
+event_schema = load_schema("agent-event-v1.json")
+```
 
 ## Install
 
 Install the tagged GitHub release:
 
 ```bash
-pip install "marginal-ai @ git+https://github.com/SignalLayerLabs/Marginal.git@v0.1.0"
+pip install "marginal-ai @ git+https://github.com/SignalLayerLabs/Marginal.git@v0.2.0"
 ```
 
 For development:
 
 ```bash
 git clone https://github.com/SignalLayerLabs/Marginal.git
-cd marginal
+cd Marginal
 python -m pip install -e ".[dev]"
 ```
 
-## Five-minute integration
+## Five-minute enforced integration
 
 ```python
-from marginal import (
-    Action,
-    ActionDenied,
-    BudgetLimits,
-    Cost,
-    MarginalPolicy,
-    PolicyConfig,
-    Treasury,
-    budgeted_call,
-    funded_call,
-)
+from marginal import Action, BudgetLimits, Cost, Treasury, budgeted_call, build_policy
 
-policy = MarginalPolicy(
-    PolicyConfig(
-        outcome_value_usd=5.0,
-        token_shadow_price_per_million_usd=10.0,
-        minimum_roi=1.0,
-    )
-)
-
+policy = build_policy("balanced")
 treasury = Treasury(
     BudgetLimits(
         max_tokens=100_000,
@@ -118,26 +137,23 @@ treasury = Treasury(
         verification_reserve_tokens=10_000,
     ),
     policy=policy,
+    mode="enforce",
 )
 
-try:
-    answer = budgeted_call(
-        treasury,
-        your_expensive_function,
-        "input",
-        action=Action(
-            name="research missing evidence",
-            kind="research",
-            cost=Cost(tokens=4_000, usd=0.04, latency_ms=1_500),
-            expected_gain=0.12,
-        ),
-    )
-except ActionDenied as exc:
-    print(f"Skipped: {exc}")
+response = budgeted_call(
+    treasury,
+    your_expensive_function,
+    "input",
+    action=Action(
+        name="research missing evidence",
+        kind="research",
+        cost=Cost(tokens=4_000, usd=0.04, latency_ms=1_500),
+        expected_gain=0.12,
+    ),
+)
 ```
 
-The wrapped function is never called when authorization is denied. Approved estimates are
-reserved immediately, preventing parallel actions from oversubscribing the same treasury.
+The wrapped function is never called when enforcement denies the action. Approved estimates are reserved immediately, preventing parallel actions from oversubscribing the same treasury.
 
 ## Fund the best next action
 
@@ -164,58 +180,217 @@ if allocation is not None:
     result = funded_call(treasury, allocation, execute, allocation.action)
 ```
 
-`fund_best` evaluates every candidate against the same current state and reserves the
-highest-scoring affordable action. `funded_call` executes that reservation and automatically
-settles or releases it. Candidate rankings are recorded in the trace.
+`fund_best` evaluates candidates against one locked state, records the full ranking, and reserves only the highest-value affordable candidate. It remains an active selection API in every execution mode.
 
-## Use actual provider usage
-
-MARGINAL has no mandatory SDK dependency. Wrap the callable already used by your app and
-extract actual token usage from its result:
+## Use measured provider usage
 
 ```python
-from marginal import budgeted_call, extract_common_llm_usage
-
 response = budgeted_call(
     treasury,
     client.responses.create,
-    action=Action(
-        name="draft final answer",
-        kind="llm",
-        cost=Cost(tokens=5_000, usd=0.08),
-        expected_gain=0.15,
-    ),
+    action=action,
     usage_extractor=extract_common_llm_usage,
     model="YOUR_MODEL",
     input="Draft the answer.",
 )
 ```
 
-The built-in extractor understands common OpenAI-, Anthropic-, and LiteLLM-like usage
-objects. It replaces the token estimate and preserves direct USD, latency, and risk values
-that provider responses do not expose consistently.
+The total-token extractor preserves direct USD, latency, and risk values that a provider response does not expose consistently. `extract_common_token_usage` provides the additive input, cached-input, non-reasoning output, reasoning, and total breakdown.
 
-A custom extractor receives `(result, estimated_cost)` and returns a complete `Cost`.
-
-## Async integration
+Async callables use the same lifecycle:
 
 ```python
-from marginal import async_budgeted_call
-
 response = await async_budgeted_call(
     treasury,
-    async_client_call,
+    client.responses.create,
     action=action,
     usage_extractor=extract_common_llm_usage,
+    **request,
 )
 ```
 
-Synchronous and asynchronous wrappers share the same reservation, settlement, duplicate,
-and trace semantics.
+## Start safely with Shadow Mode
+
+```python
+from marginal import (
+    Action,
+    BudgetLimits,
+    Cost,
+    DecisionLedgerContext,
+    JsonlDecisionLedger,
+    Treasury,
+    budgeted_call,
+    build_policy,
+)
+
+ledger = JsonlDecisionLedger(
+    "marginal-ledger.jsonl",
+    context=DecisionLedgerContext(
+        run_id="run-001",
+        task_id="task-042",
+        trajectory_id="baseline-a",
+        engine="codex",
+        model="your-model",
+    ),
+    privacy_profile="safe_telemetry",
+    privacy_key_path=".marginal/privacy.key",
+)
+
+treasury = Treasury(
+    BudgetLimits(max_tokens=50_000, verification_reserve_tokens=5_000),
+    policy=build_policy("quality-first"),
+    trace_sink=ledger,
+    mode="shadow",
+)
+
+result = budgeted_call(
+    treasury,
+    your_expensive_function,
+    action=Action(
+        name="ask another reviewer",
+        kind="review",
+        cost=Cost(tokens=5_000),
+        expected_gain=0.01,
+    ),
+)
+```
+
+Even when the policy recommendation is deny, Shadow Mode executes the callable, records the non-blocking override, and accounts for actual usage.
+
+## Record verified outcomes and action-level learning
+
+```python
+from marginal import Action, Outcome
+
+# Task outcome: evidence about the trajectory as a whole.
+treasury.record_outcome(
+    Outcome(
+        task_id="task-042",
+        reward=1.0,
+        resolved=True,
+        verifier="pytest",
+        evidence={"suite": "tests/test_payment.py"},
+    )
+)
+
+# Action-level realized gain: supplied only when the application can justify it.
+treasury.observe_value(
+    Action(name="run targeted test", kind="verification"),
+    realized_gain=0.18,
+)
+```
+
+Task outcomes and action-level realized gain are deliberately separate. A passing task alone does not establish the causal value of every action in its trajectory.
+
+## Universal runtime for engine adapters
+
+```python
+from marginal import AgentAction, AgentCapabilities, Cost, UniversalRuntime
+
+runtime = UniversalRuntime(
+    treasury,
+    engine="opencode",
+    session_id="session-1",
+    task_id="task-42",
+    capabilities=AgentCapabilities(
+        observe_model_usage=True,
+        block_actions=True,
+        record_outcomes=True,
+    ),
+)
+
+decision = runtime.before_action(
+    AgentAction(
+        action_id="read-1",
+        name="read complete repository",
+        kind="file_read",
+        estimated_cost=Cost(tokens=8_000),
+        expected_gain=0.03,
+        state_hash="workspace-sha",
+        phase="diagnose",
+        deduplication_scope="once_per_state",
+    )
+)
+
+# The adapter applies the decision, executes when allowed, then settles actual usage.
+runtime.after_action("read-1", actual_cost=Cost(tokens=6_400))
+```
+
+`UniversalRuntime` in `enforce` mode requires an adapter that declares `block_actions=True`; MARGINAL refuses to advertise enforcement through an observe-only integration.
+
+Protocol v1 defines `allow`, `deny`, `modify`, `defer`, `reuse`, `stop`, and `force_verify` directives so adapters can negotiate future control surfaces consistently. The v0.2 reference runtime currently derives `allow` and `deny` from the core decision; richer directives remain adapter and policy extension points and are not claimed as automatic behavior.
+
+## Measured token breakdown
+
+```python
+from marginal import extract_common_token_usage
+
+usage = extract_common_token_usage(response)
+print(usage.input_tokens)
+print(usage.cached_input_tokens)
+print(usage.output_tokens)
+print(usage.reasoning_tokens)
+print(usage.total_tokens)
+```
+
+The normalized fields are additive: `input_tokens` means uncached input, while cached input is reported separately.
+
+## Failed calls that still consumed resources
+
+Some provider calls fail after compute was consumed. Supply a failure usage extractor to keep accounting truthful while preserving the original exception:
+
+```python
+result = budgeted_call(
+    treasury,
+    client.responses.create,
+    action=action,
+    failure_usage_extractor=lambda error, estimate: measured_or_best_known_cost(error),
+    **request,
+)
+```
+
+Returning `None` means no external spend was observed and releases the reservation. Returning `Cost` settles the failed action.
+
+## Policy replay
+
+```bash
+marginal ledger-validate marginal-ledger.jsonl
+marginal ledger-report marginal-ledger.jsonl
+marginal replay marginal-ledger.jsonl --profile balanced
+marginal ledger-export marginal-ledger.jsonl safe-export.jsonl \
+  --privacy-profile safe_telemetry --privacy-key-file .marginal/export.key
+marginal ledger-export marginal-ledger.jsonl aggregate.jsonl \
+  --privacy-profile aggregate_export --minimum-group-size 5
+```
+
+Replay re-evaluates recorded proposed actions under another policy. It is an off-policy diagnostic based on recorded actions and costs. It is **not causal proof**, does not simulate missing trajectories, and does not establish preserved task quality.
+
+## Execution modes
+
+| Mode | Applied behavior | Intended use |
+|---|---|---|
+| `shadow` | Execute every proposed action; record recommendation | Safe data collection and calibration |
+| `recommend` | Execute every proposed action; surface recommendation | Human/agent advisory integrations |
+| `enforce` | Apply allow/deny and hard-budget decisions | Validated production control |
+
+`fund_best` remains an active selection API in every mode because MARGINAL is explicitly being asked to choose among candidates.
+
+## Reference policy profiles
+
+```python
+from marginal import build_policy
+
+quality_first = build_policy("quality-first")
+balanced = build_policy("balanced")
+token_saver = build_policy("token-saver")
+strict_budget = build_policy("strict-budget")
+```
+
+These are transparent reference defaults, not universally calibrated guarantees. Production policies should be validated against representative tasks and verifiers.
 
 ## Decision model
 
-The default policy converts all configured dimensions into a common USD-denominated value:
+The reference policy converts configured dimensions into a common USD-denominated value:
 
 ```text
 expected value = capped expected success gain × outcome value
@@ -224,101 +399,35 @@ marginal score = expected value − cost value
 ROI            = expected value ÷ cost value
 ```
 
-An action is approved only when:
+A recommended action must remain affordable, preserve verification reserves, avoid an exact duplicate under the chosen fingerprint scope, remain below the success target, and clear expected-gain and ROI thresholds.
 
-1. child and parent hard budgets remain valid;
-2. pending reservations leave enough budget;
-3. the verification reserve remains protected;
-4. the action is not a pending or completed duplicate;
-5. the target success probability has not been reached;
-6. expected gain and ROI clear configured thresholds.
-
-`Cost.usd` is direct estimated or measured spend. Shadow prices are optional opportunity
-costs used by the policy; they do not silently alter the hard USD ledger.
-
-## Reliable settlement
-
-Authorization and settlement are separate:
+## Reliable accounting
 
 ```text
 propose → evaluate → reserve → execute → settle actual cost
-                              ↘ abort and release on failure
+                              ↘ abort when no spend occurred
+                              ↘ settle failure when spend occurred
 ```
 
-If actual usage exceeds the reserved estimate, MARGINAL records the real spend first and
-then raises `BudgetOverrun`. Accounting therefore remains truthful even when a provider or
-tool costs more than predicted.
+If actual usage exceeds the reservation, MARGINAL records the real spend first. Enforce mode then raises `BudgetOverrun`. Shadow and recommend modes record the observed overrun without changing caller behavior.
 
-Authorization tracing is transactional: if the trace sink fails, the reservation and counters
-are rolled back. During execution failure, the original callable exception remains primary even
-if abort tracing also fails. A settlement trace failure cannot undo external spend, so committed
-usage remains recorded and the trace error is surfaced.
+If a failure usage extractor itself fails, MARGINAL conservatively settles the reserved estimate, releases the reservation, and keeps the original execution exception primary. A measured failed action is not marked as a completed duplicate, so a legitimate retry remains possible.
 
-## Duplicate protection
+## Duplicate protection and state-aware retries
 
-For `budgeted_call` and `async_budgeted_call`, the fingerprint includes:
+Guarded call fingerprints include the action, callable identity, arguments, and keyword arguments. Universal-agent actions additionally support:
 
-- the declared action;
-- the callable identity;
-- positional arguments;
-- keyword arguments.
+- `exact`;
+- `once_per_state`;
+- `once_per_phase`;
+- `allow_retry`.
 
-Only the SHA-256 digest is stored in normal traces. Inputs must be composed of supported,
-deterministically serializable values, or the caller can provide an explicit
-`Action.fingerprint`.
-
-## Synthetic benchmark
-
-The repository ships a deterministic functional benchmark. It is intentionally synthetic
-and is **not a production performance claim**.
-
-| Metric | Baseline | MARGINAL | Savings |
-|---|---:|---:|---:|
-| Tokens | 97,500 | 42,500 | **56.41%** |
-| Calls | 25 | 15 | **40.00%** |
-| Simulated USD | $1.1500 | $0.4500 | **60.87%** |
-| Simulated latency | 17,750 ms | 7,750 ms | **56.34%** |
-| Verified success | 100% | 100% | preserved |
-
-Run it locally:
-
-```bash
-marginal demo
-```
-
-See [benchmarks.md](benchmarks.md) and [docs/benchmarking.md](docs/benchmarking.md) for the
-methodology and limitations.
-
-## How MARGINAL differs
-
-| Category | Primary question | MARGINAL relationship |
-|---|---|---|
-| Hard budget / circuit breaker | Can this session spend more? | Complementary; MARGINAL also prices expected value |
-| Model router | Which model should answer? | A router can be one candidate action |
-| Prompt compressor | Can the same call use fewer tokens? | Complementary; MARGINAL may eliminate the call |
-| Workflow optimizer | Can a fixed workflow be simplified? | MARGINAL makes online decisions at runtime |
-| Observability | What was spent? | MARGINAL decides before spending and records settlement |
-
-## Core primitives
-
-| Primitive | Responsibility |
-|---|---|
-| `Action` | Declares proposed work, estimated cost, expected gain, and metadata |
-| `Cost` | Normalizes tokens, direct USD, latency, and risk |
-| `BudgetLimits` | Defines hard limits and protected verification reserves |
-| `MarginalPolicy` | Produces deterministic, explainable decisions |
-| `Treasury` | Ranks, reserves, settles, aborts, traces, and creates child budgets |
-| `fund_best` | Selects and reserves the highest-value candidate |
-| `budgeted_call` | Authorizes, executes, and settles a synchronous callable |
-| `funded_call` | Executes and settles the action reserved by `fund_best` |
-| `async_budgeted_call` | Guards an asynchronous callable |
-| `async_funded_call` | Executes an asynchronous funded allocation |
-| `JsonlTraceSink` | Produces append-only provider-neutral evidence |
+This lets an adapter distinguish an accidental repeated read from a legitimate test rerun after the workspace changes. Shadow Mode can observe concurrent semantic duplicates without blocking them while still reserving and settling each execution separately.
 
 ## Hierarchical agent budgets
 
 ```python
-root = Treasury(BudgetLimits(max_tokens=200_000, max_usd=5.0))
+root = Treasury(BudgetLimits(max_tokens=200_000, max_usd=5.0), mode="shadow")
 research = root.child("research", BudgetLimits(max_tokens=40_000, max_usd=1.0))
 verification = root.child(
     "verification",
@@ -326,91 +435,126 @@ verification = root.child(
 )
 ```
 
-A child authorization reserves capacity from the child and every parent treasury under one
-shared lock. A child settlement charges every level, preventing fan-out oversubscription.
+A child authorization reserves capacity from every ancestor under one shared lock. Settlement charges every level, preventing parallel sub-agents from oversubscribing a parent budget.
 
 ## Trace and inspect decisions
 
-```python
-from marginal import JsonlTraceSink
-
-trace = JsonlTraceSink("marginal-trace.jsonl")
-treasury = Treasury(BudgetLimits(max_tokens=50_000), trace_sink=trace)
-```
+`JsonlTraceSink` preserves the v0.1 trace format. `JsonlDecisionLedger` is the strict v0.2 evidence format with schema, identity, sequencing, and correlation fields.
 
 ```bash
 marginal validate marginal-trace.jsonl
 marginal report marginal-trace.jsonl
-marginal report marginal-trace.jsonl --json
+marginal ledger-validate marginal-ledger.jsonl
+marginal ledger-report marginal-ledger.jsonl
+marginal ledger-export marginal-ledger.jsonl aggregate.jsonl \
+  --privacy-profile aggregate_export --minimum-group-size 5
 ```
 
-Trace events include candidate rankings, authorization decisions, reservations, commits,
-aborts, actual usage, and overrun reasons. Prompts and model outputs are not recorded unless
-an application explicitly places them in action metadata.
+`LOCAL_FULL` is the backward-compatible ledger default. Use `SAFE_TELEMETRY` for strict
+local telemetry and `AGGREGATE_EXPORT` for grouped sharing. Aggregate groups smaller than five
+records are suppressed by default, and export destinations are never overwritten automatically.
+
+A `CompositeTraceSink` can fan events to multiple sinks in order, but writes across different sinks are not an atomic distributed transaction. Use one authoritative ledger when atomic evidence is required.
+
+## Killer Demo
+
+The bundled deterministic demo still demonstrates the allocation mechanism:
+
+```bash
+marginal killer-demo --output killer-demo-output
+```
+
+It uses declared action-cost estimates and a deterministic verifier. It is not provider telemetry, a production benchmark, or a universal savings claim.
+
+[Open the committed demo report →](demos/killer-demo/RESULTS.md)
+
+## Synthetic benchmark
+
+The bundled deterministic benchmark exercises policy, reservation, accounting, and reproducibility:
+
+```bash
+marginal demo
+```
+
+Its declared token, USD, and latency values are synthetic. The result tests mechanics and must not be presented as provider-measured savings.
+
+## Public benchmarking
+
+Real evaluations should compare the same model, task, tools, limits, and verifier with and without MARGINAL. The comparator accepts an explicit confidence level and preregistered quality margin:
+
+```bash
+marginal public-eval baseline.jsonl marginal.jsonl \
+  --confidence-level 0.95 --quality-margin-pp 1.0
+```
+
+Report:
+
+- resolved rate and confidence intervals;
+- input, cached input, output, reasoning, and total tokens where available;
+- direct cost, latency, tool calls, and sub-agent calls;
+- cost per verified successful task;
+- regressions and recoveries;
+- policy and estimator identities;
+- raw paired evidence without dropped failures.
+
+Savings without preserved quality are not optimization.
+
+See [`docs/public-benchmarks.md`](docs/public-benchmarks.md) and [`docs/benchmarking.md`](docs/benchmarking.md).
+
+## How MARGINAL differs
+
+| Category | Primary question | MARGINAL relationship |
+|---|---|---|
+| Hard budget / circuit breaker | Can this session spend more? | Complementary; MARGINAL also evaluates expected value |
+| Model router | Which model should answer? | A model choice can be represented as a candidate action |
+| Prompt compressor | Can this call use fewer tokens? | Complementary; MARGINAL may avoid the entire action |
+| Workflow optimizer | Can a fixed flow be simplified? | MARGINAL makes state-aware online decisions |
+| Observability | What was spent? | MARGINAL decides before spending and settles afterward |
+| Decision Ledger | Why did policy behavior change? | Records versioned recommendation, application, cost, and outcome evidence |
+
+## Core primitives
+
+| Primitive | Responsibility |
+|---|---|
+| `Action`, `Cost`, `TokenUsage` | Describe proposed work and estimated or measured resources |
+| `Decision`, `Allocation` | Expose applied behavior, recommendation, reason, score, and funded candidate |
+| `BudgetLimits`, `BudgetLedger` | Enforce hard limits, reservations, and verification reserves |
+| `MarginalPolicy`, `ValueEstimator` | Score expected marginal value with versioned identities |
+| `Treasury` | Coordinate ranking, authorization, settlement, hierarchy, evidence, and outcomes |
+| `JsonlDecisionLedger` | Persist strict, append-only learning-loop evidence with an explicit privacy profile |
+| `PrivacyProfile`, `export_decision_ledger` | Pseudonymize safe telemetry or create grouped aggregate exports |
+| `AgentAction`, `AgentDecision`, `AgentEvent` | Normalize engine-adapter communication |
+| `UniversalRuntime` | Correlate one engine session with transactional core operations |
+| `replay_ledger` | Compare policy recommendations over recorded actions without causal claims |
 
 ## Architecture
 
 ```text
-Agent / workflow / SDK call
-            │
-            ▼
-      Candidate actions
-            │
-            ▼
-┌────────────────────────────────┐
-│ MARGINAL Treasury              │
-│ ├─ hard child + parent budgets │
-│ ├─ pending reservations        │
-│ ├─ verification reserve        │
-│ ├─ duplicate detection         │
-│ ├─ marginal-value ranking      │
-│ └─ target-success stopping     │
-└────────────────────────────────┘
-       │ funded      │ denied
-       ▼             └── no execution
- Execute callable
-       │ success / failure
-       ▼
- Settle actual cost or release reservation
-       │
-       └──► append-only JSONL trace
+AI development agent
+        │ native hook/event
+        ▼
+thin engine adapter
+        │ universal protocol
+        ▼
+UniversalRuntime → Treasury → policy → versioned estimator
+        │              │
+        │              ├─ reserve / settle / abort / failure settlement
+        │              └─ Decision Ledger → privacy profile → outcome / replay / export
+        ▼
+allow / deny today; richer negotiated directives through protocol extensions
 ```
 
-See [docs/architecture.md](docs/architecture.md).
-
-## Research lineage
-
-MARGINAL is an independent open-source reference implementation inspired by the research
-direction described in Siqi Zhu’s position paper,
-[“Agentic AI Systems Should Be Designed as Marginal Token Allocators”](https://arxiv.org/abs/2605.01214).
-The paper proposes the economic framing; this repository focuses on a small, immediately
-usable runtime contract, accounting model, trace format, tests, and integrations.
-
-Related systems such as [AgentBudget](https://agentbudget.dev/) focus on hard session cost
-enforcement. MARGINAL is designed to complement them by deciding whether an affordable
-next action has sufficient expected value.
-
-See [docs/research.md](docs/research.md) and [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md).
+See [`docs/architecture.md`](docs/architecture.md).
 
 ## Project status
 
-MARGINAL `v0.1.0` is a reference implementation of **agent compute capital allocation**.
-It provides deterministic online ranking, authorization, reservation, settlement, and
-accounting. It does not claim causal value estimates, automatic counterfactual replay, or
-guaranteed savings on arbitrary workloads.
+MARGINAL `v0.2.0` is the **Learning Loop Foundation**. It provides a universal protocol, local runtime, non-blocking shadow evaluation, schema-versioned evidence, explicit privacy profiles, outcome recording, contextual historical estimates, failure settlement, and off-policy replay.
 
-The next validation milestone is a public benchmark across real agent frameworks and task
-sets, measuring cost per verified outcome rather than cost alone.
+It does not yet claim complete vendor-specific adapters, causal marginal-value estimation, automatic regret minimization, or guaranteed savings on arbitrary workloads. The next validation milestone is a real paired Codex integration using measured telemetry and a predefined quality non-inferiority criterion.
 
 ## Roadmap
 
-MARGINAL `v0.1.0` established the dependency-free reference allocator. Development is now
-focused on **v0.2 — Universal Agent Foundation**: one shared protocol and local runtime for
-Codex, Claude Code, GitHub Copilot, OpenCode, and future compatible development agents.
-
-The next measured milestone is a paired Codex evaluation comparing the same model, tasks,
-tools, limits, and verifier with and without MARGINAL, using real token telemetry and
-quality-preservation criteria.
+The project remains one product and one repository. Future Codex, OpenCode, Claude Code, GitHub Copilot, and other integrations will be thin adapters over the same protocol and core.
 
 [View the full product roadmap →](ROADMAP.md)
 
@@ -420,31 +564,30 @@ quality-preservation criteria.
 - [Concepts](docs/concepts.md)
 - [Architecture](docs/architecture.md)
 - [API reference](docs/api.md)
+- [Learning loop](docs/learning-loop.md)
+- [Universal runtime](docs/universal-runtime.md)
+- [Privacy profiles](docs/privacy.md)
 - [Integrations](docs/integrations.md)
-- [Killer demo](demos/killer-demo/RESULTS.md)
 - [Benchmarking](docs/benchmarking.md)
+- [Public benchmark protocol](docs/public-benchmarks.md)
 - [Research and prior art](docs/research.md)
 - [FAQ](docs/faq.md)
 - [Governance](docs/governance.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)
 
+## Research lineage
+
+MARGINAL is an independent open-source reference implementation inspired by the research direction described in Siqi Zhu’s position paper, “Agentic AI Systems Should Be Designed as Marginal Token Allocators.” The paper proposes an economic framing; this repository focuses on a usable runtime contract, accounting, evidence, tests, integrations, and honest validation.
+
 ## Contributing
 
-MARGINAL is deliberately small at the core and open at the edges. Contributions are
-welcome for adapters, estimators, benchmark scenarios, documentation, and independent
-validation. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+Contributions are welcome for adapters, estimator implementations, benchmark scenarios, schemas, documentation, and independent validation. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request.
 
 ## Citation
 
-Academic and technical work can cite the repository using [CITATION.cff](CITATION.cff).
+Research and technical work can cite the repository using [`CITATION.cff`](CITATION.cff).
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE).
-
----
-
-## Public benchmarks
-
-See [the public benchmark protocol](docs/public-benchmarks.md).
+Apache License 2.0. See [`LICENSE`](LICENSE).
