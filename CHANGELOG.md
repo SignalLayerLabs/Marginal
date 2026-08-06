@@ -19,7 +19,6 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
 - provider-neutral `Outcome` contract separated from action-level realized gain;
 - schema-versioned `JsonlDecisionLedger` with strict envelope validation, run/task/trajectory/engine/model correlation, task/outcome consistency checks, and monotonic sequencing;
 - `PrivacyProfile` with `local_full`, keyed `safe_telemetry`, and separate `aggregate_export` modes;
-- privacy-preserving aggregate export with a configurable minimum group size of five by default;
 - field classification for safe-by-default, pseudonymous, and potentially sensitive evidence;
 - HMAC-SHA-256 identifier pseudonymization, UTC-day timestamp generalization, strict free-text removal, and local 256-bit key management;
 - opaque random local identifier generation for runs, tasks, and other caller-defined namespaces;
@@ -34,6 +33,11 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
 - complete Learning Loop Foundation, universal-runtime, API, architecture, benchmarking, security, and roadmap documentation.
 
 ### Changed
+
+- redesigned the repository README as a concise, SEO-oriented technical landing page;
+- added a dependency-free, responsive, accessible GitHub Pages product website;
+- consolidated the product website, hero asset, and Killer Demo into one Pages deployment;
+- documented website ownership, deployment, accessibility, privacy, and evidence guardrails.
 
 - `Decision` is backward compatible but now carries recommendation, mode, reason-code, uncertainty, confidence, and estimator metadata;
 - `MarginalPolicy` now has a stable identity and supports both versioned and legacy custom estimators;

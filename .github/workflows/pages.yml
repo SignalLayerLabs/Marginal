@@ -1,0 +1,65 @@
+name: Deploy MARGINAL website
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "site/**"
+      - "assets/marginal-readme-hero.png"
+      - "demos/killer-demo/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Assemble website
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site/assets _site/demo
+          cp -R site/. _site/
+          cp assets/marginal-readme-hero.png _site/assets/marginal-readme-hero.png
+          cp -R demos/killer-demo/. _site/demo/
+          touch _site/.nojekyll
+      - name: Verify generated website
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f _site/index.html
+          test -f _site/styles.css
+          test -f _site/app.js
+          test -f _site/robots.txt
+          test -f _site/sitemap.xml
+          test -f _site/assets/marginal-readme-hero.png
+          test -f _site/demo/RESULTS.md
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
