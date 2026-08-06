@@ -78,3 +78,21 @@ def test_committed_killer_demo_artifacts_are_current(tmp_path: Path) -> None:
 
     for name in ("result.json", "RESULTS.md", "index.html", "comparison.svg", "trace.jsonl"):
         assert (committed / name).read_bytes() == (tmp_path / name).read_bytes()
+
+
+def test_killer_demo_html_uses_premium_results_layout() -> None:
+    result = run_killer_demo()
+    rendered = render_killer_demo_html(result)
+
+    assert 'class="browser-shell"' in rendered
+    assert 'aria-label="Killer Demo navigation"' in rendered
+    assert "Same verified outcome. Far fewer tokens, lower cost, lower latency." in rendered
+    assert "Token reduction" in rendered
+    assert "Allocation decisions" in rendered
+    assert "What this demo proves" in rendered
+    assert "Build agents that spend compute deliberately." in rendered
+    assert "marginal-project-mark.png" in rendered
+    assert "72,800" in rendered
+    assert "4,300" in rendered
+    assert "$0.763" in rendered
+    assert "$0.026" in rendered

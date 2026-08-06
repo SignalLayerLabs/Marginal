@@ -64,24 +64,3 @@ def test_demo_matches_committed_benchmark(capsys) -> None:
 
     assert exit_code == 0
     assert capsys.readouterr().out == render_markdown(run_benchmark())
-
-
-def test_killer_demo_command_writes_artifacts(tmp_path, capsys) -> None:
-    exit_code = main(["killer-demo", "--output", str(tmp_path)])
-
-    output = capsys.readouterr().out
-    assert exit_code == 0
-    assert "MARGINAL Killer Demo" in output
-    assert "Verified outcome: preserved" in output
-    assert (tmp_path / "RESULTS.md").exists()
-    assert (tmp_path / "index.html").exists()
-    assert (tmp_path / "comparison.svg").exists()
-
-
-def test_public_eval_cli(tmp_path, capsys):
-    baseline = tmp_path / "baseline.jsonl"
-    marginal = tmp_path / "marginal.jsonl"
-    baseline.write_text('{"instance_id":"task","resolved":true,"tokens":100}\n')
-    marginal.write_text('{"instance_id":"task","resolved":true,"tokens":50}\n')
-    assert main(["public-eval", str(baseline), str(marginal), "--bootstrap-samples", "20"]) == 0
-    assert "50.00% fewer" in capsys.readouterr().out

@@ -10,20 +10,26 @@ body:
     id: version
     attributes:
       label: MARGINAL version
-      placeholder: "0.1.0"
+      placeholder: "0.2.0"
     validations:
       required: true
   - type: input
     id: python
     attributes:
       label: Python version and platform
+      placeholder: "Python 3.13 on Windows 11"
     validations:
       required: true
+  - type: input
+    id: mode
+    attributes:
+      label: Execution mode and policy/estimator identity
+      placeholder: "shadow; profile:quality-first@2.0.0; historical-mean@2.0.0"
   - type: textarea
     id: behavior
     attributes:
       label: What happened?
-      description: Include the decision reason and smallest reproducible example.
+      description: Include reason codes and the smallest reproducible example.
     validations:
       required: true
   - type: textarea
@@ -35,5 +41,5 @@ body:
   - type: textarea
     id: trace
     attributes:
-      label: Redacted trace or logs
+      label: Redacted trace or Decision Ledger records
       description: Remove prompts, credentials, personal data, and proprietary content.

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SignalLayerLabs/Marginal/schemas/agent-decision-v1.json",
+  "title": "MARGINAL Agent Decision v1",
+  "type": "object",
+  "required": [
+    "action_id",
+    "allowed",
+    "recommended",
+    "reason",
+    "reason_code",
+    "recommendation_reason",
+    "recommendation_reason_code",
+    "mode",
+    "directive",
+    "recommended_directive",
+    "replacement",
+    "score",
+    "expected_gain",
+    "estimated_cost_value",
+    "uncertainty",
+    "confidence"
+  ],
+  "properties": {
+    "action_id": {"type": "string", "minLength": 1},
+    "allowed": {"type": "boolean"},
+    "recommended": {"type": "boolean"},
+    "reason": {"type": "string", "minLength": 1},
+    "reason_code": {"type": "string", "minLength": 1},
+    "recommendation_reason": {"type": "string", "minLength": 1},
+    "recommendation_reason_code": {"type": "string", "minLength": 1},
+    "mode": {"enum": ["shadow", "recommend", "enforce"]},
+    "directive": {
+      "enum": ["allow", "deny", "modify", "defer", "reuse", "stop", "force_verify"]
+    },
+    "recommended_directive": {
+      "enum": ["allow", "deny", "modify", "defer", "reuse", "stop", "force_verify"]
+    },
+    "replacement": {"type": "object"},
+    "score": {"type": "number"},
+    "expected_gain": {"type": "number", "minimum": 0, "maximum": 1},
+    "estimated_cost_value": {"type": "number"},
+    "uncertainty": {"type": "number", "minimum": 0},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+  },
+  "additionalProperties": false
+}

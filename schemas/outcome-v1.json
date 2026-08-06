@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SignalLayerLabs/Marginal/schemas/outcome-v1.json",
+  "title": "MARGINAL Outcome v1",
+  "type": "object",
+  "required": ["task_id", "reward"],
+  "properties": {
+    "task_id": {"type": "string", "minLength": 1},
+    "reward": {"type": "number"},
+    "resolved": {"type": ["boolean", "null"]},
+    "verifier": {"type": "string"},
+    "trajectory_id": {"type": "string"},
+    "evidence": {"type": "object"},
+    "metrics": {"type": "object", "additionalProperties": {"type": "number"}}
+  },
+  "additionalProperties": false
+}

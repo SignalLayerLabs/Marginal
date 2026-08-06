@@ -1,55 +1,49 @@
-# Frequently asked questions
+# FAQ
 
-## Is MARGINAL a prompt compressor?
+## Does MARGINAL guarantee fewer tokens on every request?
 
-No. Prompt compressors reduce the size of a call. MARGINAL can decide not to make a
-low-value call at all. The two approaches can be combined.
+No. Some requests are already minimal, and some require additional verification. The target is lower avoidable compute per verified successful task across representative sessions.
 
-## Is MARGINAL a model router?
+## Does Shadow Mode save tokens?
 
-No. A router chooses a model. MARGINAL can evaluate multiple model calls as candidate
-actions and fund the best one.
+No action is blocked in Shadow Mode. It creates the evidence needed to estimate which future enforcement decisions may be safe.
 
-## Is this only a hard token budget?
+## Can Shadow Mode observe repeated concurrent actions?
 
-No. Hard budgets are enforced, but the policy also compares expected success gain with
-direct cost and configured shadow prices.
+Yes. Semantic duplicates are still recommended as duplicates, but non-blocking modes keep separate internal reservations so every execution is accounted without changing the agent's behavior.
 
-## Does MARGINAL estimate expected gain automatically?
+## Is replay proof that denied actions were unnecessary?
 
-The reference estimator supports explicit values, defaults, and transparent observed
-averages by action kind. Causal estimation and counterfactual replay are future validation
-work, not current claims.
+No. Replay only reclassifies recorded proposed actions. It does not simulate the trajectory that would follow a denial.
 
-## Does authorization consume budget?
+## Does MARGINAL learn automatically from every successful task?
 
-It creates a reservation. Committed usage remains unchanged until settlement, but other
-actions cannot spend the reserved capacity.
+It records outcomes, but it does not assign causal credit automatically. Applications must provide defensible action-level realized gain or later use a validated estimator.
 
-## What happens when a call fails?
+## How is estimator state versioned?
 
-The guarded sync and async wrappers abort and release the reservation, then re-raise the
-original exception.
+The estimator identity includes name, version, configuration hash, and training-data fingerprint. Online observations update the training-data fingerprint.
 
-## What happens when actual usage exceeds the estimate?
+## What happens if a failed-call usage extractor also fails?
 
-The actual spend is recorded and traced, then `BudgetOverrun` is raised. Future decisions
-see the real overrun.
+MARGINAL conservatively settles the reserved estimate, releases the reservation, and re-raises the original execution failure with the extraction error chained as its cause.
 
-## What happens when the trace sink fails?
+## Are Codex, Claude Code, Copilot, and OpenCode already supported?
 
-An authorization trace failure rolls back the new reservation and approval counter. If a
-guarded callable fails and abort tracing also fails, MARGINAL releases the reservation and
-re-raises the callable's original exception with the trace error chained as its cause. After
-external work succeeds, committed accounting is not rolled back if settlement tracing fails.
+Version `0.2.0` provides the shared protocol, schemas, and local runtime. Vendor-specific adapters remain roadmap milestones and are not claimed complete.
 
-## Does MARGINAL store prompts?
+## Does the protocol already generate modify, defer, reuse, stop, and force-verify actions?
 
-Not by default. Automatic call fingerprints hash inputs and traces store the digest. Action
-metadata is included in traces, so applications must not put secrets there.
+The protocol defines those directives so adapters share one contract. The v0.2 reference policy and runtime currently generate allow and deny. Richer automatic directives remain future policy and adapter work.
 
-## Is it thread-safe?
+## Does MARGINAL upload code or prompts?
 
-A root treasury and all its children share one re-entrant lock for authorization,
-reservation, settlement, and abort operations. Reservations are owner-bound, and the JSONL
-sink is thread-safe within one process.
+The core has no mandatory network service and does not upload data. Prompts and outputs are not added automatically, but task IDs, action names, model identity, metadata, verifier details, error text, and exact timestamps can still be sensitive. Use `SAFE_TELEMETRY` to remove free text and pseudonymize identifiers, or `AGGREGATE_EXPORT` for grouped sharing. `LOCAL_FULL` preserves caller content. Pseudonymization is not anonymization.
+
+## Where is the pseudonymization key stored?
+
+Supply `privacy_key_path` explicitly or let a strict ledger create a hidden owner-only key beside the ledger. Keep the key outside version control and do not share an operational key with the dataset it protects. Existing group-readable or world-readable key files are rejected on POSIX systems.
+
+## Is the Decision Ledger tamper-proof?
+
+No. It is append-only at the application level, not cryptographically immutable. Use external signing or immutable storage when tamper evidence is required.

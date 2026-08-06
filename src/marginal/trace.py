@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,8 +23,19 @@ class NullTraceSink:
         del event
 
 
+class CompositeTraceSink:
+    """Fan one event out to multiple sinks in deterministic order."""
+
+    def __init__(self, sinks: Sequence[TraceSink]) -> None:
+        self.sinks = tuple(sinks)
+
+    def emit(self, event: Mapping[str, Any]) -> None:
+        for sink in self.sinks:
+            sink.emit(event)
+
+
 class JsonlTraceSink:
-    """Write one self-contained JSON object per line."""
+    """Write one v0.1-compatible, self-contained JSON object per line."""
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -32,10 +43,7 @@ class JsonlTraceSink:
         self._lock = threading.Lock()
 
     def emit(self, event: Mapping[str, Any]) -> None:
-        record = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            **dict(event),
-        }
+        record = {"timestamp": datetime.now(timezone.utc).isoformat(), **dict(event)}
         encoded = json.dumps(record, sort_keys=True, ensure_ascii=False, default=repr)
         with self._lock, self.path.open("a", encoding="utf-8") as stream:
             stream.write(encoded + "\n")

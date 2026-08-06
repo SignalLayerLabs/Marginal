@@ -9,6 +9,47 @@ from types import MappingProxyType
 from typing import Any
 
 
+def _validate_non_negative_int(name: str, value: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"{name} must be an integer")
+    if value < 0:
+        raise ValueError(f"{name} must be non-negative")
+    return value
+
+
+@dataclass(frozen=True, slots=True)
+class TokenUsage:
+    """Measured token breakdown for one model or agent action.
+
+    ``total_tokens`` is calculated from the component fields when omitted. Cached input is
+    intentionally represented separately because providers may price it differently.
+    """
+
+    input_tokens: int = 0
+    cached_input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_tokens: int = 0
+    total_tokens: int | None = None
+
+    def __post_init__(self) -> None:
+        components = (
+            _validate_non_negative_int("input_tokens", self.input_tokens),
+            _validate_non_negative_int("cached_input_tokens", self.cached_input_tokens),
+            _validate_non_negative_int("output_tokens", self.output_tokens),
+            _validate_non_negative_int("reasoning_tokens", self.reasoning_tokens),
+        )
+        calculated = sum(components)
+        if self.total_tokens is None:
+            object.__setattr__(self, "total_tokens", calculated)
+            return
+        total = _validate_non_negative_int("total_tokens", self.total_tokens)
+        if total != calculated:
+            raise ValueError(
+                "total_tokens must equal input_tokens + cached_input_tokens + "
+                "output_tokens + reasoning_tokens"
+            )
+
+
 @dataclass(frozen=True, slots=True)
 class Cost:
     """Estimated or actual resource cost for one agent action."""
@@ -19,16 +60,14 @@ class Cost:
     risk: float = 0.0
 
     def __post_init__(self) -> None:
-        if isinstance(self.tokens, bool) or not isinstance(self.tokens, int):
-            raise TypeError("tokens must be an integer")
-        if isinstance(self.latency_ms, bool) or not isinstance(self.latency_ms, int):
-            raise TypeError("latency_ms must be an integer")
+        _validate_non_negative_int("tokens", self.tokens)
+        _validate_non_negative_int("latency_ms", self.latency_ms)
         for name, value in (("usd", self.usd), ("risk", self.risk)):
             if isinstance(value, bool) or not isinstance(value, (int, float)):
                 raise TypeError(f"{name} must be a number")
             if not math.isfinite(float(value)):
                 raise ValueError("cost values must be finite")
-        if self.tokens < 0 or self.latency_ms < 0 or self.usd < 0 or self.risk < 0:
+        if self.usd < 0 or self.risk < 0:
             raise ValueError("cost values must be non-negative")
         object.__setattr__(self, "usd", float(self.usd))
         object.__setattr__(self, "risk", float(self.risk))
@@ -103,13 +142,57 @@ class Action:
 
 @dataclass(frozen=True, slots=True)
 class Decision:
-    """An explainable authorization decision."""
+    """An explainable applied decision and its underlying recommendation.
+
+    ``allowed`` describes the behavior applied by the current execution mode.
+    ``recommended`` describes the policy recommendation before shadow/recommend overrides.
+    Existing v0.1 callers can continue to inspect only ``allowed`` and ``reason``.
+    """
 
     allowed: bool
     reason: str
     score: float = 0.0
     expected_gain: float = 0.0
     estimated_cost_value: float = 0.0
+    recommended: bool | None = None
+    recommendation_reason: str | None = None
+    reason_code: str = "UNSPECIFIED"
+    recommendation_reason_code: str | None = None
+    mode: str = "enforce"
+    uncertainty: float = 0.0
+    confidence: float = 0.0
+    estimator_name: str = ""
+    estimator_version: str = ""
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.allowed, bool):
+            raise TypeError("allowed must be a boolean")
+        if not isinstance(self.reason, str) or not self.reason.strip():
+            raise ValueError("reason must not be empty")
+        if self.recommended is None:
+            object.__setattr__(self, "recommended", self.allowed)
+        elif not isinstance(self.recommended, bool):
+            raise TypeError("recommended must be a boolean or None")
+        if not isinstance(self.reason_code, str) or not self.reason_code.strip():
+            raise ValueError("reason_code must not be empty")
+        for name, value in (
+            ("score", self.score),
+            ("expected_gain", self.expected_gain),
+            ("estimated_cost_value", self.estimated_cost_value),
+            ("uncertainty", self.uncertainty),
+            ("confidence", self.confidence),
+        ):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise TypeError(f"{name} must be a number")
+            if not math.isfinite(float(value)):
+                raise ValueError(f"{name} must be finite")
+            object.__setattr__(self, name, float(value))
+        if not 0.0 <= self.expected_gain <= 1.0:
+            raise ValueError("expected_gain must be between 0 and 1")
+        if self.uncertainty < 0:
+            raise ValueError("uncertainty must be non-negative")
+        if not 0.0 <= self.confidence <= 1.0:
+            raise ValueError("confidence must be between 0 and 1")
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SignalLayerLabs/Marginal/schemas/decision-ledger-v2.json",
+  "title": "MARGINAL Decision Ledger Record v2",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "event_id",
+    "sequence",
+    "timestamp",
+    "run_id",
+    "event"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "2.0"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "trajectory_id": {
+      "type": "string"
+    },
+    "engine": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "event": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mode": {
+      "type": "string"
+    },
+    "policy": {
+      "type": "object"
+    },
+    "estimator": {
+      "type": "object"
+    },
+    "action": {
+      "type": "object"
+    },
+    "decision": {
+      "type": "object"
+    },
+    "outcome": {
+      "type": "object"
+    },
+    "privacy_profile": {
+      "type": "string",
+      "enum": [
+        "local_full",
+        "safe_telemetry"
+      ],
+      "default": "local_full"
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,80 +1,69 @@
 # Concepts
 
-## Action
+## Action, Cost, and TokenUsage
 
-An `Action` is a proposed unit of work. It has a stable name and kind, an estimated `Cost`,
-an optional expected success gain, and caller-defined metadata.
+An `Action` is proposed work. `Cost` records total tokens, direct USD, latency, and application-defined risk. `TokenUsage` records additive uncached input, cached input, non-reasoning output, reasoning, and total tokens.
 
-## Cost
+The provider-neutral hard ledger continues to use `Cost.tokens`. The detailed token breakdown is evidence for analysis, pricing, and benchmarks.
 
-`Cost` normalizes four non-negative dimensions:
+## Applied decision versus recommendation
 
-- token count;
-- direct USD spend;
-- latency in milliseconds;
-- application-defined risk.
+`Decision.allowed` is what the execution mode applies. `Decision.recommended` is what the policy recommended before a non-blocking override.
 
-`PolicyConfig` converts them to a common value unit using optional shadow prices. Hard
-budgets always inspect the original dimensions directly.
+- Enforce: applied equals recommended.
+- Shadow: every proposed action is applied, but the recommendation is preserved.
+- Recommend: non-blocking behavior intended for visible advisory integrations.
 
-## Expected gain
+Stable reason codes support analytics without forcing integrations to parse human-readable strings.
 
-Expected gain is the estimated increase in the probability of a verified successful
-outcome. The policy caps it by the remaining distance to the configured success target, so
-an action cannot claim more probability improvement than remains possible.
+## Directives
 
-Applications may provide expected gain directly or use a `ValueEstimator`.
+The universal protocol represents adapter instructions as `AgentDirective` values: allow, deny, modify, defer, reuse, stop, and force-verify. Core v0.2 decisions currently produce allow or deny. Other directives are explicit extension points for adapters and future policies.
 
-## Shadow price
+## Capability negotiation
 
-A shadow price represents the opportunity cost of consuming a scarce resource. It is
-separate from direct provider billing:
+`AgentCapabilities` states what an adapter can observe or control. Capability level is derived rather than trusted from input. Enforce Mode requires real action-blocking capability; a prompt convention or advisory skill is not enforcement.
 
-- `Cost.usd` is direct spend;
-- `token_shadow_price_per_million_usd` prices scarce tokens;
-- `latency_shadow_price_per_second_usd` prices waiting time;
-- `risk_shadow_price_usd` prices the configured risk quantity.
+## Reservation and settlement
 
-## Treasury
+Authorization reserves estimated resources. Commit replaces the reservation with actual usage. Abort releases the reservation when no external spend occurred. Failure settlement records measured or conservatively estimated spend from a failed external action.
 
-A `Treasury` owns a policy, committed usage, pending reservations, duplicate state, and an
-optional parent treasury. One root treasury should normally represent one task or workflow.
-
-## Reservation
-
-Approval reserves estimated resources immediately but does not add them to committed usage.
-Reservations prevent parallel or sequential authorizations from promising the same budget
-twice. Each reservation records its owning treasury, so siblings cannot settle or abort one
-another's work. Reservations are converted to actual usage on `commit` or released on
-`abort`.
+A failed action is accounted but not marked as a successfully completed duplicate. Concurrent semantic duplicates in non-blocking modes receive separate internal reservation identities so Shadow Mode does not alter agent behavior.
 
 ## Verification reserve
 
-Agents often spend an entire budget generating an answer and leave nothing for validation.
-A verification reserve protects tokens or USD that only actions marked `is_verification`
-may consume. A reserve requires the corresponding `max_tokens` or `max_usd` hard limit.
-Verification already spent does not reduce the regular allocation unnecessarily.
+A verification reserve protects tokens or USD that only verification actions may consume. It prevents generation from exhausting the entire budget before tests or checks can run.
 
-## Allocation
+## Decision Ledger
 
-`fund_best` evaluates a set of candidates against the same state and reserves the affordable
-candidate with the highest marginal score. The returned `Allocation` contains the prepared
-action and its explainable decision. Use `funded_call` or `async_funded_call` to execute and
-settle it safely.
+The Decision Ledger is a schema-versioned JSONL evidence stream. It correlates actions, decisions, identities, costs, failures, observations, and outcomes. Avoiding prompt and output fields is not sufficient by itself because quasi-identifiers and free text can still reveal sensitive information.
 
-## Duplicate action
+Every new ledger declares `local_full` or `safe_telemetry`. `local_full` preserves the complete operational event. `safe_telemetry` uses a strict allowlist, removes potentially sensitive content, pseudonymizes identifiers with a local key, and generalizes exact timestamps. `aggregate_export` is a separate grouped export with no identifiers or timestamps and suppresses
+groups smaller than five records by default.
 
-Direct treasury actions are fingerprinted from their declared action fields. Guarded
-callables additionally include callable identity and arguments. MARGINAL performs exact,
-deterministic deduplication; it does not claim semantic-similarity detection.
+It is append-only at the application level, not cryptographically tamper-proof and not multi-process transactional. Pseudonymization is not anonymization.
 
-## Settlement and overrun
+## Outcome
 
-Settlement replaces a reservation with actual usage. If actual usage exceeds a limit, the
-spend is still recorded because execution has already occurred, then `BudgetOverrun` is
-raised. This preserves truthful accounting.
+An `Outcome` describes a verified task-level result. It does not automatically assign causal credit to preceding actions. Outcome task identity must match the runtime or ledger context when one is declared.
 
-## Decision
+## Value estimate and estimator state
 
-Every `Decision` contains `allowed`, `reason`, `score`, `expected_gain`, and the estimated
-cost value. Policies remain inspectable and auditable.
+`ValueEstimate` includes expected gain, uncertainty, confidence, sample size, provenance, and estimator identity. Explicit estimates remain supported. Historical estimates are observational.
+
+Contextual observations also update the action-kind fallback. Online observations update `training_data_fingerprint`, so otherwise identical estimator versions with different learned state can be distinguished.
+
+## Fingerprints and deduplication
+
+Core guarded calls use deterministic semantic fingerprints. Universal actions add state-aware scopes:
+
+- exact;
+- once per state;
+- once per phase;
+- retry-number aware.
+
+Protocol fingerprint metadata must be JSON serializable. Arbitrary object `repr` values are not accepted because they may be process-dependent.
+
+## Replay
+
+Replay asks what another policy would have recommended for recorded proposed actions. It does not know what unexecuted trajectories would have produced and is not causal proof.
