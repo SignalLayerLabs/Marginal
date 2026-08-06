@@ -1,0 +1,2 @@
+const button=document.querySelector(".nav-toggle");const links=document.querySelector(".nav-links");
+if(button&&links){button.addEventListener("click",()=>{const open=links.classList.toggle("open");button.setAttribute("aria-expanded",String(open))});links.addEventListener("click",event=>{if(event.target instanceof HTMLAnchorElement){links.classList.remove("open");button.setAttribute("aria-expanded","false")}})}
