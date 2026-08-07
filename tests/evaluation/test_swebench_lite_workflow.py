@@ -32,7 +32,7 @@ def test_readme_refuses_gold_as_marginal_evidence() -> None:
 def test_workflow_accepts_both_swebench_result_layouts() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
     assert "instance_results.jsonl" in text
-    assert '.*.${RUN_ID}.json' not in text  # guard against a broken literal glob
+    assert ".*.${RUN_ID}.json" not in text  # guard against a broken literal glob
     assert '"*.${RUN_ID}.json"' in text
 
 

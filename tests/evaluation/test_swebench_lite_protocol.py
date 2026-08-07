@@ -44,8 +44,7 @@ def _make_evidence(tmp_path: Path, ids: tuple[str, ...]) -> Path:
     }
     (run_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     predictions = [
-        {"instance_id": item, "model_name_or_path": "same-model", "model_patch": ""}
-        for item in ids
+        {"instance_id": item, "model_name_or_path": "same-model", "model_patch": ""} for item in ids
     ]
     metrics = [
         {
@@ -95,8 +94,7 @@ def test_validate_evidence_accepts_matched_canary(tmp_path: Path) -> None:
 def test_validate_evidence_rejects_mismatched_lane_ids(tmp_path: Path) -> None:
     run_dir = _make_evidence(tmp_path, CANARY_INSTANCE_IDS)
     rows = [
-        json.loads(line)
-        for line in (run_dir / "marginal_metrics.ndjson").read_text().splitlines()
+        json.loads(line) for line in (run_dir / "marginal_metrics.ndjson").read_text().splitlines()
     ]
     rows.pop()
     _write_jsonl(run_dir / "marginal_metrics.ndjson", rows)
@@ -111,8 +109,7 @@ def test_validate_evidence_rejects_mismatched_lane_ids(tmp_path: Path) -> None:
 def test_validate_evidence_rejects_baseline_governance_overhead(tmp_path: Path) -> None:
     run_dir = _make_evidence(tmp_path, CANARY_INSTANCE_IDS)
     rows = [
-        json.loads(line)
-        for line in (run_dir / "baseline_metrics.ndjson").read_text().splitlines()
+        json.loads(line) for line in (run_dir / "baseline_metrics.ndjson").read_text().splitlines()
     ]
     rows[0]["governance_tokens"] = 1
     _write_jsonl(run_dir / "baseline_metrics.ndjson", rows)
@@ -127,8 +124,7 @@ def test_validate_evidence_rejects_baseline_governance_overhead(tmp_path: Path) 
 def test_validate_evidence_rejects_resolved_in_telemetry(tmp_path: Path) -> None:
     run_dir = _make_evidence(tmp_path, CANARY_INSTANCE_IDS)
     rows = [
-        json.loads(line)
-        for line in (run_dir / "marginal_metrics.ndjson").read_text().splitlines()
+        json.loads(line) for line in (run_dir / "marginal_metrics.ndjson").read_text().splitlines()
     ]
     rows[0]["resolved"] = True
     _write_jsonl(run_dir / "marginal_metrics.ndjson", rows)
