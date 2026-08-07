@@ -82,7 +82,7 @@ def test_frozen_dev_partition_is_complete_and_hash_selected() -> None:
             key=lambda value: hashlib.sha256(value.encode("utf-8")).hexdigest(),
         )[:3]
     )
-    assert SMOKE_INSTANCE_IDS == expected_smoke
+    assert expected_smoke == SMOKE_INSTANCE_IDS
 
 
 def test_validate_evidence_accepts_matched_canary(tmp_path: Path) -> None:
