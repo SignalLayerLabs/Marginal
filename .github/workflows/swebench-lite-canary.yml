@@ -1,0 +1,172 @@
+name: SWE-bench Lite Canary
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_dir:
+        description: Repo-relative evidence directory
+        required: true
+        default: benchmarks/swebench_lite/evidence/canary-001
+        type: string
+      task_set:
+        description: Frozen task partition to verify
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - canary
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swebench-lite-canary-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify matched OFF vs ON
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+      RUN_DIR: ${{ inputs.run_dir }}
+      TASK_SET: ${{ inputs.task_set }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Validate Modal credentials are configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${MODAL_TOKEN_ID}" || { echo "MODAL_TOKEN_ID is not configured"; exit 2; }
+          test -n "${MODAL_TOKEN_SECRET}" || { echo "MODAL_TOKEN_SECRET is not configured"; exit 2; }
+
+      - name: Install benchmark-only dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+          python -m pip install modal "swebench[modal]"
+
+      - name: Validate evidence before Modal spend
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${RUN_DIR}" in
+            benchmarks/swebench_lite/evidence/*) ;;
+            *) echo "run_dir must be under benchmarks/swebench_lite/evidence/"; exit 2 ;;
+          esac
+          python benchmarks/swebench_lite/protocol.py validate \
+            --run-dir "${RUN_DIR}" \
+            --task-set "${TASK_SET}"
+
+      - name: Verify baseline patches on Modal
+        shell: bash
+        run: |
+          set -euo pipefail
+          IDS="$(python benchmarks/swebench_lite/protocol.py ids --task-set "${TASK_SET}")"
+          rm -rf evaluation_results
+          RUN_ID="marginal-${TASK_SET}-baseline-${GITHUB_RUN_ID}"
+          python -m swebench.harness.run_evaluation \
+            --dataset_name princeton-nlp/SWE-bench_Lite \
+            --split dev \
+            --predictions_path "${RUN_DIR}/baseline_predictions.ndjson" \
+            --instance_ids ${IDS} \
+            --run_id "${RUN_ID}" \
+            --parallelism 10 \
+            --modal true
+          RESULT="$(find evaluation_results -type f -name instance_results.jsonl -print -quit 2>/dev/null || true)"
+          if [ -n "${RESULT}" ]; then
+            cp "${RESULT}" "${RUN_DIR}/verifier_baseline.ndjson"
+          else
+            RESULT="$(find . -maxdepth 1 -type f -name "*.${RUN_ID}.json" -print -quit)"
+            test -n "${RESULT}" || { echo "SWE-bench did not produce a verifier report"; exit 3; }
+            cp "${RESULT}" "${RUN_DIR}/verifier_baseline.json"
+          fi
+
+      - name: Verify MARGINAL patches on Modal
+        shell: bash
+        run: |
+          set -euo pipefail
+          IDS="$(python benchmarks/swebench_lite/protocol.py ids --task-set "${TASK_SET}")"
+          rm -rf evaluation_results
+          RUN_ID="marginal-${TASK_SET}-on-${GITHUB_RUN_ID}"
+          python -m swebench.harness.run_evaluation \
+            --dataset_name princeton-nlp/SWE-bench_Lite \
+            --split dev \
+            --predictions_path "${RUN_DIR}/marginal_predictions.ndjson" \
+            --instance_ids ${IDS} \
+            --run_id "${RUN_ID}" \
+            --parallelism 10 \
+            --modal true
+          RESULT="$(find evaluation_results -type f -name instance_results.jsonl -print -quit 2>/dev/null || true)"
+          if [ -n "${RESULT}" ]; then
+            cp "${RESULT}" "${RUN_DIR}/verifier_marginal.ndjson"
+          else
+            RESULT="$(find . -maxdepth 1 -type f -name "*.${RUN_ID}.json" -print -quit)"
+            test -n "${RESULT}" || { echo "SWE-bench did not produce a verifier report"; exit 3; }
+            cp "${RESULT}" "${RUN_DIR}/verifier_marginal.json"
+          fi
+
+      - name: Merge verifier outcomes with measured telemetry
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASELINE_VERIFIER="${RUN_DIR}/verifier_baseline.ndjson"
+          [ -f "${BASELINE_VERIFIER}" ] || BASELINE_VERIFIER="${RUN_DIR}/verifier_baseline.json"
+          MARGINAL_VERIFIER="${RUN_DIR}/verifier_marginal.ndjson"
+          [ -f "${MARGINAL_VERIFIER}" ] || MARGINAL_VERIFIER="${RUN_DIR}/verifier_marginal.json"
+          python benchmarks/swebench_lite/merge_results.py \
+            --metrics "${RUN_DIR}/baseline_metrics.ndjson" \
+            --verifier "${BASELINE_VERIFIER}" \
+            --output "${RUN_DIR}/baseline_verified.ndjson"
+          python benchmarks/swebench_lite/merge_results.py \
+            --metrics "${RUN_DIR}/marginal_metrics.ndjson" \
+            --verifier "${MARGINAL_VERIFIER}" \
+            --output "${RUN_DIR}/marginal_verified.ndjson"
+
+      - name: Build MARGINAL public comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          marginal public-eval \
+            "${RUN_DIR}/baseline_verified.ndjson" \
+            "${RUN_DIR}/marginal_verified.ndjson" \
+            --confidence-level 0.95 \
+            --quality-margin-pp 1.0 \
+            > "${RUN_DIR}/PUBLIC_BENCHMARK.md"
+          marginal public-eval \
+            "${RUN_DIR}/baseline_verified.ndjson" \
+            "${RUN_DIR}/marginal_verified.ndjson" \
+            --confidence-level 0.95 \
+            --quality-margin-pp 1.0 \
+            --json \
+            > "${RUN_DIR}/public-benchmark.json"
+
+      - name: Add comparison to job summary
+        if: success()
+        shell: bash
+        run: cat "${RUN_DIR}/PUBLIC_BENCHMARK.md" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swebench-lite-${{ inputs.task_set }}-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            ${{ inputs.run_dir }}
+            evaluation_results
