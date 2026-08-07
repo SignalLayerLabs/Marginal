@@ -36,8 +36,8 @@ def test_killer_demo_is_real_and_committed() -> None:
 
 def test_release_workflow_matches_ci_scope() -> None:
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-    assert "ruff format --check src tests examples" in workflow
-    assert "ruff check src tests examples" in workflow
+    assert "ruff format --check ." in workflow
+    assert "ruff check ." in workflow
 
 
 def test_all_relative_markdown_links_resolve() -> None:
