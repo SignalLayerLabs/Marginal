@@ -47,7 +47,7 @@ operational key with an exported dataset. The default ignore rules exclude `*.pr
 Applications can still write sensitive data to `JsonlTraceSink`, `LOCAL_FULL` ledgers, custom
 files, logs outside MARGINAL, or downstream systems. `SAFE_TELEMETRY` is a strict allowlist at the
 Decision Ledger boundary; it does not sanitize arbitrary external logs. Review
-[`docs/privacy.md`](docs/privacy.md) before sharing evidence.
+[`docs/operations/privacy.md`](docs/operations/privacy.md) before sharing evidence.
 
 Protocol metadata used for automatic fingerprints must be deterministically JSON serializable.
 This rejects ambiguous custom-object representations, but it does not make the source metadata

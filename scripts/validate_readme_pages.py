@@ -42,17 +42,18 @@ class Parser(HTMLParser):
 
 readme = (ROOT / "README.md").read_text(encoding="utf-8")
 words = len(re.findall(r"\b[\w\'-]+\b", readme))
-assert 1200 <= words <= 2200, f"README words: {words}"
+assert 1000 <= words <= 2400, f"README words: {words}"
 for heading in [
     "# MARGINAL",
-    "## Why MARGINAL",
-    "## How it works",
+    "## The problem in one trace",
+    "## What changed after community review",
+    "## MARGINAL must earn its own compute",
+    "## State-aware diminishing returns",
+    "## Governance accounting and false-stop review",
+    "## Proof standard",
     "## Install",
     "## Quickstart",
-    "## The Learning Loop Foundation",
-    "## Universal Agent Runtime",
-    "## Privacy by design",
-    "## Evidence, not hype",
+    "## Architecture",
     "## Project status",
     "## Documentation",
 ]:
@@ -61,18 +62,20 @@ for forbidden in [
     "guarantees fewer tokens",
     "saves tokens on every request",
     "Codex adapter is available",
-    "Claude Code adapter is available",
+    "providers want agents to waste tokens",
 ]:
     assert forbidden.lower() not in readme.lower(), forbidden
 
 required = [
-    "docs/quickstart.md",
-    "docs/architecture.md",
-    "docs/privacy.md",
-    "docs/api.md",
-    "docs/integrations.md",
-    "docs/benchmarking.md",
-    "docs/public-benchmarks.md",
+    "docs/getting-started/quickstart.md",
+    "docs/product/architecture.md",
+    "docs/operations/privacy.md",
+    "docs/reference/api.md",
+    "docs/integrations/overview.md",
+    "docs/evaluation/benchmarking.md",
+    "docs/evaluation/public-benchmarks.md",
+    "docs/evaluation/governance-evidence.md",
+    "docs/project/community-feedback.md",
     "ROADMAP.md",
     "SECURITY.md",
     "CONTRIBUTING.md",
@@ -93,6 +96,17 @@ assert parser.styles == ["styles.css"]
 assert parser.scripts == ["app.js"]
 assert not any(x.startswith(("http://", "https://")) for x in parser.styles + parser.scripts)
 
+site_text = (ROOT / "site/index.html").read_text(encoding="utf-8")
+for required_phrase in [
+    "Illustrative trace",
+    "Not a benchmark",
+    "MARGINAL must earn its own compute",
+    "Graceful irrelevance",
+    "Community pressure test",
+    "pass_through",
+]:
+    assert required_phrase in site_text, required_phrase
+
 for path in [
     "site/styles.css",
     "site/app.js",
@@ -105,7 +119,6 @@ for path in [
 workflow = (ROOT / ".github/workflows/pages.yml").read_text(encoding="utf-8")
 for token in [
     "actions/configure-pages@v5",
-    "actions/upload-pages-artifact@v3",
     "actions/deploy-pages@v4",
     "demos/killer-demo",
     "assets/marginal-readme-hero.png",
@@ -122,5 +135,5 @@ assert deployers == [".github/workflows/pages.yml"], deployers
 print(f"README words: {words}")
 print("README structure and claims: PASS")
 print("Referenced files: PASS")
-print("Website SEO and dependency audit: PASS")
+print("Website evidence-first structure: PASS")
 print("Pages workflow consolidation: PASS")

@@ -8,6 +8,7 @@ import math
 from dataclasses import asdict, dataclass
 
 from .budget import BudgetLedger
+from .controls import DiminishingReturnDetector, DiminishingReturnSignal
 from .estimator import EstimatorIdentity, ValueEstimate, ValueEstimator
 from .models import Action, Decision
 
@@ -65,7 +66,12 @@ class PolicyConfig:
 
 
 class MarginalPolicy:
-    """Authorize actions only when expected marginal value justifies total cost."""
+    """Authorize actions only when expected marginal value justifies total cost.
+
+    State-aware diminishing-return control is opt-in. This preserves v0.2 behavior while
+    allowing engine adapters to enable repetition control first in Shadow/Recommend mode and
+    promote it to enforcement only after measured validation.
+    """
 
     def __init__(
         self,
@@ -74,9 +80,11 @@ class MarginalPolicy:
         *,
         name: str = "marginal-reference",
         version: str = "2.0.0",
+        diminishing_detector: DiminishingReturnDetector | None = None,
     ) -> None:
         self.config = config or PolicyConfig()
         self.estimator = estimator or ValueEstimator()
+        self.diminishing_detector = diminishing_detector
         if not isinstance(name, str):
             raise TypeError("name must be a string")
         if not name.strip():
@@ -96,8 +104,23 @@ class MarginalPolicy:
         self._executed_fingerprints: set[str] = set()
 
     def mark_executed(self, fingerprint: str) -> None:
+        """Backward-compatible exact duplicate accounting."""
+
         if fingerprint:
             self._executed_fingerprints.add(fingerprint)
+
+    def observe_execution(self, action: Action) -> None:
+        """Record one successfully executed action for exact and semantic repetition control."""
+
+        if action.fingerprint:
+            self.mark_executed(action.fingerprint)
+        if self.diminishing_detector is not None:
+            self.diminishing_detector.observe(action)
+
+    def diminishing_signal(self, action: Action) -> DiminishingReturnSignal | None:
+        if self.diminishing_detector is None:
+            return None
+        return self.diminishing_detector.evaluate(action)
 
     def evaluate(self, action: Action, ledger: BudgetLedger) -> Decision:
         if action.current_success_probability >= self.config.target_success_probability:
@@ -117,12 +140,21 @@ class MarginalPolicy:
                 "BUDGET_REJECTED",
             )
 
+        diminishing = self.diminishing_signal(action)
+        if diminishing is not None and diminishing.should_stop:
+            return self._decision(
+                False,
+                f"rejected: {diminishing.reason}",
+                diminishing.reason_code,
+            )
+
         estimate = self._estimate(action)
+        gain_multiplier = diminishing.gain_multiplier if diminishing is not None else 1.0
         remaining_probability = max(
             0.0,
             self.config.target_success_probability - action.current_success_probability,
         )
-        expected_gain = min(estimate.expected_gain, remaining_probability)
+        expected_gain = min(estimate.expected_gain * gain_multiplier, remaining_probability)
         if expected_gain < self.config.minimum_expected_gain:
             return self._decision(
                 False,

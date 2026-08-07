@@ -64,7 +64,7 @@ marginal ledger-export ledger.jsonl aggregate.jsonl --privacy-profile aggregate_
 `safe_telemetry` excludes free text and pseudonymizes identifiers. Use `local_full` only for a
 trusted operational ledger. Use `aggregate_export` when preparing grouped data for sharing; groups
 smaller than five records are suppressed by default.
-Pseudonymization is not anonymization; read [`privacy.md`](privacy.md) before export.
+Pseudonymization is not anonymization; read [`privacy.md`](../operations/privacy.md) before export.
 
 Move to `recommend` when recommendations are surfaced to a user or agent. Move to `enforce` only after representative validation shows acceptable quality.
 
@@ -72,4 +72,4 @@ Move to `recommend` when recommendations are surfaced to a user or agent. Move t
 
 Use `UniversalRuntime` when integrating a development agent. Enforce Mode requires an adapter that declares real action-blocking capability. The reference runtime currently maps core decisions to allow or deny; other protocol directives are extension points.
 
-See [`universal-runtime.md`](universal-runtime.md) and the executable examples in [`examples`](../examples).
+See [`universal-runtime.md`](../product/architecture.md) and the executable examples in [`examples`](../../examples).

@@ -9,7 +9,7 @@
     "VISUAL_STUDIO_COMMIT_PROMPT.md",
     "docs/superpowers/plans/2026-08-06-readme-pages.md",
     "docs/superpowers/specs/2026-08-06-readme-pages-design.md",
-    "docs/website.md",
+    "docs/operations/website.md",
     "scripts/validate_readme_pages.py",
     "site/404.html",
     "site/app.js",

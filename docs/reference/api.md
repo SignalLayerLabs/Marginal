@@ -126,7 +126,7 @@ Public privacy values and functions:
 
 `JsonlDecisionLedger` accepts `privacy_profile`, `privacy_key`, and `privacy_key_path`.
 `aggregate_export` is rejected as an operational profile and must use the export API. Export
-destinations are not overwritten. See [`privacy.md`](privacy.md) for field behavior and threat
+destinations are not overwritten. See [`privacy.md`](../operations/privacy.md) for field behavior and threat
 model.
 
 ## Universal protocol
@@ -178,7 +178,7 @@ for name in available_schemas():
     schema = load_schema(name)
 ```
 
-The public schema API reads immutable JSON resources bundled in the installed wheel. Names are restricted to known basenames; path traversal and unknown resources are rejected. The same source contracts remain available under [`schemas/`](../schemas/).
+The public schema API reads immutable JSON resources bundled in the installed wheel. Names are restricted to known basenames; path traversal and unknown resources are rejected. The same source contracts remain available under [`schemas/`](../../schemas/).
 
 Privacy-specific contracts include `safe-telemetry-v1.json`, which recursively rejects unreviewed fields from strict event-level exports, and `aggregate-export-v1.json`, which accepts only grouped generalized rows.
 

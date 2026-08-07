@@ -1,0 +1,48 @@
+{
+  "package": "MARGINAL community evidence hardening overlay",
+  "target_repository": "SignalLayerLabs/Marginal",
+  "target_branch": "main",
+  "prepared_against_commit": "d6ab5c745f1a2ec19b2cb2395a1e6bfae66f2de5",
+  "created": "2026-08-07",
+  "package_type": "repository-overlay",
+  "rules": [
+    "Apply to a clean checkout of the target repository.",
+    "Do not add this ZIP or the external Visual Studio prompt to Git.",
+    "Run scripts/reorganize_docs.py after overlay extraction.",
+    "Do not invent benchmark results or mark the Codex adapter as implemented.",
+    "Run all validation commands before committing."
+  ],
+  "moves": {
+    "docs/quickstart.md": "docs/getting-started/quickstart.md",
+    "docs/concepts.md": "docs/product/concepts.md",
+    "docs/architecture.md": "docs/product/architecture.md",
+    "docs/faq.md": "docs/product/faq.md",
+    "docs/api.md": "docs/reference/api.md",
+    "docs/integrations.md": "docs/integrations/overview.md",
+    "docs/benchmarking.md": "docs/evaluation/benchmarking.md",
+    "docs/public-benchmarks.md": "docs/evaluation/public-benchmarks.md",
+    "docs/research.md": "docs/evaluation/research.md",
+    "docs/privacy.md": "docs/operations/privacy.md",
+    "docs/website.md": "docs/operations/website.md",
+    "docs/governance.md": "docs/project/governance.md"
+  },
+  "new_core_modules": [
+    "src/marginal/controls/__init__.py",
+    "src/marginal/controls/diminishing.py",
+    "src/marginal/controls/governance.py"
+  ],
+  "replaced_core_files": [
+    "src/marginal/__init__.py",
+    "src/marginal/cli.py",
+    "src/marginal/policy.py",
+    "src/marginal/public_eval.py",
+    "src/marginal/treasury.py"
+  ],
+  "communication_files": [
+    "README.md",
+    "ROADMAP.md",
+    "CHANGELOG.md",
+    "site/index.html",
+    "site/styles.css"
+  ]
+}

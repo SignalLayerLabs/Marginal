@@ -2,6 +2,34 @@
 
 All notable changes to MARGINAL are documented here. The project follows Semantic Versioning.
 
+## [Unreleased]
+
+### Added
+
+- opt-in, provider-neutral `DiminishingReturnDetector` with same-state/evidence-aware gain decay;
+- `GovernanceTracker` for MARGINAL decision latency and external governance tokens, USD and latency;
+- explicit counterfactual stop review through `Treasury.record_stop_review(...)` without inferring action causality from task outcomes;
+- public-evaluation fields for repeated calls, governance overhead, reviewed stops and false stops;
+- gross-versus-net savings and intervention status including Graceful Irrelevance through `pass_through`;
+- governance evidence standard, Codex benchmark-readiness guide and Community Feedback Log;
+- structured documentation information architecture by user intent.
+
+### Changed
+
+- public benchmark efficiency counts governance overhead in effective tokens/USD while retaining agent-only metrics and backward-compatible rows;
+- `MarginalPolicy` can optionally discount or reject repeated semantic same-state work;
+- `Treasury` records policy-decision latency and exposes governance evidence in summaries/traces;
+- website and README now lead with a concrete illustrative trace and proof standard before architecture theory;
+- roadmap now treats governance tax, false-stop rate, matched OFF/ON evaluation and pass-through as first-class success criteria;
+- the 10-task Codex canary is explicitly classified as integration validation rather than public performance evidence.
+
+### Scientific limitations
+
+- diminishing-return thresholds are transparent heuristics until calibrated on representative engine telemetry;
+- false stops require external review/counterfactual labels and are not automatically causal estimates;
+- Graceful Irrelevance classifies the measured configuration, not the universal usefulness of MARGINAL;
+- vendor-specific Codex integration and measured public savings remain future v0.3 evidence.
+
 ## [0.2.0] - 2026-08-06
 
 ### Added
@@ -34,32 +62,27 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
 
 ### Changed
 
-- redesigned the repository README as a concise, SEO-oriented technical landing page;
+- redesigned the repository README as a concise technical landing page;
 - added a dependency-free, responsive, accessible GitHub Pages product website;
-- consolidated the product website, hero asset, and Killer Demo into one Pages deployment;
-- documented website ownership, deployment, accessibility, privacy, and evidence guardrails.
-
-- `Decision` is backward compatible but now carries recommendation, mode, reason-code, uncertainty, confidence, and estimator metadata;
-- `MarginalPolicy` now has a stable identity and supports both versioned and legacy custom estimators;
-- `Treasury.summary()` includes mode, policy, estimator, observed overruns, failed settlements, outcomes, and estimator observations;
-- child treasuries inherit the parent execution mode;
-- trace events include execution mode plus policy and estimator identity;
-- Decision Ledger records now declare their privacy profile; `local_full` remains backward compatible while strict profiles are opt-in;
-- actual failed-call spend can be accounted without replacing the original execution exception; extraction failures conservatively settle the reserved estimate and remain chained as secondary errors;
-- strict public-benchmark parsing rejects string-like booleans instead of silently coercing them;
-- project description and documentation now consistently describe MARGINAL as a learning-loop foundation rather than only a static wrapper.
+- consolidated product website, hero asset and Killer Demo into one Pages deployment;
+- `Decision` carries recommendation, mode, reason-code, uncertainty, confidence and estimator metadata;
+- `MarginalPolicy` has stable identity and supports versioned/legacy custom estimators;
+- `Treasury.summary()` includes mode, policy, estimator, observed overruns, failed settlements, outcomes and estimator observations;
+- child treasuries inherit parent execution mode;
+- traces include execution mode plus policy and estimator identity;
+- strict public-benchmark parsing rejects string-like booleans.
 
 ### Compatibility
 
-- existing v0.1 constructors, enforced execution, `JsonlTraceSink`, synchronous and asynchronous wrappers, demos, and CLI commands remain supported;
+- existing v0.1 constructors, enforced execution, `JsonlTraceSink`, synchronous/asynchronous wrappers, demos and CLI commands remain supported;
 - new dataclass fields have backward-compatible defaults;
-- the runtime core continues to have zero mandatory dependencies.
+- runtime core continues to have zero mandatory dependencies.
 
 ### Scientific limitations
 
 - historical estimates are observational and do not establish causal action value;
 - policy replay does not simulate unobserved trajectories or prove quality preservation;
-- vendor-specific Codex, Claude Code, GitHub Copilot, and OpenCode adapters remain future milestones;
+- vendor-specific Codex, Claude Code, GitHub Copilot and OpenCode adapters remain future milestones;
 - reference profiles are transparent defaults, not universal calibrations.
 
 ## [0.1.0] - 2026-08-04
@@ -68,12 +91,12 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
 
 - provider-neutral `Action`, `Cost`, `Decision`, and `Allocation` value objects;
 - deterministic candidate ranking, authorization, reservation, settlement, and abort;
-- hard budgets for tokens, direct USD, latency, and risk;
-- pending reservations and hierarchical parent/child accounting;
+- hard token, USD, latency and risk budgets;
+- pending reservations and hierarchical accounting;
 - protected verification reserves;
-- marginal-value policy with token, latency, and risk shadow prices;
-- exact action and callable-input fingerprinting;
-- synchronous and asynchronous guarded-call adapters;
+- marginal-value policy with token, latency and risk shadow prices;
+- exact action/callable-input fingerprinting;
+- synchronous/asynchronous guarded-call adapters;
 - append-only JSONL traces and CLI reporting;
-- synthetic benchmark, public comparison utility, and Killer Demo;
-- Python 3.10–3.13 CI, CodeQL, packaging, and community documentation.
+- synthetic benchmark, public comparison utility and Killer Demo;
+- Python 3.10–3.13 CI, CodeQL, packaging and community documentation.

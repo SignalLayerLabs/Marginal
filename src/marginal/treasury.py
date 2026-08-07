@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Iterable
+import time
+from collections.abc import Callable, Iterable
 from dataclasses import asdict, replace
 from typing import Any
 
 from .budget import BudgetLedger, BudgetLimits, BudgetOverrun, BudgetUsage
+from .controls import GovernanceTracker
 from .fingerprint import fingerprint_action
 from .models import Action, Allocation, Cost, Decision
 from .modes import ExecutionMode
@@ -21,7 +23,11 @@ class AuthorizationRequired(RuntimeError):
 
 
 class Treasury:
-    """Allocate and account for agent compute as a scarce resource."""
+    """Allocate and account for agent compute as a scarce resource.
+
+    Governance overhead is measured separately from agent workload cost. Parent/child
+    treasuries share one tracker so the reported governance tax covers the full treasury tree.
+    """
 
     def __init__(
         self,
@@ -32,6 +38,8 @@ class Treasury:
         name: str = "root",
         parent: Treasury | None = None,
         mode: ExecutionMode | str = ExecutionMode.ENFORCE,
+        governance_tracker: GovernanceTracker | None = None,
+        clock: Callable[[], int] | None = None,
     ) -> None:
         self.name = name
         self.ledger = BudgetLedger(limits)
@@ -45,6 +53,10 @@ class Treasury:
         self._pending_semantics: dict[str, list[str]] = (
             parent._pending_semantics if parent is not None else {}
         )
+        self._clock: Callable[[], int] = clock or time.perf_counter_ns
+        self.governance: GovernanceTracker = (
+            parent.governance if parent is not None else governance_tracker or GovernanceTracker()
+        )
         if parent is None:
             self._reservation_counter = 0
         self._approved_count = 0
@@ -55,6 +67,8 @@ class Treasury:
         self._failed_settled_count = 0
         self._outcome_count = 0
         self._observation_count = 0
+        self._recommended_denials: set[str] = set()
+        self._reviewed_denials: set[str] = set()
 
     @property
     def usage(self) -> BudgetUsage:
@@ -68,12 +82,12 @@ class Treasury:
         return self.authorize(action)
 
     def evaluate(self, action: Action) -> Decision:
-        """Evaluate an action without reserving resources or mutating counters."""
+        """Evaluate an action without reserving resources or mutating decision counters."""
 
         prepared = self._prepare(action)
         assert prepared.fingerprint is not None
         with self._lock:
-            return self._recommended_decision(prepared)
+            return self._timed_recommendation(prepared)
 
     def is_authorized(self, action: Action) -> bool:
         prepared = self._prepare(action)
@@ -95,7 +109,7 @@ class Treasury:
             for action in actions:
                 prepared = self._prepare(action)
                 assert prepared.fingerprint is not None
-                decision = self._recommended_decision(prepared)
+                decision = self._timed_recommendation(prepared)
                 evaluated.append(
                     {
                         "action": action_payload(prepared),
@@ -134,7 +148,9 @@ class Treasury:
         prepared = self._prepare(action)
         assert prepared.fingerprint is not None
         with self._lock:
-            recommended = self._recommended_decision(prepared)
+            recommended = self._timed_recommendation(prepared)
+            if not recommended.allowed:
+                self._recommended_denials.add(prepared.fingerprint)
             decision = self._apply_mode(recommended) if apply_mode else recommended
 
             reservation_action: Action | None = None
@@ -160,6 +176,7 @@ class Treasury:
                         "decision": decision_payload(decision),
                         "usage": usage_payload(self.usage),
                         "reserved": usage_payload(self.ledger.reserved_usage),
+                        "governance": self.governance.summary(),
                     }
                 )
             except Exception:
@@ -222,7 +239,11 @@ class Treasury:
                     violations.append(decision.reason)
 
             if not failed:
-                self.policy.mark_executed(prepared.fingerprint)
+                observe_execution = getattr(self.policy, "observe_execution", None)
+                if callable(observe_execution):
+                    observe_execution(prepared)
+                else:
+                    self.policy.mark_executed(prepared.fingerprint)
             self._unregister_pending(prepared.fingerprint, reservation_fingerprint)
             self._committed_count += 1
             if failed:
@@ -238,6 +259,7 @@ class Treasury:
                 "usage": usage_payload(self.usage),
                 "budget_overrun": bool(violations),
                 "violations": sorted(set(violations)),
+                "governance": self.governance.summary(),
             }
             if failed:
                 event["reason"] = failure_reason
@@ -268,6 +290,51 @@ class Treasury:
                     "action": action_payload(prepared),
                     "reason": reason,
                     "usage": usage_payload(self.usage),
+                }
+            )
+
+    def record_governance_overhead(
+        self,
+        *,
+        tokens: int = 0,
+        usd: float = 0.0,
+        latency_ms: float = 0.0,
+    ) -> None:
+        """Record overhead produced outside the local policy, such as an adapter-side model call."""
+
+        with self._lock:
+            self.governance.record_external_overhead(
+                tokens=tokens,
+                usd=usd,
+                latency_ms=latency_ms,
+            )
+
+    def record_stop_review(self, action: Action, *, would_have_helped: bool) -> None:
+        """Attach an explicit counterfactual label to a prior deny recommendation.
+
+        This method intentionally refuses to infer false stops from task success and rejects
+        duplicate labels for the same semantic action fingerprint.
+        """
+
+        prepared = self._prepare(action)
+        assert prepared.fingerprint is not None
+        with self._lock:
+            fingerprint = prepared.fingerprint
+            if fingerprint not in self._recommended_denials:
+                raise ValueError("action was not previously recommended for denial")
+            if fingerprint in self._reviewed_denials:
+                raise ValueError("deny recommendation has already been reviewed")
+            self.governance.record_stop_review(would_have_helped=would_have_helped)
+            self._reviewed_denials.add(fingerprint)
+            self.trace_sink.emit(
+                {
+                    **self._identity_payload(),
+                    "event": "counterfactual_review",
+                    "treasury": self.name,
+                    "action": action_payload(prepared),
+                    "would_have_helped": would_have_helped,
+                    "false_stop": would_have_helped,
+                    "governance": self.governance.summary(),
                 }
             )
 
@@ -337,7 +404,16 @@ class Treasury:
             "limits": asdict(self.limits),
             "policy": self.policy.identity.to_dict(),
             "estimator": self.policy.estimator_identity.to_dict(),
+            "governance": self.governance.summary(),
         }
+
+    def _timed_recommendation(self, prepared: Action) -> Decision:
+        started = self._clock()
+        try:
+            return self._recommended_decision(prepared)
+        finally:
+            latency_ms = (self._clock() - started) / 1_000_000
+            self.governance.record_decision(latency_ms=latency_ms)
 
     def _recommended_decision(self, prepared: Action) -> Decision:
         assert prepared.fingerprint is not None

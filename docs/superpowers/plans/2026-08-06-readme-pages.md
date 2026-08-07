@@ -13,5 +13,5 @@
 1. Replace `README.md`, preserving install, quickstart, evidence, privacy, roadmap, docs, contribution, citation, and license.
 2. Add `site/index.html`, styles, navigation script, robots, sitemap, and 404 page.
 3. Add one `.github/workflows/pages.yml` deployment that also publishes the Killer Demo.
-4. Add `docs/website.md` and update `CHANGELOG.md`.
+4. Add `docs/operations/website.md` and update `CHANGELOG.md`.
 5. Run `scripts/validate_readme_pages.py`, repository CI checks, local preview, and final diff review.
