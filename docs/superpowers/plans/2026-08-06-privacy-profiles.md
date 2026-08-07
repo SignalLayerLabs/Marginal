@@ -93,8 +93,8 @@ Tasks 1–5 have been implemented with test-first coverage. Task 6 is complete f
 
 **Files:**
 - Modify: `README.md`, `SECURITY.md`, `CHANGELOG.md`, `ROADMAP.md`
-- Modify: `docs/api.md`, `docs/concepts.md`, `docs/learning-loop.md`, `docs/universal-runtime.md`, `docs/architecture.md`, `docs/quickstart.md`, `docs/faq.md`, `docs/index.md`
-- Create: `docs/privacy.md`
+- Modify: `docs/reference/api.md`, `docs/product/concepts.md`, `docs/learning-loop.md`, `docs/universal-runtime.md`, `docs/product/architecture.md`, `docs/getting-started/quickstart.md`, `docs/product/faq.md`, `docs/index.md`
+- Create: `docs/operations/privacy.md`
 - Create: `examples/privacy_profiles.py`
 - Modify: repository consistency tests.
 

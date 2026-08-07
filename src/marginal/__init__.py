@@ -12,6 +12,12 @@ from .adapters import (
     funded_call,
 )
 from .budget import BudgetExceeded, BudgetLedger, BudgetLimits, BudgetOverrun, BudgetUsage
+from .controls import (
+    DiminishingReturnConfig,
+    DiminishingReturnDetector,
+    DiminishingReturnSignal,
+    GovernanceTracker,
+)
 from .estimator import EstimatorIdentity, ValueEstimate, ValueEstimator
 from .killer_demo import run_killer_demo
 from .ledger import (
@@ -82,10 +88,14 @@ __all__ = [
     "Decision",
     "DecisionLedgerContext",
     "DeduplicationScope",
+    "DiminishingReturnConfig",
+    "DiminishingReturnDetector",
+    "DiminishingReturnSignal",
     "EstimatorIdentity",
     "EstimatorRegistry",
     "ExecutionMode",
     "FailureUsageExtractor",
+    "GovernanceTracker",
     "JsonlDecisionLedger",
     "JsonlTraceSink",
     "LocalPseudonymizer",

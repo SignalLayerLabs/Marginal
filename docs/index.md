@@ -1,21 +1,45 @@
-# MARGINAL documentation
+# MARGINAL Documentation
 
-MARGINAL is a provider-neutral decision, accounting, and evidence layer for economically disciplined AI agents. Version `0.2.0` adds the Learning Loop Foundation: non-blocking Shadow Mode, a versioned Decision Ledger, explicit privacy profiles, strict shareable-telemetry schemas, outcome contracts, versioned estimators, replay, packaged protocol schemas, and a universal adapter runtime.
+MARGINAL documentation is organized by user intent instead of keeping every guide in one flat directory.
 
-Start with the [quickstart](quickstart.md), then read the [concepts](concepts.md), [learning loop](learning-loop.md), and [architecture](architecture.md).
+## Getting started
 
-## Guides
+- [Quickstart](getting-started/quickstart.md)
 
-- [Quickstart](quickstart.md)
-- [Concepts](concepts.md)
-- [Learning Loop Foundation](learning-loop.md)
-- [Universal runtime](universal-runtime.md)
-- [Privacy profiles](privacy.md)
-- [Architecture](architecture.md)
-- [API reference](api.md)
-- [Integrations](integrations.md)
-- [Benchmarking](benchmarking.md)
-- [Public benchmark protocol](public-benchmarks.md)
-- [Research and prior art](research.md)
-- [FAQ](faq.md)
-- [Governance](governance.md)
+## Product
+
+- [Concepts](product/concepts.md)
+- [Architecture](product/architecture.md)
+- [FAQ](product/faq.md)
+
+## Integrations
+
+- [Integration overview](integrations/overview.md)
+- [Codex benchmark readiness](integrations/codex-benchmark-readiness.md)
+
+## Evaluation and research
+
+- [Benchmarking](evaluation/benchmarking.md)
+- [Public benchmark protocol](evaluation/public-benchmarks.md)
+- [Governance evidence standard](evaluation/governance-evidence.md)
+- [Research and prior art](evaluation/research.md)
+
+## Reference
+
+- [API reference](reference/api.md)
+
+## Operations
+
+- [Privacy](operations/privacy.md)
+- [Website operations](operations/website.md)
+- [Website review — 2026-08-07](operations/website-review-2026-08-07.md)
+
+## Project
+
+- [Governance](project/governance.md)
+- [Community feedback](project/community-feedback.md)
+- [Roadmap](../ROADMAP.md)
+- [Contributing](../CONTRIBUTING.md)
+- [Security](../SECURITY.md)
+
+`docs/superpowers/` contains implementation specs and plans for maintainers and agentic development workflows; it is intentionally separate from end-user documentation.

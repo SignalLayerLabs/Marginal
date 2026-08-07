@@ -1,45 +1,50 @@
 # MARGINAL Roadmap
 
-MARGINAL's North Star is simple:
+MARGINAL's North Star is:
 
-> **Install MARGINAL once, keep using your AI development agent normally, and reduce avoidable token consumption without sacrificing verified quality.**
+> **Reduce avoidable compute per verified successful task while accounting for the cost and mistakes of the governor itself.**
 
-MARGINAL is being developed as one universal, local compute-governance product for the main AI development agents. A single core, protocol, installer, policy system, learning loop, and reporting experience will support Codex, Claude Code, GitHub Copilot, OpenCode, and future compatible runtimes through thin engine adapters.
+The project is one universal, local compute-governance product for AI development agents. A shared core, protocol, policy system, evidence model and reporting layer support engine-specific adapters without duplicating economic logic.
 
-This roadmap is milestone-driven rather than date-driven. It communicates product direction and measurable outcomes. GitHub Issues and pull requests should track implementation-level work.
+This roadmap is milestone-driven rather than date-driven. GitHub Issues and pull requests should track implementation-level work.
 
 ## Product principles
 
-1. **One product:** one core, one protocol, one installer, and one user experience.
-2. **Thin adapters:** engine-specific behavior stays outside the decision core.
-3. **Quality first:** token reduction is valuable only when verified quality is preserved.
-4. **Measured claims:** public savings claims must use real runtime or provider telemetry.
-5. **Learning without overclaiming:** observational associations are not described as causal value.
+1. **One product:** one core, protocol, evidence model and user experience.
+2. **Thin adapters:** engine-specific interception stays outside the decision core.
+3. **Quality first:** lower compute is valuable only when verified quality remains inside the preregistered constraint.
+4. **Measured claims:** public savings claims require matched real-runtime telemetry.
+5. **Learning without overclaiming:** observational associations are not causal proof.
 6. **Local first:** prompts and source code are not uploaded or logged by default.
-7. **Simple installation:** supported agents should require no manual code changes.
-8. **Transparent capabilities:** observe-only and enforcement integrations must be clearly distinguished.
-9. **Small core:** the provider-neutral core keeps zero mandatory runtime dependencies.
+7. **Simple installation:** supported agents should require no manual project-code changes.
+8. **Transparent capabilities:** observe-only and enforcement integrations are clearly distinguished.
+9. **Small core:** the provider-neutral runtime keeps zero mandatory dependencies.
+10. **Self-accounting:** governance tokens, USD and latency are first-class evidence, not hidden overhead.
+11. **Graceful irrelevance:** if MARGINAL does not demonstrate positive net value for a workload, pass-through is a valid outcome.
+12. **False-stop visibility:** harmful deny recommendations are explicitly reviewed and never inferred away by aggregate success.
+13. **Community pressure testing:** criticism can change the roadmap when it creates a stronger falsification test; unsupported speculation does not become product doctrine.
 
 ## Status legend
 
 | Status | Meaning |
 |---|---|
-| **Planned** | Scope is defined, but implementation has not started. |
+| **Planned** | Scope is defined; implementation has not started. |
 | **In progress** | Implementation is actively underway. |
-| **Validation** | Implementation exists, but final CI, release, integration, or benchmark evidence is pending. |
-| **Complete** | All exit criteria have been met and supporting evidence is available. |
+| **Validation** | Implementation exists; final CI, release, integration or evidence is pending. |
+| **Complete** | Exit criteria and supporting evidence are satisfied. |
 
 ## Milestones at a glance
 
 | Milestone | Status | Primary outcome |
 |---|---|---|
-| **v0.1 — Reference Allocator Foundation** | Complete | Provider-neutral allocation, accounting, tracing, demos, and first release |
-| **v0.2 — Learning Loop Foundation** | Validation | Universal protocol, non-blocking observation, versioned evidence, outcomes, replay, and estimators |
-| **v0.3 — Codex Reference Integration** | Planned | Real Codex integration and measured paired benchmark |
-| **v0.4 — Multi-Engine Developer Preview** | Planned | Codex, OpenCode, Claude Code, and GitHub Copilot compatibility |
-| **v0.5 — One-Command Universal Installation** | Planned | Automatic detection, installation, diagnostics, and rollback |
-| **v0.6 — Adaptive and Causal Allocation** | Planned | Calibrated learning, context-carry economics, exploration, and regret measurement |
-| **v0.7 — Ecosystem and Operational Scale** | Planned | Additional engines, persistent runtimes, observability, and team controls |
+| **v0.1 — Reference Allocator Foundation** | Complete | Provider-neutral allocation, accounting, tracing and first release |
+| **v0.2 — Learning Loop Foundation** | Validation | Universal protocol, non-blocking observation, versioned evidence, privacy and replay |
+| **Community hardening** | In progress | Governance tax, false-stop accounting, diminishing-return control and clearer evidence UX |
+| **v0.3 — Codex Reference Integration** | Planned | One-command target, real telemetry and first matched public benchmark |
+| **v0.4 — Multi-Engine Developer Preview** | Planned | Shared core across materially different coding agents |
+| **v0.5 — One-Command Universal Installation** | Planned | Detection, installation, diagnostics and rollback across engines |
+| **v0.6 — Adaptive and Causal Allocation** | Planned | Calibrated learning, exploration and stronger identification strategies |
+| **v0.7 — Ecosystem and Operational Scale** | Planned | Persistence, observability, team controls and more engines |
 
 ---
 
@@ -47,31 +52,9 @@ This roadmap is milestone-driven rather than date-driven. It communicates produc
 
 **Status:** Complete
 
-**Objective:** Establish a small, auditable, provider-neutral compute-allocation core.
+Delivered provider-neutral `Action`, `Cost`, `Decision` and `Allocation` primitives; hard token/USD/latency/risk budgets; reservations and settlement; hierarchical treasuries; verification reserves; marginal-value policy; duplicate protection; guarded-call adapters; common usage extraction; JSONL traces; synthetic benchmark; Killer Demo; public comparison utility; Python 3.10–3.13 CI and project documentation.
 
-### Delivered
-
-- [x] Provider-neutral `Action`, `Cost`, `Decision`, and `Allocation` primitives
-- [x] Hard token, USD, latency, and risk budgets
-- [x] Atomic reservation, settlement, abort, and overrun accounting
-- [x] Hierarchical treasuries and protected verification reserves
-- [x] Deterministic marginal-value policy and candidate ranking
-- [x] Exact duplicate and pending-action protection
-- [x] Synchronous and asynchronous guarded-call adapters
-- [x] Common LLM usage extraction
-- [x] Append-only JSONL decision traces and CLI reporting
-- [x] Synthetic benchmark and end-to-end Killer Demo
-- [x] Public benchmark comparison utility
-- [x] Python 3.10–3.13 CI, CodeQL, packaging, and project documentation
-
-### Exit criteria
-
-- [x] `v0.1.0` released
-- [x] CI passes across supported Python versions
-- [x] Synthetic claims are clearly separated from measured production claims
-- [x] Core remains free of mandatory runtime dependencies
-
-Evidence: [`CHANGELOG.md`](CHANGELOG.md), [`docs/architecture.md`](docs/architecture.md), and [`demos/killer-demo`](demos/killer-demo/RESULTS.md).
+**Exit criteria:** released, CI green, synthetic claims separated from measured claims, zero mandatory runtime dependencies.
 
 ---
 
@@ -79,50 +62,59 @@ Evidence: [`CHANGELOG.md`](CHANGELOG.md), [`docs/architecture.md`](docs/architec
 
 **Status:** Validation
 
-**Objective:** Create the shared, versioned learning-loop foundation that lets every supported development agent use the same MARGINAL decisions, evidence model, accounting, and safety guarantees.
+The v0.2 release candidate adds:
 
-### Delivered in the release candidate
+- Universal Agent Protocol v1 and capability negotiation;
+- normalized action, decision, outcome, token-usage and ledger schemas;
+- additive uncached/cached/output/reasoning token accounting;
+- `shadow`, `recommend` and `enforce` modes;
+- Decision Ledger v2 with engine/model/task/trajectory identity;
+- `LOCAL_FULL`, `SAFE_TELEMETRY` and `AGGREGATE_EXPORT` privacy boundaries;
+- state-aware fingerprints and deduplication scopes;
+- failed-action settlement and measured overruns;
+- quality-first/balanced/token-saver/strict-budget profiles;
+- versioned estimators, uncertainty, confidence and provenance;
+- task outcomes separated from action-level realized gain;
+- non-causal replay and ledger/reporting CLI support.
 
-- [x] Publish MARGINAL Universal Agent Protocol v1
-- [x] Define normalized event, decision, capability, outcome, token-usage, and ledger schemas
-- [x] Add capability negotiation for observe, modify, deny, stop, and verification control
-- [x] Add additive token usage v2 for uncached input, cached input, output, reasoning, and total tokens
-- [x] Add Decision Ledger v2 with run, task, trajectory, action, policy, estimator, engine, and model identity
-- [x] Classify evidence fields as safe-by-default, pseudonymous, or potentially sensitive
-- [x] Add `LOCAL_FULL` and keyed `SAFE_TELEMETRY` operational ledger profiles
-- [x] Add separate grouped `AGGREGATE_EXPORT` output with no identifiers or timestamps
-- [x] Suppress aggregate groups smaller than five records by default with a configurable threshold
-- [x] Publish recursively strict JSON Schemas for safe event-level telemetry and aggregate exports
-- [x] Add local 256-bit key generation, restrictive permission checks, race-safe exports, and safe export CLI
-- [x] Add strict ledger parsing, monotonic sequence validation, and task/outcome correlation checks
-- [x] Add state-aware fingerprints and configurable deduplication scopes
-- [x] Add `shadow`, `recommend`, and `enforce` operating modes
-- [x] Preserve concurrent Shadow Mode observations with separate reservation identities
-- [x] Add explicit failed-action settlement for measured, estimated, and unavailable usage
-- [x] Keep failed actions retryable while accounting for consumed resources
-- [x] Add conservative fallback settlement when failure usage extraction itself fails
-- [x] Add Quality First, Balanced, Token Saver, and Strict Budget reference profiles
-- [x] Add a provider-neutral local `UniversalRuntime`
-- [x] Add explicit task outcomes and separate action-level realized-gain observations
-- [x] Add versioned estimator identities, uncertainty, confidence, sample size, provenance, and registry
-- [x] Add deterministic training-data fingerprints for online observations
-- [x] Add non-causal policy replay and CLI ledger validation/reporting
-- [x] Add protocol and schema conformance tests, executable examples, and aligned documentation
-- [x] Preserve the dependency-free provider-neutral runtime core
+### Remaining exit criteria
+
+- [ ] Ruff, mypy strict, full tests, package build and Twine validation pass in canonical CI.
+- [ ] `v0.2.0` is tagged/released from the canonical repository.
+
+Vendor-specific adapters and measured production savings are intentionally outside v0.2.
+
+---
+
+## Community hardening — Net-value evidence layer
+
+**Status:** In progress
+
+**Objective:** turn early community criticism into falsifiable product requirements without introducing model-specific patches or unsupported narratives.
+
+### Deliverables
+
+- [x] Add opt-in provider-neutral `DiminishingReturnDetector` for semantic same-state repetition.
+- [x] Fail open when state is unavailable and reset pressure when state/evidence changes.
+- [x] Integrate successful-execution observation without counting denied proposals as executed work.
+- [x] Add `GovernanceTracker` for local decision latency and externally supplied governance tokens/USD/latency.
+- [x] Add explicit reviewed false-stop accounting; never infer false stops from task outcome alone.
+- [x] Extend public evaluation with repeated calls, gross versus net savings and governance overhead.
+- [x] Add intervention statuses: `supported`, `pass_through`, `quality_regression`, `false_stop_risk`.
+- [x] Define Graceful Irrelevance as a first-class product behavior.
+- [x] Rewrite the website around a concrete trace and proof standard before theory.
+- [x] Publish a Community Feedback Log with accepted, partial and rejected decisions.
+- [x] Reorganize documentation by getting-started/product/integrations/evaluation/reference/operations/project responsibility.
+- [ ] Validate the overlay against the canonical full repository and merge through normal CI/review.
 
 ### Exit criteria
 
-- [x] Protocols and schemas are versioned and documented.
-- [x] Privacy profiles, field classification, key handling, small-group suppression, export boundaries, and limitations are documented.
-- [x] The provider-neutral reference runtime passes focused protocol and lifecycle tests.
-- [x] Shadow Mode can observe complete action lifecycles without blocking caller behavior.
-- [x] Existing v0.1 constructors and enforced execution paths remain covered by regression tests.
-- [x] The package metadata and public documentation describe the implemented v0.2 behavior consistently.
-- [x] The runtime core still has zero mandatory dependencies.
-- [ ] Ruff, mypy strict, the full repository test suite, package build, and Twine validation pass in the canonical GitHub checkout and CI.
-- [ ] `v0.2.0` is tagged and released from the canonical repository.
-
-The release remains in **Validation** until the final two exit criteria are satisfied. Vendor-specific adapters and measured production savings are intentionally not part of v0.2.
+- Existing v0.2 public benchmark rows remain parseable.
+- Existing public-eval keys remain usable; new rows count governance overhead in net metrics.
+- State-aware repetition control is opt-in until engine evidence supports enforcement.
+- A no-benefit configuration can report `pass_through` without being mislabeled as a successful optimization.
+- Website examples contain no fabricated performance numbers.
+- Community feedback documentation distinguishes evidence-backed design requirements from speculation.
 
 ---
 
@@ -130,29 +122,71 @@ The release remains in **Validation** until the final two exit criteria are sati
 
 **Status:** Planned
 
-**Objective:** Integrate MARGINAL into Codex and produce the first real paired benchmark with measured token telemetry.
+**Objective:** integrate MARGINAL into Codex and produce the first real matched benchmark with measured telemetry and net-value accounting.
 
-### Deliverables
+### Integration deliverables
 
-- [ ] Build the Codex adapter against the Universal Agent Protocol
-- [ ] Support `marginal install codex`
-- [ ] Capture measured input, cached input, output, reasoning, and total tokens
-- [ ] Intercept supported tool, retry, verification, and continuation decisions
-- [ ] Add Codex session, workspace-state, and patch correlation
-- [ ] Build the paired baseline-versus-MARGINAL benchmark runner
-- [ ] Run a 10-task canary with identical model, prompts, tools, limits, and verifier
-- [ ] Run a preregistered 100-task public benchmark
-- [ ] Report token savings, quality delta, regressions, recoveries, latency, and tool calls
-- [ ] Report token cost per verified successful task
-- [ ] Publish raw paired JSONL results and a reproducible report
+- [ ] Build a thin Codex adapter against the Universal Agent Protocol.
+- [ ] Target `marginal install codex` with safe backup, Shadow Mode default and clean uninstall.
+- [ ] Detect Codex version/capability level and refuse unsupported enforcement claims.
+- [ ] Capture measured input, cached input, output, reasoning and total tokens.
+- [ ] Correlate model/tool/retry/verification actions with session, task and workspace state.
+- [ ] Record evidence hashes where deterministic evidence boundaries exist.
+- [ ] Capture governance tokens, USD and latency separately from workload usage.
+- [ ] Define and record repeated-call metrics consistently in OFF and ON arms.
+- [ ] Export raw paired JSONL sufficient to reproduce the public report.
 
-### Exit criteria
+### Canary: engineering validation only
 
-- Codex baseline and Codex with MARGINAL can be executed under matched conditions.
-- Token usage comes from Codex telemetry rather than declared estimates.
-- The 10-task canary completes without integration failures.
-- The 100-task report includes statistical uncertainty and a predefined quality non-inferiority margin.
-- Public claims link directly to reproducible evidence.
+- [ ] Run a 10-task matched canary with identical model, prompt, tools, limits and verifier.
+- [ ] Confirm event/session/state correlation and no orphaned reservations.
+- [ ] Confirm telemetry is measured rather than declared.
+- [ ] Confirm governance overhead is separately accounted.
+- [ ] Review deny recommendations for false-stop candidates.
+- [ ] Preserve pass-through and negative results instead of filtering them out.
+
+**The 10-task canary is not public performance evidence.** Its purpose is to prove the measurement/integration pipeline is trustworthy enough for a larger run.
+
+### Public benchmark
+
+Before execution, preregister:
+
+- [ ] agent/model/version and environment;
+- [ ] benchmark dataset/version and exclusions;
+- [ ] matched task count and repeat count;
+- [ ] quality non-inferiority margin;
+- [ ] maximum acceptable false-stop rate;
+- [ ] minimum net token-savings threshold;
+- [ ] verifier and failure policy;
+- [ ] bootstrap/repeated-run statistical method.
+
+Run at least:
+
+- [ ] the community-requested SWE-bench Pro surface, with version/exclusion/quality notes;
+- [ ] a targeted MARGINAL repetition suite that exposes same-state retry/verification behavior.
+
+Report:
+
+- [ ] verified resolve-rate delta;
+- [ ] gross agent tokens and net effective tokens;
+- [ ] effective tokens per verified successful task;
+- [ ] governance tokens/USD/latency;
+- [ ] tool calls and repeated calls;
+- [ ] regressions and recoveries;
+- [ ] reviewed false stops and false-stop rate;
+- [ ] uncertainty across matched/repeated runs;
+- [ ] final intervention status.
+
+### v0.3 exit criteria
+
+- Codex baseline and Codex + MARGINAL run under matched conditions.
+- Telemetry comes from the runtime/provider integration rather than declared demo estimates.
+- The canary completes without integration failures.
+- Public results are reproducible from raw paired artifacts.
+- Headline claims use **net** metrics after governance tax.
+- If the preregistered gate is not met, the published conclusion says so.
+
+See [Codex benchmark readiness](docs/integrations/codex-benchmark-readiness.md).
 
 ---
 
@@ -160,27 +194,9 @@ The release remains in **Validation** until the final two exit criteria are sati
 
 **Status:** Planned
 
-**Objective:** Prove that one MARGINAL runtime can govern materially different AI development agents without duplicating policy logic.
+Build OpenCode, Claude Code and GitHub Copilot integrations where official control surfaces permit them. Reuse the same protocol, policy, governance accounting, privacy boundaries and reports. Publish a capability matrix and label each engine as Observe, Tool Enforcement or Full Compute Enforcement.
 
-### Deliverables
-
-- [ ] Build an OpenCode adapter
-- [ ] Build a Claude Code adapter
-- [ ] Build a GitHub Copilot CLI or coding-agent adapter where official control surfaces permit it
-- [ ] Reuse the same protocol, policy profiles, telemetry, ledger, and reports across all adapters
-- [ ] Publish an engine capability matrix
-- [ ] Add adapter-specific compatibility and end-to-end tests
-- [ ] Clearly label each integration as Observe, Tool Enforcement, or Full Compute Enforcement
-- [ ] Add unified cross-engine session reporting
-- [ ] Validate clean failure and fail-open behavior for every adapter
-
-### Exit criteria
-
-- At least four development-agent environments, including Codex, pass protocol conformance tests.
-- No adapter contains duplicated economic decision logic.
-- Every supported engine has documented capabilities and limitations.
-- The same policy profile produces comparable decision records across engines.
-- At least two engines support real action enforcement.
+**Exit criteria:** at least four environments pass protocol conformance; economic logic remains centralized; at least two integrations support real enforcement; each engine documents limitations and fail-open behavior.
 
 ---
 
@@ -188,31 +204,9 @@ The release remains in **Validation** until the final two exit criteria are sati
 
 **Status:** Planned
 
-**Objective:** Make MARGINAL installable and removable by non-expert users without manual configuration edits.
+Add `marginal install --detect`, safe backups, supported-agent detection, Shadow Mode defaults, `status`, `doctor`, profile management and clean uninstall/rollback on Windows, macOS and Linux.
 
-### Deliverables
-
-- [ ] Add `marginal install --detect`
-- [ ] Automatically detect supported agents and their versions
-- [ ] Install only the required adapters
-- [ ] Create safe backups before changing agent configuration
-- [ ] Enable Quality First and Shadow Mode by default
-- [ ] Add `marginal status`
-- [ ] Add `marginal doctor`
-- [ ] Add `marginal profile`
-- [ ] Add `marginal uninstall`
-- [ ] Restore original configurations during rollback
-- [ ] Keep telemetry local and prompt logging disabled by default
-- [ ] Test installation on Windows, macOS, and Linux
-- [ ] Provide clear handling for unsupported or partially supported versions
-
-### Exit criteria
-
-- A new user can install MARGINAL with one command and no manual file edits.
-- Supported-agent detection and diagnostics complete in under two minutes on a typical development machine.
-- Uninstall restores the original agent configuration.
-- A failed installer does not leave a supported agent unusable.
-- The user sees one consistent status and configuration experience across engines.
+**Exit criteria:** non-expert installation requires no project-code edits; failed installation leaves agents usable; uninstall restores prior configuration; users receive one consistent diagnostic experience.
 
 ---
 
@@ -220,29 +214,9 @@ The release remains in **Validation** until the final two exit criteria are sati
 
 **Status:** Planned
 
-**Objective:** Learn calibrated action value from real trajectories while distinguishing prediction, association, and causal evidence.
+Train contextual estimators on real trajectories; add calibrated belief state, context-carry economics, dynamic shadow pricing, bounded exploration with propensity logging, off-policy evaluation, calibration/drift/regret reporting and explicit identification strategies before causal claims.
 
-### Deliverables
-
-- [ ] Train and validate contextual estimators on real engine trajectories
-- [ ] Add a calibrated task belief state updated by deterministic evidence
-- [ ] Estimate context-carry cost across future model turns
-- [ ] Add dynamic token shadow pricing based on scarcity and projected remaining work
-- [ ] Add controlled, budgeted exploration with propensity logging
-- [ ] Prevent exploration for unsafe or irreversible actions
-- [ ] Add off-policy evaluation appropriate to logged propensities
-- [ ] Add estimator calibration, drift, and regret reports
-- [ ] Compare adaptive policies against fixed reference policies on held-out runs
-- [ ] Define explicit evidence standards before making causal marginal-value claims
-- [ ] Preserve deterministic policy modes for reproducibility and regulated use cases
-
-### Exit criteria
-
-- Predicted action value and observed outcomes have published calibration evidence.
-- Adaptive allocation improves token cost per verified task over the fixed reference policy on held-out runs.
-- Quality remains within the predefined non-inferiority margin.
-- Exploration behavior is bounded, reproducible, and separately accounted.
-- Any causal claim includes a documented identification strategy and assumptions.
+**Exit criteria:** held-out evidence shows better effective compute per verified task than fixed policy while preserving quality; exploration remains bounded; any causal claim documents assumptions and identification strategy.
 
 ---
 
@@ -250,55 +224,24 @@ The release remains in **Validation** until the final two exit criteria are sati
 
 **Status:** Planned
 
-**Objective:** Expand compatibility and operational robustness after the universal runtime has been validated.
+Evaluate additional engines; add persistent sessions, optional storage backends, reservation leases/recovery, OpenTelemetry, team policy pinning, signed manifests, optional shared dashboards and portfolio allocation for multi-agent workloads.
 
-### Deliverables
-
-- [ ] Evaluate Gemini CLI, Aider, Cline, Roo Code, Continue, and other compatible runtimes
-- [ ] Add persistent local treasury and session recovery
-- [ ] Add optional SQLite, Redis, or PostgreSQL backends without burdening the core
-- [ ] Add reservation leases, expiry, replay, snapshots, and crash recovery
-- [ ] Add OpenTelemetry spans and metrics
-- [ ] Add team policy configuration and policy version pinning
-- [ ] Add signed adapter and policy manifests
-- [ ] Add optional shared dashboards without requiring MARGINAL Cloud
-- [ ] Add portfolio allocation for parallel and multi-agent workloads
-- [ ] Add action dependency, conflict, alternative, and prerequisite modeling
-- [ ] Publish long-running and multi-agent reliability benchmarks
-
-### Exit criteria
-
-- Persistent sessions recover without losing committed usage.
-- Distributed reservations prevent double-spend under supported backends.
-- Additional adapters pass the same protocol conformance suite.
-- Team features remain optional and the local open-source runtime remains fully usable without an account.
+**Exit criteria:** persistent sessions recover without lost committed usage; distributed reservations prevent supported double-spend; optional team/cloud features do not make the local open-source runtime dependent on an account.
 
 ---
 
-## Initial engine scope
-
-The first product scope is AI development agents with observable or controllable agent loops.
-
-| Engine | Planned role |
-|---|---|
-| **Codex** | Reference integration and primary measured benchmark |
-| **OpenCode** | Open-source research and adapter-development environment |
-| **Claude Code** | Rich hook-based commercial integration |
-| **GitHub Copilot CLI / coding agent** | Broad developer adoption where official APIs permit enforcement |
-| **Gemini CLI, Aider, Cline, Roo Code, Continue** | Later compatibility candidates |
-
-Autocomplete-only surfaces and traditional IDE chat are not considered equivalent to a fully controllable agent runtime. They will not be labeled as full MARGINAL integrations unless an official control surface supports real interception and measured usage.
-
 ## Success metrics
 
-MARGINAL will be evaluated on the combined outcome, not token savings alone:
+MARGINAL is evaluated on the combined outcome, not token savings alone:
 
 - verified task resolution rate;
-- input, cached input, output, reasoning, and total tokens;
-- token cost per verified successful task;
+- input, cached input, output, reasoning and total workload tokens;
+- governance tokens, USD and latency;
+- effective tokens and USD per verified successful task;
+- gross versus net savings;
 - regressions and recoveries;
-- tool and sub-agent calls;
-- latency and direct cost;
+- tool calls and repeated calls;
+- reviewed stops, false stops and false-stop rate;
 - estimator calibration and decision regret;
 - variance across repeated runs;
 - installation success and rollback reliability;
@@ -306,19 +249,16 @@ MARGINAL will be evaluated on the combined outcome, not token savings alone:
 
 The primary optimization target is:
 
-> **Minimize token consumption per verified successful task, subject to a predefined quality non-inferiority constraint.**
+> **Minimize effective compute per verified successful task, subject to predefined quality and false-stop constraints.**
 
-MARGINAL does not promise that every individual request will use fewer tokens. Some tasks may require additional verification. The product goal is to remove avoidable compute across real sessions while protecting outcome quality.
+MARGINAL does not promise that every request will use fewer tokens. Some tasks should spend more on verification. Some efficient model/runtime combinations should result in pass-through.
 
 ## Maintaining this roadmap
 
-- Update milestone status only when its definition changes.
-- Check off a deliverable only after implementation and validation are merged.
-- Link relevant issues, pull requests, releases, benchmarks, or evidence where useful.
-- Use GitHub Issues and Projects for task ownership and day-to-day execution.
-- Keep implementation details out of this file unless they change product scope.
-- Keep the README limited to the active milestone and a link to this roadmap.
-- Update `CHANGELOG.md` when behavior is released, not when work is merely planned.
-- Mark a milestone **Complete** only when every exit criterion has been satisfied.
-
-Roadmap changes are welcome through focused issues and pull requests. Proposed changes should explain the user outcome, compatibility implications, validation method, and relationship to the North Star.
+- Check off deliverables only after implementation and validation are merged.
+- Link issues, pull requests, releases and benchmark evidence where useful.
+- Keep README claims aligned with the active released milestone.
+- Update `CHANGELOG.md` when behavior is released, not merely planned.
+- Mark a milestone Complete only after every exit criterion is satisfied.
+- Treat negative benchmark results as valid project evidence.
+- Require proposed performance changes to state how they could be falsified.

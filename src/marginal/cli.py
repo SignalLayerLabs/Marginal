@@ -128,6 +128,18 @@ def _build_parser() -> argparse.ArgumentParser:
     public_eval.add_argument("--bootstrap-samples", type=int, default=2_000)
     public_eval.add_argument("--confidence-level", type=float, default=0.95)
     public_eval.add_argument("--quality-margin-pp", type=float, default=1.0)
+    public_eval.add_argument(
+        "--minimum-net-token-savings-percent",
+        type=float,
+        default=0.0,
+        help="minimum net token saving required before intervention is classified supported",
+    )
+    public_eval.add_argument(
+        "--max-false-stop-rate",
+        type=float,
+        default=0.0,
+        help="maximum reviewed false-stop rate allowed for a supported intervention",
+    )
     public_eval.add_argument("--seed", type=int, default=42)
     return parser
 
@@ -209,6 +221,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 bootstrap_samples=args.bootstrap_samples,
                 confidence_level=args.confidence_level,
                 quality_margin_pp=args.quality_margin_pp,
+                minimum_net_token_savings_percent=(args.minimum_net_token_savings_percent),
+                max_false_stop_rate=args.max_false_stop_rate,
                 seed=args.seed,
             )
         except (OSError, ValueError) as exc:

@@ -340,6 +340,7 @@ def run_killer_demo(output_dir: str | Path | None = None) -> dict[str, Any]:
             policy=policy,
             trace_sink=trace,
             name="killer-demo",
+            clock=lambda: 0,
         )
 
         stage_results: list[dict[str, Any]] = []
@@ -1959,7 +1960,7 @@ def render_killer_demo_html(result: dict[str, Any]) -> str:
           <a class="active" href="#results">Results</a>
           <a href="trace.jsonl">Trace</a>
           <a
-            href="https://github.com/SignalLayerLabs/Marginal/blob/main/docs/public-benchmarks.md"
+            href="https://github.com/SignalLayerLabs/Marginal/blob/main/docs/evaluation/public-benchmarks.md"
           >Benchmark</a>
         </nav>
       </header>
