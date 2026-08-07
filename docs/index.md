@@ -32,7 +32,6 @@ MARGINAL documentation is organized by user intent instead of keeping every guid
 
 - [Privacy](operations/privacy.md)
 - [Website operations](operations/website.md)
-- [Website review — 2026-08-07](operations/website-review-2026-08-07.md)
 
 ## Project
 
