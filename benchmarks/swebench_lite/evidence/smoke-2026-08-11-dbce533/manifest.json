@@ -1,0 +1,22 @@
+{
+  "agent": "codex-cli",
+  "agent_version": "0.147.0",
+  "benchmark": "swe-bench-lite-dev-canary",
+  "dataset": "princeton-nlp/SWE-bench_Lite",
+  "limits": {
+    "repetitions": 1,
+    "timeout_seconds": 1800
+  },
+  "marginal": {
+    "commit": "dbce533e5c8e8def62b0543853d07cfab2bc79c1",
+    "mode": "enforce",
+    "policy": "balanced+diminishing-defaults",
+    "version": "0.2.0+unreleased"
+  },
+  "model": "gpt-5.6-sol",
+  "prompt_sha256": "3a2ced1afb7e9a74176090db264259c52b6ebcf383d787a1030f83ecb6d67416",
+  "schema_version": 1,
+  "split": "dev",
+  "task_set": "smoke",
+  "task_set_sha256": "1c8c06935484fd57f4c27c363418884542bcfb06c69d02f480b61fe7687b58eb"
+}

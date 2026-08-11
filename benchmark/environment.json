@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-08-11",
+  "timezone": "Europe/Rome",
+  "repository": {
+    "url": "https://github.com/SignalLayerLabs/Marginal.git",
+    "commit": "4c8856401b4c752d5c214df5e84b9632d9897ec9",
+    "version": "0.2.0+unreleased"
+  },
+  "host": {
+    "operating_system": "macOS 26.6",
+    "build": "25G72",
+    "architecture": "arm64"
+  },
+  "python": "3.13.0",
+  "codex": {
+    "cli_version": "0.147.0",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "sandbox": "workspace-write",
+    "timeout_seconds": 1800,
+    "json_events": true,
+    "ephemeral": true
+  },
+  "benchmark": {
+    "name": "swe-bench-lite-dev-smoke",
+    "dataset": "princeton-nlp/SWE-bench_Lite",
+    "split": "dev",
+    "task_set_sha256": "1c8c06935484fd57f4c27c363418884542bcfb06c69d02f480b61fe7687b58eb",
+    "prompt_template_sha256": "3a2ced1afb7e9a74176090db264259c52b6ebcf383d787a1030f83ecb6d67416",
+    "verifier": "official SWE-bench harness; backend selected by preflight",
+    "verifier_version": null
+  },
+  "credentials_recorded": false
+}

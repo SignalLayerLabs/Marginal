@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "task_set": "smoke",
+  "authoritative": {
+    "backend": "official-swebench-docker",
+    "swebench_version": "4.1.0",
+    "architecture": "x86_64",
+    "baseline": {
+      "run_id": "local-smoke-baseline-31474500980",
+      "submitted": 3,
+      "completed": 3,
+      "resolved": 0,
+      "errors": 0,
+      "report": "verifier_baseline.json",
+      "report_sha256": "5e7fc0deab6548bc7b8e487aaf01389e19f4a27df880a9d97cccafac3e23c412"
+    },
+    "marginal": {
+      "run_id": "local-smoke-on-31474500980",
+      "submitted": 3,
+      "completed": 3,
+      "resolved": 0,
+      "errors": 0,
+      "report": "verifier_marginal.json",
+      "report_sha256": "5e7fc0deab6548bc7b8e487aaf01389e19f4a27df880a9d97cccafac3e23c412"
+    }
+  },
+  "modal_audit": {
+    "workflow_run": "https://github.com/SignalLayerLabs/Marginal/actions/runs/31474500980",
+    "modal_version": "1.5.3",
+    "swebench_version": "4.1.0",
+    "status": "infrastructure_error_not_scored",
+    "baseline_completed": 2,
+    "marginal_completed": 2,
+    "baseline_errors": 1,
+    "marginal_errors": 1,
+    "symmetric_error_ids": [
+      "pylint-dev__astroid-1978"
+    ],
+    "baseline_report": "verifier_modal_baseline.json",
+    "marginal_report": "verifier_modal_marginal.json",
+    "report_sha256": "9c7ebafff8e259de16a5cad8f20dc1ad04553a12e0e3960175b7ac207e503e4d"
+  },
+  "public_result": {
+    "resolved": "0/3 -> 0/3",
+    "net_token_savings_percent": 24.93,
+    "intervention_status": "pass_through",
+    "eligible_for_support": false
+  }
+}

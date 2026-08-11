@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1
+ARG TASK_IMAGE
+FROM --platform=linux/amd64 node:22-bookworm-slim AS codex_builder
+
+ARG CODEX_VERSION=0.147.0
+RUN npm install --global --omit=dev "@openai/codex@${CODEX_VERSION}" \
+    && codex --version
+
+FROM ${TASK_IMAGE}
+
+ARG TASK_IMAGE
+ARG CODEX_VERSION=0.147.0
+ARG MARGINAL_SOURCE_COMMIT
+
+LABEL org.opencontainers.image.title="MARGINAL Codex SWE-bench tool layer" \
+      org.opencontainers.image.source="https://github.com/SignalLayerLabs/Marginal" \
+      org.marginal.codex.version="${CODEX_VERSION}" \
+      org.marginal.source.commit="${MARGINAL_SOURCE_COMMIT}" \
+      org.marginal.task.image="${TASK_IMAGE}"
+
+COPY --from=codex_builder /usr/local/bin/node /opt/marginal-tools/bin/node
+COPY --from=codex_builder /usr/local/lib/node_modules/@openai/codex /opt/marginal-tools/lib/codex
+COPY benchmark/container/codex-wrapper.sh /opt/marginal-tools/bin/codex
+
+COPY pyproject.toml /opt/marginal/pyproject.toml
+COPY src/marginal /opt/marginal/src/marginal
+COPY benchmark/__init__.py /opt/marginal/benchmark/__init__.py
+COPY benchmark/codex_adapter /opt/marginal/benchmark/codex_adapter
+COPY benchmark/container/entrypoint.sh /opt/marginal/benchmark/container/entrypoint.sh
+
+RUN chmod 0555 \
+      /opt/marginal-tools/bin/codex \
+      /opt/marginal/benchmark/container/entrypoint.sh \
+    && PYTHONPATH=/opt/marginal/src:/opt/marginal /usr/bin/python3 -c \
+      "from marginal import Treasury; from benchmark.codex_adapter.engine import CodexGovernanceEngine" \
+    && /opt/marginal-tools/bin/codex --version
+
+ENV PYTHONPATH=/opt/marginal/src:/opt/marginal
+WORKDIR /testbed

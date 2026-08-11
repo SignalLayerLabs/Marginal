@@ -86,7 +86,7 @@ def test_merge_rejects_id_mismatch(tmp_path: Path) -> None:
         raise AssertionError("expected ID mismatch to be rejected")
 
 
-def test_merge_supports_current_swebench_aggregate_report(tmp_path: Path) -> None:
+def test_merge_rejects_swebench_infrastructure_errors(tmp_path: Path) -> None:
     metrics = tmp_path / "metrics.ndjson"
     verifier = tmp_path / "model.run.json"
     output = tmp_path / "out.ndjson"
@@ -116,6 +116,40 @@ def test_merge_supports_current_swebench_aggregate_report(tmp_path: Path) -> Non
         ),
         encoding="utf-8",
     )
+    try:
+        merge_results(metrics, verifier, output)
+    except MergeError as exc:
+        assert "infrastructure" in str(exc)
+        assert "repo__project-3" in str(exc)
+    else:
+        raise AssertionError("expected verifier infrastructure errors to be rejected")
+
+
+def test_merge_supports_completed_swebench_aggregate_report(tmp_path: Path) -> None:
+    metrics = tmp_path / "metrics.ndjson"
+    verifier = tmp_path / "model.run.json"
+    output = tmp_path / "out.ndjson"
+    _write_jsonl(
+        metrics,
+        [
+            {"instance_id": "repo__project-1", "tokens": 10},
+            {"instance_id": "repo__project-2", "tokens": 20},
+        ],
+    )
+    verifier.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "submitted_ids": ["repo__project-1", "repo__project-2"],
+                "resolved_ids": ["repo__project-1"],
+                "unresolved_ids": ["repo__project-2"],
+                "error_ids": [],
+                "empty_patch_ids": [],
+                "incomplete_ids": [],
+            }
+        ),
+        encoding="utf-8",
+    )
     merge_results(metrics, verifier, output)
     rows = [json.loads(line) for line in output.read_text().splitlines()]
-    assert [row["resolved"] for row in rows] == [True, False, False]
+    assert [row["resolved"] for row in rows] == [True, False]

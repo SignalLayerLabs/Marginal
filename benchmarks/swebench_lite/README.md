@@ -115,8 +115,14 @@ GitHub Actions authenticates to Modal through the repository secrets `MODAL_TOKE
 
 The workflow runs the official SWE-bench evaluator with `--split dev --modal true` for both lanes, merges verifier outcomes into telemetry, runs `marginal public-eval`, adds the Markdown comparison to the Actions job summary, and uploads the complete evidence bundle as an artifact.
 
-The verifier adapter accepts both SWE-bench result layouts currently encountered in the public harness: per-instance `instance_results.jsonl` and the aggregate schema-v2 `<model>.<run_id>.json` report containing `submitted_ids` / `resolved_ids`. Submitted tasks that are not listed as resolved — including empty patches and evaluation errors — remain unresolved rather than being dropped.
+The verifier adapter accepts both SWE-bench result layouts currently encountered in the public harness: per-instance `instance_results.jsonl` and the aggregate schema-v2 `<model>.<run_id>.json` report containing `submitted_ids` / `resolved_ids`. Empty patches remain unresolved. `error_ids` and `incomplete_ids` fail closed: infrastructure failures cannot be silently scored as model failures.
 
 ## Interpretation
 
 A valid run can conclude `supported`, `pass_through`, `quality_regression`, or `false_stop_risk`. A lower token count is not considered a win if verified quality regresses or MARGINAL's own governance overhead removes the apparent saving.
+
+## First completed smoke
+
+The evidence bundle in [`evidence/smoke-2026-08-11-dbce533/`](evidence/smoke-2026-08-11-dbce533/) contains the first matched Codex OFF/ON run. The authoritative SWE-bench 4.1 Docker verifier completed 3/3 tasks per lane with zero infrastructure errors; both lanes resolved 0/3. The resulting intervention status is `pass_through`, even though ON used 24.93% fewer measured tokens, because no successful task exists from which to calculate effective compute per resolved task.
+
+The associated [Modal workflow run](https://github.com/SignalLayerLabs/Marginal/actions/runs/31474500980) completed but reported a symmetric build failure for one task in each lane. Those reports are retained as `verifier_modal_*.json` for audit and are not used as correctness evidence. See `verification.json` for the verifier chain and report digests.

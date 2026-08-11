@@ -296,6 +296,7 @@ def compare_runs(
 
     quality_margin_value = float(quality_margin_pp)
     quality_preserved = delta_pp >= -quality_margin_value
+    has_verified_success = int(marginal_total["resolved"]) > 0
     false_stop_rate = marginal_total["false_stop_rate"]
     false_stops_acceptable = false_stop_rate is None or float(false_stop_rate) <= float(
         max_false_stop_rate
@@ -304,7 +305,7 @@ def compare_runs(
         intervention_status = "quality_regression"
     elif not false_stops_acceptable:
         intervention_status = "false_stop_risk"
-    elif float(cast(float, net_savings["tokens_percent"])) <= float(
+    elif not has_verified_success or float(cast(float, net_savings["tokens_percent"])) <= float(
         minimum_net_token_savings_percent
     ):
         intervention_status = "pass_through"
@@ -350,12 +351,16 @@ def compare_runs(
             "false_stop_rate": false_stop_rate,
             "max_false_stop_rate": max_false_stop_rate,
             "false_stops_acceptable": false_stops_acceptable,
+            "has_verified_success": has_verified_success,
         },
         "intervention": {
             "status": intervention_status,
             "minimum_net_token_savings_percent": minimum_net_token_savings_percent,
             "net_positive": float(cast(float, net_savings["tokens_percent"])) > 0.0,
             "graceful_irrelevance": intervention_status == "pass_through",
+            "eligible_for_support": (
+                quality_preserved and false_stops_acceptable and has_verified_success
+            ),
         },
     }
 
@@ -465,6 +470,12 @@ def render_public_report(result: dict[str, Any]) -> str:
                 f"({_format_optional_rate(quality.get('false_stop_rate'))})."
             ),
             f"Intervention status: **{intervention['status']}**.",
+            (
+                "No verified successful task was observed, so token efficiency per resolved "
+                "task is undefined and the intervention cannot be classified as supported."
+                if not quality.get("has_verified_success", True)
+                else ""
+            ),
             "",
             (
                 "`pass_through` is a valid result: it means MARGINAL did not demonstrate "

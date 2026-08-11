@@ -1,0 +1,28 @@
+{
+  "tasks": [
+    {
+      "base_commit": "04a523fafbd61bc2e49420963b84ed8e2bd1b3cf",
+      "baseline_overlay_image": "sha256:d32a981a154d51043281e301e4a9ccf2fdecf310114fbe0bb8f8969b03549a40",
+      "instance_id": "pvlib__pvlib-python-1072",
+      "marginal_overlay_image": "sha256:d32a981a154d51043281e301e4a9ccf2fdecf310114fbe0bb8f8969b03549a40",
+      "prompt_sha256": "6a4885b85b49ded91db260fe34775f577ce3b3127c4d9ab8ec05611a499f4696",
+      "task_image": "swebench/sweb.eval.x86_64.pvlib_1776_pvlib-python-1072@sha256:c8e43bebd10d7d2330820af520361dc6adc9642f98c7b7b7c415cca39852ffdd"
+    },
+    {
+      "base_commit": "40e9e978c170bdde4eeee1547729417665dbc34c",
+      "baseline_overlay_image": "sha256:859a3989c6cd8aa428b2e3b0f38b374049a97379ae9861dc8554baeaf228b227",
+      "instance_id": "pvlib__pvlib-python-1707",
+      "marginal_overlay_image": "sha256:859a3989c6cd8aa428b2e3b0f38b374049a97379ae9861dc8554baeaf228b227",
+      "prompt_sha256": "b7691aba45ae5d3dfbfeb1e372a4b4b61c0ed122cda3bc55a2218aaadafd2a02",
+      "task_image": "swebench/sweb.eval.x86_64.pvlib_1776_pvlib-python-1707@sha256:3c103594eb39c0564cfd71f12ecca0d75a9a4a821f33c6e43b036d2271e75de7"
+    },
+    {
+      "base_commit": "0c9ab0fe56703fa83c73e514a1020d398d23fa7f",
+      "baseline_overlay_image": "sha256:cfdce1645338601413efcc6453d0d6336a20a5810de721e05a25ee18042ff82c",
+      "instance_id": "pylint-dev__astroid-1978",
+      "marginal_overlay_image": "sha256:cfdce1645338601413efcc6453d0d6336a20a5810de721e05a25ee18042ff82c",
+      "prompt_sha256": "eade552f513e57f3dfad7cb84ac00ac45d83f4e168201f8c86e554e9278f9f4a",
+      "task_image": "swebench/sweb.eval.x86_64.pylint-dev_1776_astroid-1978@sha256:c8c32dfa1bb2ac5bf5b52e2c96fbd18b0a3a8a864b30e757b03f5a79a6e6a685"
+    }
+  ]
+}

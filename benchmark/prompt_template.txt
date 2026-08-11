@@ -1,0 +1,12 @@
+You are fixing one software issue in the repository provided as your working directory.
+
+Read the issue below, inspect the implementation and tests, make the smallest complete fix,
+and run relevant tests. Do not access benchmark metadata, reference patches, gold patches,
+or another run's artifacts. Do not commit or push.
+
+ISSUE:
+{{problem_statement}}
+
+When finished, leave the working tree containing only the proposed solution and any tests
+that are legitimately part of that solution.
+

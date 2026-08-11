@@ -58,7 +58,12 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
-          python -m pip install modal "swebench[modal]"
+          python -m pip install "modal==1.5.3" "swebench==4.1.0"
+          python -m modal token set \
+            --token-id "${MODAL_TOKEN_ID}" \
+            --token-secret "${MODAL_TOKEN_SECRET}" \
+            --verify
+          test -s ~/.modal.toml
 
       - name: Validate evidence before Modal spend
         shell: bash
@@ -78,14 +83,15 @@ jobs:
           set -euo pipefail
           IDS="$(python benchmarks/swebench_lite/protocol.py ids --task-set "${TASK_SET}")"
           rm -rf evaluation_results
+          cp "${RUN_DIR}/baseline_predictions.ndjson" /tmp/baseline_predictions.jsonl
           RUN_ID="marginal-${TASK_SET}-baseline-${GITHUB_RUN_ID}"
           python -m swebench.harness.run_evaluation \
             --dataset_name princeton-nlp/SWE-bench_Lite \
             --split dev \
-            --predictions_path "${RUN_DIR}/baseline_predictions.ndjson" \
+            --predictions_path /tmp/baseline_predictions.jsonl \
             --instance_ids ${IDS} \
             --run_id "${RUN_ID}" \
-            --parallelism 10 \
+            --max_workers 10 \
             --modal true
           RESULT="$(find evaluation_results -type f -name instance_results.jsonl -print -quit 2>/dev/null || true)"
           if [ -n "${RESULT}" ]; then
@@ -102,14 +108,15 @@ jobs:
           set -euo pipefail
           IDS="$(python benchmarks/swebench_lite/protocol.py ids --task-set "${TASK_SET}")"
           rm -rf evaluation_results
+          cp "${RUN_DIR}/marginal_predictions.ndjson" /tmp/marginal_predictions.jsonl
           RUN_ID="marginal-${TASK_SET}-on-${GITHUB_RUN_ID}"
           python -m swebench.harness.run_evaluation \
             --dataset_name princeton-nlp/SWE-bench_Lite \
             --split dev \
-            --predictions_path "${RUN_DIR}/marginal_predictions.ndjson" \
+            --predictions_path /tmp/marginal_predictions.jsonl \
             --instance_ids ${IDS} \
             --run_id "${RUN_ID}" \
-            --parallelism 10 \
+            --max_workers 10 \
             --modal true
           RESULT="$(find evaluation_results -type f -name instance_results.jsonl -print -quit 2>/dev/null || true)"
           if [ -n "${RESULT}" ]; then
@@ -162,7 +169,7 @@ jobs:
 
       - name: Upload benchmark evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: swebench-lite-${{ inputs.task_set }}-${{ github.run_id }}
           if-no-files-found: warn
