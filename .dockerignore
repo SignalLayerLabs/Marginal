@@ -1,12 +1,13 @@
 *
 !pyproject.toml
 !src/
+src/*
 !src/marginal/
 !src/marginal/**
 !benchmark/
+benchmark/*
 !benchmark/__init__.py
 !benchmark/codex_adapter/
 !benchmark/codex_adapter/**
 !benchmark/container/
 !benchmark/container/**
-

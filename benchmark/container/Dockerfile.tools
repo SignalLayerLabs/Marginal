@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
+ARG TASK_IMAGE
 FROM --platform=linux/amd64 node:22-bookworm-slim AS codex_builder
 
 ARG CODEX_VERSION=0.147.0
 RUN npm install --global --omit=dev "@openai/codex@${CODEX_VERSION}" \
     && codex --version
 
-ARG TASK_IMAGE
 FROM ${TASK_IMAGE}
 
 ARG CODEX_VERSION=0.147.0
@@ -35,4 +35,3 @@ RUN chmod 0555 \
 
 ENV PYTHONPATH=/opt/marginal/src:/opt/marginal
 WORKDIR /testbed
-
