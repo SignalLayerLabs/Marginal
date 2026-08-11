@@ -22,9 +22,9 @@ if [[ "${MARGINAL_CONDITION}" != "baseline" && "${MARGINAL_CONDITION}" != "margi
   exit 64
 fi
 
-mkdir -p /marginal-home/codex /marginal-home/home
-install -m 0600 /run/secrets/codex-auth.json /marginal-home/codex/auth.json
-export CODEX_HOME=/marginal-home/codex
+mkdir -p /marginal-home/.codex /marginal-home/home
+install -m 0600 /run/secrets/codex-auth.json /marginal-home/.codex/auth.json
+export CODEX_HOME=/marginal-home/.codex
 export HOME=/marginal-home/home
 export PYTHONPATH=/opt/marginal/src:/opt/marginal
 export MARGINAL_SOCKET=/marginal-run/marginal.sock
@@ -84,14 +84,13 @@ if [[ "${MARGINAL_CONDITION}" == "marginal" ]]; then
   fi
 
   /usr/bin/python3 -c \
-    'from benchmark.codex_adapter.hook_config import install_project_hooks; install_project_hooks("/testbed", python_executable="/usr/bin/python3", hook_client="/opt/marginal/benchmark/codex_adapter/hook_client.py")'
+    'from benchmark.codex_adapter.hook_config import install_project_hooks; install_project_hooks("/marginal-home", python_executable="/usr/bin/python3", hook_client="/opt/marginal/benchmark/codex_adapter/hook_client.py")'
 fi
 
 shell_policy="$(/usr/bin/python3 -c 'import json, os; values={"HOME":"/marginal-home/home","LANG":"C.UTF-8","LC_ALL":"C.UTF-8","PATH":os.environ["PATH"],"TERM":"dumb"}; print("{" + ",".join(f"{key}={json.dumps(value)}" for key, value in sorted(values.items())) + "}")')"
 
 command=(
   /opt/marginal-tools/bin/codex exec
-  --ignore-user-config
   --ignore-rules
   --ephemeral
   --json

@@ -140,3 +140,13 @@ def test_entrypoint_enables_native_hooks_for_both_lanes() -> None:
     ).read_text(encoding="utf-8")
 
     assert entrypoint.count("--enable codex_hooks") == 1
+
+
+def test_entrypoint_uses_only_ephemeral_user_hook_configuration() -> None:
+    entrypoint = (
+        Path(__file__).resolve().parents[2] / "benchmark" / "container" / "entrypoint.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "export CODEX_HOME=/marginal-home/.codex" in entrypoint
+    assert 'install_project_hooks("/marginal-home"' in entrypoint
+    assert "--ignore-user-config" not in entrypoint
