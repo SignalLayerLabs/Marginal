@@ -27,7 +27,7 @@ install -m 0600 /run/secrets/codex-auth.json /marginal-home/.codex/auth.json
 export CODEX_HOME=/marginal-home/.codex
 export HOME=/marginal-home/home
 export PYTHONPATH=/opt/marginal/src:/opt/marginal
-export MARGINAL_SOCKET=/marginal-run/marginal.sock
+export MARGINAL_SOCKET=/marginal-home/marginal.sock
 export MARGINAL_HOOK_FAILURE_LOG=/marginal-run/hook-failures.log
 
 if ! git -C /testbed cat-file -e "${MARGINAL_EXPECTED_BASE_COMMIT}^{commit}"; then

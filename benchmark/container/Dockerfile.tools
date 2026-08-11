@@ -8,13 +8,15 @@ RUN npm install --global --omit=dev "@openai/codex@${CODEX_VERSION}" \
 
 FROM ${TASK_IMAGE}
 
+ARG TASK_IMAGE
 ARG CODEX_VERSION=0.147.0
 ARG MARGINAL_SOURCE_COMMIT
 
 LABEL org.opencontainers.image.title="MARGINAL Codex SWE-bench tool layer" \
       org.opencontainers.image.source="https://github.com/SignalLayerLabs/Marginal" \
       org.marginal.codex.version="${CODEX_VERSION}" \
-      org.marginal.source.commit="${MARGINAL_SOURCE_COMMIT}"
+      org.marginal.source.commit="${MARGINAL_SOURCE_COMMIT}" \
+      org.marginal.task.image="${TASK_IMAGE}"
 
 COPY --from=codex_builder /usr/local/bin/node /opt/marginal-tools/bin/node
 COPY --from=codex_builder /usr/local/lib/node_modules/@openai/codex /opt/marginal-tools/lib/codex

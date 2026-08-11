@@ -60,8 +60,12 @@ def test_container_command_is_digest_pinned_and_contains_no_host_credentials(
 
     assert command[:3] == ["docker", "run", "--rm"]
     assert "--platform" in command and "linux/amd64" in command
-    assert "--cap-drop=ALL" in command
+    assert "--cap-drop=ALL" not in command
+    assert "--cap-add=SYS_ADMIN" in command
     assert "no-new-privileges" in command
+    assert "seccomp=unconfined" in command
+    assert "apparmor=unconfined" in command
+    assert "systempaths=unconfined" in command
     assert "MARGINAL_CONDITION=baseline" in command
     assert f"MARGINAL_EXPECTED_BASE_COMMIT={_BASE_COMMIT}" in command
     assert str(config.run_dir.resolve()) in joined
@@ -150,3 +154,22 @@ def test_entrypoint_uses_only_ephemeral_user_hook_configuration() -> None:
     assert "export CODEX_HOME=/marginal-home/.codex" in entrypoint
     assert 'install_project_hooks("/marginal-home"' in entrypoint
     assert "--ignore-user-config" not in entrypoint
+
+
+def test_entrypoint_places_daemon_socket_on_container_tmpfs() -> None:
+    """The macOS-to-VM SSHFS bind cannot host Unix-domain sockets."""
+
+    entrypoint = (
+        Path(__file__).resolve().parents[2] / "benchmark" / "container" / "entrypoint.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "export MARGINAL_SOCKET=/marginal-home/marginal.sock" in entrypoint
+    assert "export MARGINAL_SOCKET=/marginal-run/" not in entrypoint
+
+
+def test_overlay_records_exact_task_image_provenance() -> None:
+    dockerfile = (
+        Path(__file__).resolve().parents[2] / "benchmark" / "container" / "Dockerfile.tools"
+    ).read_text(encoding="utf-8")
+
+    assert 'org.marginal.task.image="${TASK_IMAGE}"' in dockerfile
