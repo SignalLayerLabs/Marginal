@@ -78,11 +78,12 @@ jobs:
           set -euo pipefail
           IDS="$(python benchmarks/swebench_lite/protocol.py ids --task-set "${TASK_SET}")"
           rm -rf evaluation_results
+          cp "${RUN_DIR}/baseline_predictions.ndjson" /tmp/baseline_predictions.jsonl
           RUN_ID="marginal-${TASK_SET}-baseline-${GITHUB_RUN_ID}"
           python -m swebench.harness.run_evaluation \
             --dataset_name princeton-nlp/SWE-bench_Lite \
             --split dev \
-            --predictions_path "${RUN_DIR}/baseline_predictions.ndjson" \
+            --predictions_path /tmp/baseline_predictions.jsonl \
             --instance_ids ${IDS} \
             --run_id "${RUN_ID}" \
             --max_workers 10 \
@@ -102,11 +103,12 @@ jobs:
           set -euo pipefail
           IDS="$(python benchmarks/swebench_lite/protocol.py ids --task-set "${TASK_SET}")"
           rm -rf evaluation_results
+          cp "${RUN_DIR}/marginal_predictions.ndjson" /tmp/marginal_predictions.jsonl
           RUN_ID="marginal-${TASK_SET}-on-${GITHUB_RUN_ID}"
           python -m swebench.harness.run_evaluation \
             --dataset_name princeton-nlp/SWE-bench_Lite \
             --split dev \
-            --predictions_path "${RUN_DIR}/marginal_predictions.ndjson" \
+            --predictions_path /tmp/marginal_predictions.jsonl \
             --instance_ids ${IDS} \
             --run_id "${RUN_ID}" \
             --max_workers 10 \

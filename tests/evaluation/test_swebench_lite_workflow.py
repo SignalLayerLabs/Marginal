@@ -46,6 +46,10 @@ def test_workflow_uses_the_pinned_swebench_4_1_cli_contract() -> None:
     assert 'python -m pip install "modal==1.5.3" "swebench==4.1.0"' in text
     assert text.count("--max_workers 10") == 2
     assert "--parallelism" not in text
+    assert 'cp "${RUN_DIR}/baseline_predictions.ndjson" /tmp/baseline_predictions.jsonl' in text
+    assert 'cp "${RUN_DIR}/marginal_predictions.ndjson" /tmp/marginal_predictions.jsonl' in text
+    assert '--predictions_path /tmp/baseline_predictions.jsonl' in text
+    assert '--predictions_path /tmp/marginal_predictions.jsonl' in text
 
 
 def test_release_lint_scope_includes_repository_benchmark_code() -> None:
