@@ -94,7 +94,7 @@ def test_new_tool_evidence_clears_repetition_penalty(tmp_path: Path) -> None:
     assert engine.pre_tool_use(_pre("call-3"))["allowed"] is True
 
 
-def test_shell_without_exit_status_settles_failure_and_does_not_advance_history(
+def test_completed_shell_action_advances_history_without_inferred_exit_status(
     tmp_path: Path,
 ) -> None:
     engine = CodexGovernanceEngine(
@@ -102,16 +102,21 @@ def test_shell_without_exit_status_settles_failure_and_does_not_advance_history(
     )
     shell_input = {"command": "pytest -q"}
 
-    for index in (1, 2, 3):
+    for index in (1, 2):
         pre = _pre(f"call-{index}", tool_name="Bash", tool_input=shell_input)
         assert engine.pre_tool_use(pre)["allowed"] is True
         post = _post(f"call-{index}", tool_name="Bash", tool_input=shell_input)
         result = engine.post_tool_use(post)
-        assert result == {"settled": True, "successful": False}
+        assert result == {"settled": True, "completed": True}
+
+    third = engine.pre_tool_use(_pre("call-3", tool_name="Bash", tool_input=shell_input))
+    assert third["allowed"] is False
+    assert third["reason_code"] == "DIMINISHING_RETURN_REJECTED"
 
     summary = engine.summary()
-    assert summary["failed_settled"] == 3
-    assert summary["denied"] == 0
+    assert summary["committed"] == 2
+    assert summary["failed_settled"] == 0
+    assert summary["denied"] == 1
 
 
 def test_denied_action_is_not_left_pending(tmp_path: Path) -> None:

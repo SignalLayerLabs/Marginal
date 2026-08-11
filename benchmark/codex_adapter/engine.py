@@ -13,7 +13,6 @@ from typing import Any
 
 from marginal.budget import BudgetLimits
 from marginal.controls import DiminishingReturnDetector
-from marginal.models import Cost
 from marginal.policy import MarginalPolicy
 from marginal.profiles import PolicyProfile, policy_config_for_profile
 from marginal.trace import JsonlTraceSink
@@ -169,19 +168,15 @@ class CodexGovernanceEngine:
             preparation_ms = (time.perf_counter_ns() - started) / 1_000_000
             self._treasury.record_governance_overhead(latency_ms=preparation_ms)
 
-            successful = settled_action.kind not in {"shell", "verification"}
-            if successful:
-                self._treasury.commit(settled_action)
-            else:
-                self._treasury.settle_failure(
-                    settled_action,
-                    Cost(),
-                    reason="Codex PostToolUse does not expose the shell exit status",
-                )
+            # PostToolUse is Codex's authoritative signal that the tool handler
+            # completed. An application-level non-zero exit (for example, a red test)
+            # is still evidence-producing work. Codex 0.147 does not expose that exit
+            # status here, so classifying it as a transport failure would erase the
+            # exact repeated verification behavior this adapter is designed to govern.
+            self._treasury.commit(settled_action)
             del self._pending[tool_use_id]
             semantic_key = str(settled_action.metadata["marginal_semantic_key"])
-            if successful:
-                self._evidence_by_semantic_key[semantic_key] = evidence_hash
+            self._evidence_by_semantic_key[semantic_key] = evidence_hash
             self._events.emit(
                 {
                     "event": "codex_post_tool_use",
@@ -189,10 +184,10 @@ class CodexGovernanceEngine:
                     "tool_name": payload.get("tool_name"),
                     "state_hash": state_hash,
                     "evidence_hash": evidence_hash,
-                    "successful": successful,
+                    "completed": True,
                 }
             )
-            return {"settled": True, "successful": successful}
+            return {"settled": True, "completed": True}
 
     def summary(self) -> dict[str, Any]:
         with self._lock:

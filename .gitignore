@@ -17,6 +17,7 @@ build/
 
 # Local Codex benchmark trajectories, task checkouts, and copied runtime state
 /benchmark/runs/
+/benchmark/.venv/
 
 # Aggregated benchmark records are intentionally reviewable artifacts.
 !/benchmark/results/*.jsonl
