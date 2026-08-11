@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "dataset": "princeton-nlp/SWE-bench_Lite",
+  "split": "dev",
+  "selection_rule": "three lexicographically lowest SHA-256(instance_id) digests",
+  "task_set_sha256": "1c8c06935484fd57f4c27c363418884542bcfb06c69d02f480b61fe7687b58eb",
+  "repetitions": 1,
+  "conditions": [
+    "baseline",
+    "marginal"
+  ],
+  "task_ids": [
+    "pvlib__pvlib-python-1072",
+    "pvlib__pvlib-python-1707",
+    "pylint-dev__astroid-1978"
+  ],
+  "task_details": [
+    {
+      "instance_id": "pvlib__pvlib-python-1072",
+      "repo": "pvlib/pvlib-python",
+      "base_commit": "04a523fafbd61bc2e49420963b84ed8e2bd1b3cf",
+      "problem_statement_sha256": "f07d27d56ebb8157d446fe705e1e4c61fc9de31cffb1ebddc2d0b4d1baadc254",
+      "hints_text_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "instance_id": "pvlib__pvlib-python-1707",
+      "repo": "pvlib/pvlib-python",
+      "base_commit": "40e9e978c170bdde4eeee1547729417665dbc34c",
+      "problem_statement_sha256": "7c02516a72352ed042e9a91acdf852617b5ed76813b5bf01dd7be21354d08ee5",
+      "hints_text_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "instance_id": "pylint-dev__astroid-1978",
+      "repo": "pylint-dev/astroid",
+      "base_commit": "0c9ab0fe56703fa83c73e514a1020d398d23fa7f",
+      "problem_statement_sha256": "51ad593217e29a0c7ff27d7440ba5f33770f11dc1faa2d52cca73f137694bcc3",
+      "hints_text_sha256": "38b86e0724c5741dab9a455fcbecabb9f1cff161c3f3a706c486b5bb16a14a79"
+    }
+  ]
+}
