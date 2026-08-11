@@ -44,6 +44,10 @@ def test_workflow_pins_dev_split_for_both_lanes() -> None:
 def test_workflow_uses_the_pinned_swebench_4_1_cli_contract() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
     assert 'python -m pip install "modal==1.5.3" "swebench==4.1.0"' in text
+    assert "python -m modal token set" in text
+    assert '--token-id "${MODAL_TOKEN_ID}"' in text
+    assert '--token-secret "${MODAL_TOKEN_SECRET}"' in text
+    assert "test -s ~/.modal.toml" in text
     assert text.count("--max_workers 10") == 2
     assert "--parallelism" not in text
     assert 'cp "${RUN_DIR}/baseline_predictions.ndjson" /tmp/baseline_predictions.jsonl' in text

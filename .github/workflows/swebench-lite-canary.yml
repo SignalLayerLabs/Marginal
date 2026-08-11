@@ -59,6 +59,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
           python -m pip install "modal==1.5.3" "swebench==4.1.0"
+          python -m modal token set \
+            --token-id "${MODAL_TOKEN_ID}" \
+            --token-secret "${MODAL_TOKEN_SECRET}" \
+            --verify
+          test -s ~/.modal.toml
 
       - name: Validate evidence before Modal spend
         shell: bash
