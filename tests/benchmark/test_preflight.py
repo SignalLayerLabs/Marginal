@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import platform
 import subprocess
 import sys
 import textwrap
@@ -77,7 +78,7 @@ def _config(tmp_path: Path, *, version: str = "0.147.0", hooks: bool = True) -> 
         json.dumps(
             {
                 "repository": {"commit": commit},
-                "python": "3.13.0",
+                "python": platform.python_version(),
                 "codex": {
                     "cli_version": "0.147.0",
                     "model": "gpt-5.6-sol",
