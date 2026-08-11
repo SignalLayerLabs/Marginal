@@ -27,6 +27,31 @@ Open source · Local first · Provider neutral · Zero mandatory runtime depende
 
 ---
 
+## First measured Codex integration — correctness first
+
+> **Exploratory 3-task smoke, one paired run per task.** This validates the integration; it is not a general performance claim.
+
+| Metric | Codex OFF | Codex + MARGINAL | Observed change |
+|---|---:|---:|---:|
+| SWE-bench resolved | 0/3 | 0/3 | **0/3 → 0/3** |
+| Effective tokens | 1,098,747 | 824,839 | **24.93% fewer** |
+| Effective latency | 593.11 s | 565.77 s | **4.61% lower** |
+| Tool calls | 33 | 32 | **3.03% fewer** |
+| Governance overhead | — | 0 tokens · $0 · **7.06 s** | measured separately |
+| Evaluator decision | — | **pass_through** | not eligible for a support claim |
+
+The matched trajectories used Codex CLI 0.147.0, GPT-5.6-sol, identical prompts and limits, and pinned SWE-bench Lite task images. The official verifier completed all six evaluations without infrastructure errors in the authoritative Docker run. Neither lane resolved a task, so tokens per resolved task is undefined: the observed 24.93% token difference is useful trajectory telemetry, not proof of useful token saving. **No deny was applied in these three agent trajectories**, so the difference cannot be attributed to a MARGINAL stop decision.
+
+The Modal audit completed two tasks per lane but hit the same image-build error for `pylint-dev__astroid-1978` in both lanes. Those cloud errors are preserved and excluded from scoring; the public evaluator now fails closed on `error_ids` and `incomplete_ids` instead of silently treating them as unresolved.
+
+[Full report](benchmarks/swebench_lite/PUBLIC_BENCHMARK.md) ·
+[Raw JSON](benchmarks/swebench_lite/public-benchmark.json) ·
+[Evidence bundle](benchmarks/swebench_lite/evidence/smoke-2026-08-11-dbce533/) ·
+[Frozen protocol](benchmarks/swebench_lite/README.md) ·
+[Modal workflow run](https://github.com/SignalLayerLabs/Marginal/actions/runs/31474500980)
+
+---
+
 ## The problem in one trace
 
 Coding agents can spend compute on actions whose incremental value is unclear or diminishing. The useful failure mode is not "GPT-5.6 is wasteful"; it is **repeated work against unchanged state that produces no new evidence**.
@@ -174,7 +199,7 @@ cd Marginal
 python -m pip install -e ".[dev]"
 ```
 
-The upcoming Codex reference integration remains a roadmap milestone. It is not presented here as already available.
+The auditable Codex reference adapter and its first matched smoke are now available in `benchmark/codex_adapter/`. Start from the frozen protocol and treat the current n=3 result as integration evidence, not a performance claim.
 
 ## Quickstart
 

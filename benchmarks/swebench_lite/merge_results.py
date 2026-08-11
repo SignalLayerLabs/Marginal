@@ -107,6 +107,20 @@ def _index_aggregate_report(report: dict[str, Any]) -> dict[str, bool]:
     resolved_set = set(resolved)
     if not resolved_set <= submitted_set:
         raise MergeError("aggregate resolved_ids must be a subset of submitted_ids")
+    infrastructure_failures: list[str] = []
+    for key in ("error_ids", "incomplete_ids"):
+        values = report.get(key, [])
+        if not isinstance(values, list) or not all(
+            isinstance(item, str) and item for item in values
+        ):
+            raise MergeError(f"aggregate {key} must contain non-empty strings")
+        infrastructure_failures.extend(values)
+    if infrastructure_failures:
+        failed = sorted(set(infrastructure_failures))
+        raise MergeError(
+            "verifier infrastructure failures cannot be scored as unresolved: "
+            + ", ".join(failed[:5])
+        )
     return {instance_id: instance_id in resolved_set for instance_id in submitted}
 
 

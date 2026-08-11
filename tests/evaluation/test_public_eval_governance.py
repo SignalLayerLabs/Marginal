@@ -61,3 +61,15 @@ def test_reviewed_false_stop_can_fail_the_intervention_gate() -> None:
 
     assert result["quality"]["false_stop_rate"] == 1.0
     assert result["intervention"]["status"] == "false_stop_risk"
+
+
+def test_zero_verified_successes_cannot_support_an_intervention_claim() -> None:
+    baseline = {"task": RunRecord(instance_id="task", resolved=False, tokens=1000)}
+    marginal = {"task": RunRecord(instance_id="task", resolved=False, tokens=500)}
+
+    result = compare_runs(baseline, marginal, bootstrap_samples=20)
+
+    assert result["quality"]["has_verified_success"] is False
+    assert result["intervention"]["status"] == "pass_through"
+    assert result["intervention"]["eligible_for_support"] is False
+    assert "No verified successful task" in render_public_report(result)

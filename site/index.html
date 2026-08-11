@@ -28,6 +28,7 @@
       <a class="brand" href="#top" aria-label="MARGINAL home"><span class="brand-mark" aria-hidden="true">M</span><span>MARGINAL</span></a>
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-links">Menu</button>
       <div class="nav-links" id="nav-links">
+        <a href="#benchmark">Benchmark</a>
         <a href="#trace">Concrete trace</a>
         <a href="#proof">Proof standard</a>
         <a href="#irrelevance">Graceful irrelevance</a>
@@ -38,10 +39,36 @@
   </header>
 
   <main id="main">
+    <section class="benchmark-strip" id="benchmark" aria-labelledby="benchmark-title">
+      <div class="shell benchmark-shell">
+        <div class="benchmark-heading">
+          <p class="eyebrow">First measured Codex integration</p>
+          <h1 id="benchmark-title">Measured OFF vs ON. Correctness first.</h1>
+          <p>Exploratory 3-task smoke, one paired run per task. Codex CLI 0.147.0 with GPT-5.6-sol, identical prompts and limits, verified in official SWE-bench Lite task environments on Modal.</p>
+        </div>
+        <div class="benchmark-metrics" aria-label="Exploratory benchmark results">
+          <article><span>Verified quality</span><strong data-benchmark-metric="resolved">0/3 → 0/3</strong><small>OFF → ON resolved</small></article>
+          <article class="benchmark-primary"><span>Effective tokens</span><strong data-benchmark-metric="tokens">24.93% fewer</strong><small>1,098,747 → 824,839</small></article>
+          <article><span>Tool calls</span><strong data-benchmark-metric="tool_calls">3.03% fewer</strong><small>33 → 32</small></article>
+          <article><span>Governance latency</span><strong data-benchmark-metric="governance_latency">7.06 s</strong><small>0 external tokens · $0</small></article>
+          <article><span>Decision</span><strong data-benchmark-metric="status">pass_through</strong><small>not support-eligible</small></article>
+        </div>
+        <div class="benchmark-disclosure">
+          <p><strong>Scope matters.</strong> This smoke validates the integration and supplies an early paired observation; n=3 is too small for a general performance claim. Neither lane resolved a task, so efficiency per resolved task is undefined. No deny was applied in these three agent trajectories, so the observed token difference is not evidence that a deny caused the saving.</p>
+          <div class="benchmark-links">
+            <a href="https://github.com/SignalLayerLabs/Marginal/blob/main/benchmarks/swebench_lite/PUBLIC_BENCHMARK.md">Full report</a>
+            <a href="https://github.com/SignalLayerLabs/Marginal/tree/main/benchmarks/swebench_lite/evidence/smoke-2026-08-11-dbce533">Evidence</a>
+            <a href="benchmark-data.json">Raw JSON</a>
+            <a href="https://github.com/SignalLayerLabs/Marginal/actions/workflows/swebench-lite-canary.yml">Verifier workflow</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="hero shell" id="top">
       <div class="hero-copy">
         <p class="eyebrow">Compute governance, measured</p>
-        <h1>The next action should add evidence, not just activity.</h1>
+        <h2 class="hero-title">The next action should add evidence, not just activity.</h2>
         <p class="hero-lead">MARGINAL evaluates whether another model call, tool call, retry, verification or reviewer is likely to add enough value to justify its cost — and accounts for the cost of making that decision.</p>
         <div class="hero-actions">
           <a class="button" href="https://github.com/SignalLayerLabs/Marginal#install">Get started</a>
@@ -140,11 +167,11 @@
     </section>
 
     <section class="section roadmap-section"><div class="shell">
-      <div class="section-heading"><p class="eyebrow">Next milestone</p><h2>Codex Reference Integration</h2><p>The core is being prepared now; the adapter and measured Codex runs remain the next implementation milestone.</p></div>
+      <div class="section-heading"><p class="eyebrow">Measured milestone</p><h2>Codex Reference Integration</h2><p>The auditable adapter and first matched smoke are implemented. The next evidence gate is a preregistered repeated canary large enough to estimate trajectory variance.</p></div>
       <div class="roadmap-line">
         <div class="done"><span>v0.2</span><b>Learning Loop Foundation</b><small>universal protocol · ledger · privacy · replay</small></div>
         <div class="current"><span>Hardening</span><b>Net-value evidence layer</b><small>governance tax · false stops · diminishing returns</small></div>
-        <div><span>v0.3</span><b>Codex integration</b><small>one-command target · telemetry · canary · public matched benchmark</small></div>
+        <div class="done"><span>v0.3 foundation</span><b>Codex integration smoke</b><small>pinned runtime · telemetry · matched OFF/ON · Modal verification</small></div>
       </div>
       <div class="center"><a class="button button-secondary" href="https://github.com/SignalLayerLabs/Marginal/blob/main/ROADMAP.md">Read the roadmap</a></div>
     </div></section>

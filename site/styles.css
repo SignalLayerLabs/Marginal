@@ -44,9 +44,27 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; co
 .button-secondary { background: transparent; color: var(--text); border-color: var(--line); }
 .button-small { min-height: 38px; padding: .45rem .8rem; color: #071006 !important; }
 
+.benchmark-strip { border-bottom: 1px solid var(--line); background: radial-gradient(circle at 15% 0%, rgba(145,255,99,.12), transparent 38%), var(--surface-3); }
+.benchmark-shell { padding-block: 4rem 3.5rem; }
+.benchmark-heading { max-width: 900px; }
+.benchmark-heading h1 { font-size: clamp(2.5rem, 5vw, 4.8rem); }
+.benchmark-heading > p:last-child { color: var(--muted); max-width: 820px; font-size: 1.05rem; }
+.benchmark-metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: .75rem; margin-top: 2.4rem; }
+.benchmark-metrics article { display: grid; gap: .3rem; min-height: 145px; padding: 1.15rem; border: 1px solid var(--line); border-radius: 14px; background: rgba(16,21,29,.82); }
+.benchmark-metrics article > span { color: var(--muted); font-size: .73rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.benchmark-metrics strong { align-self: end; font-size: clamp(1.5rem, 2.6vw, 2.35rem); line-height: 1; letter-spacing: -.04em; }
+.benchmark-metrics small { color: var(--muted); }
+.benchmark-metrics .benchmark-primary { border-color: var(--accent); background: var(--accent-soft); }
+.benchmark-metrics .benchmark-primary strong { color: var(--accent); }
+.benchmark-disclosure { display: flex; justify-content: space-between; gap: 2rem; margin-top: 1rem; padding: 1rem 1.15rem; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); font-size: .87rem; }
+.benchmark-disclosure p { max-width: 760px; margin: 0; }
+.benchmark-disclosure strong { color: var(--text); }
+.benchmark-links { display: flex; flex-wrap: wrap; justify-content: flex-end; align-content: flex-start; gap: .55rem 1rem; min-width: 270px; }
+.benchmark-links a { color: var(--accent); font-weight: 760; text-decoration: none; }
+
 .hero { min-height: 760px; display: grid; grid-template-columns: 1.08fr .92fr; align-items: center; gap: 4.5rem; padding-block: 7rem 5rem; }
 .eyebrow { color: var(--accent); text-transform: uppercase; letter-spacing: .14em; font-size: .77rem; font-weight: 820; }
-h1 { font-size: clamp(3rem, 6.7vw, 6rem); line-height: .98; letter-spacing: -.055em; margin: .5rem 0 1.4rem; max-width: 900px; }
+h1, .hero-title { font-size: clamp(3rem, 6.7vw, 6rem); line-height: .98; letter-spacing: -.055em; margin: .5rem 0 1.4rem; max-width: 900px; }
 h2 { font-size: clamp(2rem, 4.2vw, 4rem); line-height: 1.05; letter-spacing: -.04em; margin: .45rem 0 1.2rem; }
 h3 { line-height: 1.2; }
 .hero-lead { color: var(--muted); font-size: clamp(1.08rem, 2vw, 1.3rem); max-width: 720px; }
@@ -123,19 +141,24 @@ footer { padding-block: 3rem; border-top: 1px solid var(--line); color: var(--mu
   .hero { min-height: auto; gap: 2.5rem; padding-top: 5rem; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); }
   .roadmap-line { grid-template-columns: 1fr; }
+  .benchmark-metrics { grid-template-columns: repeat(2, 1fr); }
+  .benchmark-disclosure { display: grid; }
+  .benchmark-links { justify-content: flex-start; min-width: 0; }
   .nav-toggle { display: inline-flex; background: transparent; border: 1px solid var(--line); color: var(--text); padding: .55rem .75rem; border-radius: 8px; }
   .nav-links { display: none; position: absolute; left: 1rem; right: 1rem; top: 72px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1rem; flex-direction: column; align-items: stretch; }
   .nav-links.open { display: flex; }
 }
 
 @media (max-width: 620px) {
-  h1 { font-size: 3.1rem; }
+  h1, .hero-title { font-size: 3.1rem; }
   .section { padding-block: 4.5rem; }
   .metric-grid, .decision-cards, .footer-grid, .proof-list { grid-template-columns: 1fr; }
   .trace-row { grid-template-columns: 28px 1fr; }
   .trace-row .status { grid-column: 2; justify-self: start; }
   .logic-list div { grid-template-columns: 1fr; gap: .25rem; }
   .evidence-banner { grid-template-columns: 1fr; }
+  .benchmark-metrics { grid-template-columns: 1fr; }
+  .benchmark-metrics article { min-height: 120px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

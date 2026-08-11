@@ -1,0 +1,32 @@
+{
+    "total_instances": 3,
+    "submitted_instances": 3,
+    "completed_instances": 2,
+    "resolved_instances": 0,
+    "unresolved_instances": 2,
+    "empty_patch_instances": 0,
+    "error_instances": 1,
+    "completed_ids": [
+        "pvlib__pvlib-python-1072",
+        "pvlib__pvlib-python-1707"
+    ],
+    "incomplete_ids": [],
+    "empty_patch_ids": [],
+    "submitted_ids": [
+        "pvlib__pvlib-python-1072",
+        "pvlib__pvlib-python-1707",
+        "pylint-dev__astroid-1978"
+    ],
+    "resolved_ids": [],
+    "unresolved_ids": [
+        "pvlib__pvlib-python-1072",
+        "pvlib__pvlib-python-1707"
+    ],
+    "error_ids": [
+        "pylint-dev__astroid-1978"
+    ],
+    "schema_version": 2,
+    "unstopped_instances": 0,
+    "unstopped_containers": [],
+    "unremoved_images": []
+}

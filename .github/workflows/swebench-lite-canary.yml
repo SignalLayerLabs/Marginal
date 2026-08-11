@@ -169,7 +169,7 @@ jobs:
 
       - name: Upload benchmark evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: swebench-lite-${{ inputs.task_set }}-${{ github.run_id }}
           if-no-files-found: warn

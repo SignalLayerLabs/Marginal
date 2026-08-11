@@ -19,7 +19,7 @@ def test_workflow_is_manual_modal_only_and_compares_both_lanes() -> None:
     assert "marginal_predictions.ndjson" in text
     assert text.count("--modal true") == 2
     assert "marginal public-eval" in text
-    assert "actions/upload-artifact@v4" in text
+    assert "actions/upload-artifact@v7" in text
 
 
 def test_readme_refuses_gold_as_marginal_evidence() -> None:
@@ -52,8 +52,8 @@ def test_workflow_uses_the_pinned_swebench_4_1_cli_contract() -> None:
     assert "--parallelism" not in text
     assert 'cp "${RUN_DIR}/baseline_predictions.ndjson" /tmp/baseline_predictions.jsonl' in text
     assert 'cp "${RUN_DIR}/marginal_predictions.ndjson" /tmp/marginal_predictions.jsonl' in text
-    assert '--predictions_path /tmp/baseline_predictions.jsonl' in text
-    assert '--predictions_path /tmp/marginal_predictions.jsonl' in text
+    assert "--predictions_path /tmp/baseline_predictions.jsonl" in text
+    assert "--predictions_path /tmp/marginal_predictions.jsonl" in text
 
 
 def test_release_lint_scope_includes_repository_benchmark_code() -> None:
