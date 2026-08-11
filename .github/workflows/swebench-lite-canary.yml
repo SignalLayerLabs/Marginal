@@ -58,7 +58,7 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
-          python -m pip install modal "swebench[modal]"
+          python -m pip install "modal==1.5.3" "swebench==4.1.0"
 
       - name: Validate evidence before Modal spend
         shell: bash
@@ -85,7 +85,7 @@ jobs:
             --predictions_path "${RUN_DIR}/baseline_predictions.ndjson" \
             --instance_ids ${IDS} \
             --run_id "${RUN_ID}" \
-            --parallelism 10 \
+            --max_workers 10 \
             --modal true
           RESULT="$(find evaluation_results -type f -name instance_results.jsonl -print -quit 2>/dev/null || true)"
           if [ -n "${RESULT}" ]; then
@@ -109,7 +109,7 @@ jobs:
             --predictions_path "${RUN_DIR}/marginal_predictions.ndjson" \
             --instance_ids ${IDS} \
             --run_id "${RUN_ID}" \
-            --parallelism 10 \
+            --max_workers 10 \
             --modal true
           RESULT="$(find evaluation_results -type f -name instance_results.jsonl -print -quit 2>/dev/null || true)"
           if [ -n "${RESULT}" ]; then
