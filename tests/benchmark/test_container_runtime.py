@@ -13,6 +13,7 @@ from benchmark.codex_adapter.container_runtime import (
 _BASE_COMMIT = "04a523fafbd61bc2e49420963b84ed8e2bd1b3cf"
 _BASE_DIGEST = "c8e43bebd10d7d2330820af520361dc6adc9642f98c7b7b7c415cca39852ffdd"
 _OVERLAY_DIGEST = "1" * 64
+_OVERLAY_IMAGE = f"sha256:{_OVERLAY_DIGEST}"
 
 
 def _config(tmp_path: Path, *, condition: str = "baseline") -> ContainerRunConfig:
@@ -34,7 +35,7 @@ def _config(tmp_path: Path, *, condition: str = "baseline") -> ContainerRunConfi
         task_image=(
             f"swebench/sweb.eval.x86_64.pvlib_1776_pvlib-python-1072@sha256:{_BASE_DIGEST}"
         ),
-        overlay_image=f"marginal-codex-pvlib@sha256:{_OVERLAY_DIGEST}",
+        overlay_image=_OVERLAY_IMAGE,
         container_name=f"marginal-{condition}-pvlib-1072",
         run_dir=run_dir,
         source_root=source,
@@ -124,10 +125,18 @@ def test_run_dir_must_not_be_inside_source_tree(tmp_path: Path) -> None:
             condition="baseline",
             expected_base_commit=_BASE_COMMIT,
             task_image=f"swebench/task@sha256:{_BASE_DIGEST}",
-            overlay_image=f"marginal/task@sha256:{_OVERLAY_DIGEST}",
+            overlay_image=_OVERLAY_IMAGE,
             container_name="marginal-baseline-pvlib-1072",
             run_dir=run_dir,
             source_root=source,
             auth_source=auth,
             prompt_file=prompt,
         )
+
+
+def test_entrypoint_enables_native_hooks_for_both_lanes() -> None:
+    entrypoint = (
+        Path(__file__).resolve().parents[2] / "benchmark" / "container" / "entrypoint.sh"
+    ).read_text(encoding="utf-8")
+
+    assert entrypoint.count("--enable codex_hooks") == 1

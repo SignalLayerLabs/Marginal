@@ -8,6 +8,7 @@ from pathlib import Path
 
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _DIGEST_IMAGE = re.compile(r"^[a-z0-9][a-z0-9._/-]*(?::[A-Za-z0-9._-]+)?@sha256:[0-9a-f]{64}$")
+_IMAGE_ID = re.compile(r"^sha256:[0-9a-f]{64}$")
 _INSTANCE_ID = re.compile(r"^[A-Za-z0-9_.-]+__[A-Za-z0-9_.-]+-[0-9]+$")
 _CONTAINER_NAME = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,127}$")
 
@@ -68,7 +69,10 @@ class ContainerRunConfig:
             raise ValueError("expected_base_commit must be a lowercase 40-character SHA")
         if _DIGEST_IMAGE.fullmatch(self.task_image) is None:
             raise ValueError("task_image must be digest-pinned")
-        if _DIGEST_IMAGE.fullmatch(self.overlay_image) is None:
+        if (
+            _DIGEST_IMAGE.fullmatch(self.overlay_image) is None
+            and _IMAGE_ID.fullmatch(self.overlay_image) is None
+        ):
             raise ValueError("overlay_image must be digest-pinned")
         if _CONTAINER_NAME.fullmatch(self.container_name) is None:
             raise ValueError("container_name is invalid")

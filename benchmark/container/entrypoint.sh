@@ -98,6 +98,7 @@ command=(
   --color never
   --strict-config
   --dangerously-bypass-hook-trust
+  --enable codex_hooks
   -m "${MARGINAL_MODEL}"
   -c "model_reasoning_effort=\"${MARGINAL_REASONING_EFFORT}\""
   -c 'approval_policy="never"'
