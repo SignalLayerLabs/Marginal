@@ -60,7 +60,7 @@ dev = [
   "mypy>=1.17",
   "pytest>=8.3",
   "jsonschema>=4.23",
-  "ruff==0.15.22",
+  "ruff==0.16.2",
   "twine>=6.1",
 ]
 
