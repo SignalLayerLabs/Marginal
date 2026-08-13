@@ -4,10 +4,12 @@ import hashlib
 import json
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 import pytest
 from scripts.build_codex_plugin import build_plugin_runtime
+from scripts.build_codex_plugin_submission import build_submission_archive
 
 REPO = Path(__file__).resolve().parents[2]
 PLUGIN = REPO / "plugins" / "marginal"
@@ -43,6 +45,54 @@ def test_manifest_is_validator_clean() -> None:
     )
 
     assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_manifest_has_directory_publication_metadata() -> None:
+    manifest = json.loads((PLUGIN / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
+
+    assert manifest["homepage"] == "https://signallayerlabs.github.io/Marginal/"
+    assert manifest["repository"] == "https://github.com/SignalLayerLabs/Marginal"
+    assert manifest["license"] == "Apache-2.0"
+    assert {"compute-governance", "codex", "token-efficiency"} <= set(manifest["keywords"])
+
+    interface = manifest["interface"]
+    assert interface["websiteURL"] == manifest["homepage"]
+    assert interface["privacyPolicyURL"].endswith("/privacy.html")
+    assert interface["termsOfServiceURL"].endswith("/terms.html")
+    assert interface["brandColor"] == "#22D3EE"
+    assert interface["composerIcon"] == "./assets/marginal-logo.png"
+    assert interface["logo"] == "./assets/marginal-logo.png"
+    assert 1 <= len(interface["defaultPrompt"]) <= 3
+    assert all(len(prompt) <= 128 for prompt in interface["defaultPrompt"])
+
+
+def test_directory_logo_is_square_png() -> None:
+    logo = PLUGIN / "assets" / "marginal-logo.png"
+    data = logo.read_bytes()
+
+    assert data[:8] == b"\x89PNG\r\n\x1a\n"
+    width = int.from_bytes(data[16:20], "big")
+    height = int.from_bytes(data[20:24], "big")
+    assert width == height
+    assert width >= 512
+
+
+def test_directory_submission_archive_is_reproducible_and_complete(tmp_path: Path) -> None:
+    first = build_submission_archive(REPO, output_dir=tmp_path / "first")
+    second = build_submission_archive(REPO, output_dir=tmp_path / "second")
+
+    assert _sha256(first) == _sha256(second)
+    with zipfile.ZipFile(first) as archive:
+        names = set(archive.namelist())
+    assert {
+        ".codex-plugin/plugin.json",
+        "skills/marginal/SKILL.md",
+        "skills/marginal/agents/openai.yaml",
+        "hooks/hooks.json",
+        "runtime/marginal_runtime.pyz",
+        "assets/marginal-logo.png",
+    } <= names
+    assert not any("__pycache__" in name or name.endswith(".pyc") for name in names)
 
 
 def test_hooks_cover_exact_supported_lifecycle() -> None:

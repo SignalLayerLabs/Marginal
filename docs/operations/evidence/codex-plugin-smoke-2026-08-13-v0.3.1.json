@@ -1,0 +1,14 @@
+{
+  "codex_version": "codex-cli 0.147.0",
+  "completed_sessions": 1,
+  "directory_archive_sha256": "f43231057fab50a35fed14a55f95a2452e0c0c64f3b9b1f0a1a602e24af19582",
+  "evidence_records": 4,
+  "hook_coverage": 1.0,
+  "installed": true,
+  "marketplace_selector": "marginal@marginal",
+  "plugin_version": "0.3.1",
+  "raw_secret_occurrences": 0,
+  "removed": true,
+  "runtime_sha256": "98dc5a49e77864fd529c647cc5e81181b9f5ebda234561135a80d4a05823f06d",
+  "shadow_block_count": 0
+}

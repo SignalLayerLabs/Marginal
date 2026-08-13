@@ -4,8 +4,8 @@ title: "MARGINAL: Economically Disciplined Compute Allocation for AI Agents"
 type: software
 authors:
   - name: SignalLayer Labs
-version: 0.3.0
-date-released: 2026-08-06
+version: 0.3.1
+date-released: 2026-08-13
 license: Apache-2.0
 repository-code: "https://github.com/SignalLayerLabs/Marginal"
 url: "https://github.com/SignalLayerLabs/Marginal"

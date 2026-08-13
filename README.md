@@ -235,7 +235,7 @@ marginal install codex
 Current tagged library install target:
 
 ```bash
-pip install "marginal-ai @ git+https://github.com/SignalLayerLabs/Marginal.git@v0.3.0"
+pip install "marginal-ai @ git+https://github.com/SignalLayerLabs/Marginal.git@v0.3.1"
 ```
 
 Development checkout:
