@@ -1,0 +1,20 @@
+{
+  "name": "marginal",
+  "interface": {
+    "displayName": "Marginal"
+  },
+  "plugins": [
+    {
+      "name": "marginal",
+      "source": {
+        "source": "local",
+        "path": "./plugins/marginal"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

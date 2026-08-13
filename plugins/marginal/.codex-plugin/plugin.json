@@ -1,0 +1,19 @@
+{
+  "name": "marginal",
+  "version": "0.3.0",
+  "description": "Evidence-gated compute governance for Codex, local-first and Shadow Mode by default.",
+  "author": {
+    "name": "SignalLayer Labs",
+    "url": "https://github.com/SignalLayerLabs/Marginal"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Marginal",
+    "shortDescription": "Earned enforcement for agent compute.",
+    "longDescription": "MARGINAL measures repeated Codex tool work locally, starts in Shadow Mode, and permits repository Tool Enforcement only after a versioned evidence gate proves coverage, reviewed false stops, and governance overhead.",
+    "developerName": "SignalLayer Labs",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use $marginal to inspect this repository's Shadow Mode evidence and explain whether Tool Enforcement is ready."
+  }
+}

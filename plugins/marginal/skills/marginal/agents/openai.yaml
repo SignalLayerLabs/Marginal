@@ -1,0 +1,4 @@
+interface:
+  display_name: "MARGINAL"
+  short_description: "Inspect evidence-gated Codex governance"
+  default_prompt: "Use $marginal to inspect this repository’s Shadow Mode evidence and explain whether Tool Enforcement is ready."

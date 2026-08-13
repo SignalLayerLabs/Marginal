@@ -6,7 +6,11 @@ import hashlib
 import json
 import os
 import secrets
-from dataclasses import dataclass
+import subprocess
+import sys
+import threading
+import time
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -42,7 +46,11 @@ def _repository_hash(workspace: Path) -> str:
     return hashlib.sha256(str(workspace.resolve()).encode("utf-8")).hexdigest()
 
 
-def _handler(runtime: CodexSessionRuntime) -> Any:
+def _handler(
+    runtime: CodexSessionRuntime,
+    *,
+    shutdown_event: threading.Event | None = None,
+) -> Any:
     def handle(operation: str, payload: dict[str, Any]) -> dict[str, Any] | None:
         if operation == "status":
             return runtime.summary()
@@ -59,10 +67,122 @@ def _handler(runtime: CodexSessionRuntime) -> Any:
             return None
         if operation == "close":
             runtime.close()
+            if shutdown_event is not None:
+                threading.Timer(0.05, shutdown_event.set).start()
             return runtime.summary()
         raise ValueError("unsupported service operation")
 
     return handle
+
+
+def _bootstrap_path(data_root: Path, session_id: str) -> Path:
+    bootstrap_root = data_root / "bootstrap"
+    bootstrap_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if os.name == "posix":
+        bootstrap_root.chmod(0o700)
+    return bootstrap_root / f"{session_id}-{secrets.token_hex(8)}.json"
+
+
+def _spawn_session_service(
+    event: SessionEvent,
+    *,
+    data_root: Path,
+) -> ConnectionInfo:
+    existing_path = _connection_path(data_root, event.session_id)
+    if existing_path.exists():
+        try:
+            existing = ConnectionInfo.from_file(existing_path)
+            if request_session(existing, operation="status", payload={}).get("ok") is True:
+                return existing
+        except (OSError, ValueError, KeyError):
+            pass
+        existing_path.unlink(missing_ok=True)
+
+    bootstrap = _bootstrap_path(data_root, event.session_id)
+    payload = {
+        "event": asdict(event),
+        "data_root": str(data_root),
+        "token": secrets.token_hex(32),
+    }
+    descriptor = os.open(bootstrap, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    try:
+        os.write(
+            descriptor,
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8"),
+        )
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+    executable = Path(sys.argv[0]).resolve()
+    if executable.suffix == ".pyz":
+        command = [sys.executable, str(executable), "--serve", str(bootstrap)]
+    else:
+        command = [
+            sys.executable,
+            "-m",
+            "marginal.integrations.codex.service",
+            "--serve",
+            str(bootstrap),
+        ]
+    environment = {
+        name: value
+        for name in ("PATH", "LANG", "LC_ALL", "SYSTEMROOT", "PYTHONPATH")
+        if (value := os.environ.get(name)) is not None
+    }
+    subprocess.Popen(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        env=environment,
+        close_fds=True,
+        start_new_session=True,
+    )
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        if existing_path.exists():
+            try:
+                connection = ConnectionInfo.from_file(existing_path)
+                if request_session(connection, operation="status", payload={}).get("ok") is True:
+                    return connection
+            except (OSError, ValueError, KeyError):
+                pass
+        time.sleep(0.05)
+    bootstrap.unlink(missing_ok=True)
+    raise RuntimeError("Codex session service did not become ready")
+
+
+def _serve_bootstrap(path: Path) -> int:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    finally:
+        path.unlink(missing_ok=True)
+    event = parse_hook_event(payload["event"])
+    if not isinstance(event, SessionEvent) or event.hook_event_name != "SessionStart":
+        return 2
+    data_root = Path(payload["data_root"]).resolve()
+    token = str(payload["token"])
+    treasury = Treasury(BudgetLimits(), mode="shadow")
+    universal = UniversalRuntime(
+        treasury,
+        engine="codex",
+        session_id=event.session_id,
+        task_id=_repository_hash(Path(event.cwd)),
+        capabilities=AgentCapabilities(block_actions=True),
+    )
+    runtime = CodexSessionRuntime(universal, workspace=event.cwd)
+    shutdown_event = threading.Event()
+    server = SessionServer(
+        data_root=data_root,
+        session_id=event.session_id,
+        token=token,
+        handler=_handler(runtime, shutdown_event=shutdown_event),
+    )
+    server.start()
+    shutdown_event.wait()
+    server.stop()
+    return 0
 
 
 def start_session_service(
@@ -179,7 +299,7 @@ def run_hook(payload: dict[str, Any], *, data_root: str | Path) -> HookResult:
         event = parse_hook_event(payload)
         if isinstance(event, SessionEvent):
             if event.hook_event_name == "SessionStart":
-                start_session_service(event, data_root=root)
+                _spawn_session_service(event, data_root=root)
             else:
                 stop_session_service(event.session_id, data_root=root)
             return HookResult(exit_code=0)
@@ -202,3 +322,27 @@ def run_hook(payload: dict[str, Any], *, data_root: str | Path) -> HookResult:
         _demote_all_enforced(root, "INTEGRATION_ERROR")
         return HookResult(exit_code=0, warning_code="INTEGRATION_ERROR")
 
+
+def hook_main(argv: list[str] | None = None) -> int:
+    """Zipapp entry point used by the native plugin hook shim."""
+
+    selected = list(sys.argv[1:] if argv is None else argv)
+    if len(selected) == 2 and selected[0] == "--serve":
+        return _serve_bootstrap(Path(selected[1]).resolve())
+    data_root_value = os.environ.get("PLUGIN_DATA")
+    if not data_root_value:
+        return 0
+    try:
+        payload = json.load(sys.stdin)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return 0
+    if not isinstance(payload, dict):
+        return 0
+    result = run_hook(payload, data_root=data_root_value)
+    if result.output is not None:
+        print(json.dumps(result.output, sort_keys=True, separators=(",", ":")))
+    return result.exit_code
+
+
+if __name__ == "__main__":
+    raise SystemExit(hook_main())
