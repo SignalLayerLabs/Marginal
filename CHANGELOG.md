@@ -4,6 +4,15 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-08-13
+
+### Fixed
+
+- native hook and control launchers now replace an incompatible `python3` (including macOS Xcode
+  Python 3.9) with an available Python 3.10–3.13 interpreter;
+- marketplace smoke now invokes the exact public `python3` launcher path and records its version,
+  preventing isolated test environments from masking interpreter-selection failures.
+
 ## [0.3.2] - 2026-08-13
 
 ### Added

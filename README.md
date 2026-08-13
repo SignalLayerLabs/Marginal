@@ -213,7 +213,8 @@ codex plugin marketplace add SignalLayerLabs/Marginal --ref main && codex plugin
 
 Then open `/hooks` in Codex, review the exact commands, and grant trust only after inspection.
 MARGINAL never bypasses the hook trust boundary. No Python package or global executable is needed.
-In Codex, ask the bundled skill directly:
+One local Python 3.10–3.13 interpreter is required; the launcher finds it automatically even when
+`python3` points to an older macOS/Xcode runtime. In Codex, ask the bundled skill directly:
 
 ```text
 Use $marginal to report whether a live hook service is active, whether hooks were observed, and whether this repository is in Shadow Mode or Tool Enforcement.
@@ -237,7 +238,7 @@ marginal install codex
 Current tagged library install target:
 
 ```bash
-pip install "marginal-ai @ git+https://github.com/SignalLayerLabs/Marginal.git@v0.3.2"
+pip install "marginal-ai @ git+https://github.com/SignalLayerLabs/Marginal.git@v0.3.3"
 ```
 
 Development checkout:

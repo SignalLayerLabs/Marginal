@@ -20,7 +20,7 @@ def test_public_repository_identity_is_consistent() -> None:
         assert "SignalLayer Labs" in text or "SignalLayerLabs" in text, path
 
     codemeta = json.loads((ROOT / "codemeta.json").read_text(encoding="utf-8"))
-    assert codemeta["version"] == "0.3.2"
+    assert codemeta["version"] == "0.3.3"
     assert codemeta["codeRepository"] == "https://github.com/SignalLayerLabs/Marginal"
     assert codemeta["issueTracker"] == "https://github.com/SignalLayerLabs/Marginal/issues"
     assert codemeta["author"]["name"] == "SignalLayer Labs"

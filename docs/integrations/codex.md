@@ -14,6 +14,10 @@ Open `/hooks` in Codex and inspect the four MARGINAL lifecycle commands before g
 plugin never uses the bypass-trust flag. Until trust and runtime coverage are observed, MARGINAL is
 unobserved or Shadow-only; lack of evidence alone does not prove that hooks are disabled.
 
+The bundle has no third-party Python dependency, but requires one local Python 3.10–3.13 runtime.
+Its launchers automatically select a compatible version even when `python3` resolves to macOS/Xcode
+Python 3.9. If none is available, control commands return the exact requirement and hooks fail open.
+
 An installed Python package can perform the same native transaction:
 
 ```bash

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 import subprocess
 import sys
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from scripts.build_codex_plugin import build_plugin_runtime
@@ -245,6 +247,26 @@ fi
     assert payload["plugins_enabled"] is True
 
 
+def test_runtime_selector_replaces_an_incompatible_launcher_python(monkeypatch) -> None:
+    module_path = PLUGIN / "scripts" / "runtime_python.py"
+    spec = importlib.util.spec_from_file_location("marginal_plugin_runtime_python", module_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(
+        module,
+        "sys",
+        SimpleNamespace(version_info=(3, 9, 6), executable="/usr/bin/python3"),
+    )
+    monkeypatch.setattr(
+        module.shutil,
+        "which",
+        lambda name: "/opt/runtime/python3.11" if name == "python3.11" else None,
+    )
+
+    assert module.compatible_python() == ("/opt/runtime/python3.11",)
+
+
 def test_plugin_runtime_contains_no_live_repository_paths() -> None:
     runtime = (PLUGIN / "runtime" / "marginal_runtime.pyz").read_bytes()
 
@@ -265,6 +287,7 @@ def test_skill_teaches_truthful_earned_enforcement_workflow() -> None:
         "scripts/marginal_control.py",
         "hooks_active",
         "hooks_observed",
+        "Python 3.10",
         "never claim token savings",
     ):
         assert phrase.casefold() in text.casefold()

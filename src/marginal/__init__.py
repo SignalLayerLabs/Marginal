@@ -137,4 +137,4 @@ __all__ = [
     "validate_safe_telemetry_record",
 ]
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"

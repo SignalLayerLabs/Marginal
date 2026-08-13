@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
+
+from runtime_python import compatible_python
 
 
 def main() -> int:
@@ -16,6 +17,10 @@ def main() -> int:
     runtime = Path(plugin_root).resolve() / "runtime" / "marginal_runtime.pyz"
     if not runtime.is_file():
         return 0
+    try:
+        python = compatible_python()
+    except RuntimeError:
+        return 0
     environment = {
         name: value
         for name in ("PATH", "LANG", "LC_ALL", "SYSTEMROOT")
@@ -23,7 +28,7 @@ def main() -> int:
     }
     environment["PLUGIN_DATA"] = str(Path(plugin_data).resolve())
     environment["PLUGIN_ROOT"] = str(Path(plugin_root).resolve())
-    os.execve(sys.executable, [sys.executable, str(runtime)], environment)
+    os.execve(python[0], [*python, str(runtime)], environment)
     return 0
 
 

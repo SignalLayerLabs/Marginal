@@ -1,6 +1,6 @@
 {
   "name": "marginal",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Evidence-gated compute governance for Codex, local-first and Shadow Mode by default.",
   "author": {
     "name": "SignalLayer Labs",
