@@ -141,12 +141,66 @@ def _build_parser() -> argparse.ArgumentParser:
         help="maximum reviewed false-stop rate allowed for a supported intervention",
     )
     public_eval.add_argument("--seed", type=int, default=42)
+
+    install_parser = subparsers.add_parser("install", help="install a native integration")
+    install_parser.add_argument("target", choices=["codex"])
+    install_parser.add_argument("--repository", default="SignalLayerLabs/Marginal")
+    install_parser.add_argument("--ref", default="main")
+    install_parser.add_argument("--json", action="store_true", dest="as_json")
+
+    uninstall_parser = subparsers.add_parser("uninstall", help="remove a native integration")
+    uninstall_parser.add_argument("target", choices=["codex"])
+    uninstall_parser.add_argument("--purge-data", action="store_true")
+    uninstall_parser.add_argument("--yes", action="store_true")
+    uninstall_parser.add_argument("--data-dir", type=Path)
+    uninstall_parser.add_argument("--json", action="store_true", dest="as_json")
+
+    codex = subparsers.add_parser("codex", help="manage the Codex integration")
+    codex.add_argument("codex_command", choices=["status", "doctor", "review", "promote", "demote"])
+    codex.add_argument("--data-dir", type=Path)
+    codex.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
+
+    if args.command == "install":
+        from .integrations.codex.installer import install
+
+        result = install(repository=args.repository, ref=args.ref)
+        payload = result.to_dict()
+        if args.as_json:
+            print(json.dumps(payload, sort_keys=True))
+        else:
+            print(result.message or result.error_code)
+        return 0 if result.installed else 1
+
+    if args.command == "uninstall":
+        from .integrations.codex.commands import default_data_dir, purge_data
+        from .integrations.codex.installer import uninstall
+
+        if args.purge_data and not args.yes:
+            print("--purge-data requires --yes", file=sys.stderr)
+            return 2
+        result = uninstall()
+        if args.purge_data and not result.installed:
+            purge_data(args.data_dir or default_data_dir(), confirmed=True)
+        if args.as_json:
+            print(json.dumps(result.to_dict(), sort_keys=True))
+        else:
+            print(result.message or result.error_code)
+        return 0 if not result.installed else 1
+
+    if args.command == "codex":
+        from .integrations.codex.commands import codex_command
+
+        return codex_command(
+            args.codex_command,
+            data_dir=args.data_dir,
+            as_json=args.as_json,
+        )
 
     if args.command == "ledger-export":
         from .ledger import export_decision_ledger
