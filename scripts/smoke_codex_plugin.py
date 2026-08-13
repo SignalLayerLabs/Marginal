@@ -7,7 +7,6 @@ import argparse
 import json
 import os
 import subprocess
-import sys
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -23,6 +22,7 @@ class CodexPluginSmokeResult:
     completed_sessions: int
     native_control_observed: bool
     native_control_mode: str
+    launcher_python_version: str
     raw_secret_occurrences: int
     removed: bool
     codex_version: str
@@ -131,6 +131,8 @@ def smoke_plugin(
     }
     _initialize_repository(workspace, environment)
     version = _run([str(codex), "--version"], environment=environment, cwd=root).stdout.strip()
+    launcher = _run(["python3", "--version"], environment=environment, cwd=root)
+    launcher_python_version = (launcher.stdout or launcher.stderr).strip()
     _run(
         [str(codex), "plugin", "marketplace", "add", str(marketplace), "--json"],
         environment=environment,
@@ -161,7 +163,7 @@ def smoke_plugin(
     try:
         for payload in _hook_payloads(workspace, secret):
             result = _run(
-                [sys.executable, str(hook_script)],
+                ["python3", str(hook_script)],
                 environment=hook_environment,
                 cwd=workspace,
                 input_text=json.dumps(payload),
@@ -177,7 +179,7 @@ def smoke_plugin(
             time.sleep(0.02)
         control = _run(
             [
-                sys.executable,
+                "python3",
                 str(plugin_root / "scripts" / "marginal_control.py"),
                 "status",
                 "--workspace",
@@ -219,6 +221,7 @@ def smoke_plugin(
         ),
         native_control_observed=native_control_observed,
         native_control_mode=native_control_mode,
+        launcher_python_version=launcher_python_version,
         raw_secret_occurrences=_count_secret(plugin_data, secret),
         removed=removed,
         codex_version=version,

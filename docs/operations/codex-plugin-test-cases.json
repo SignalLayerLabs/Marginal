@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plugin_version": "0.3.2",
+  "plugin_version": "0.3.3",
   "positive": [
     {
       "id": "positive-shadow-status",

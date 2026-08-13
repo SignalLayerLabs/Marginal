@@ -24,5 +24,6 @@ def test_marketplace_install_and_remove(tmp_path: Path) -> None:
     assert result.completed_sessions == 1
     assert result.native_control_observed is True
     assert result.native_control_mode == "shadow"
+    assert result.launcher_python_version.startswith("Python 3.")
     assert result.raw_secret_occurrences == 0
     assert result.removed is True

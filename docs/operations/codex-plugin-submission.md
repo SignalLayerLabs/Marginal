@@ -3,7 +3,7 @@
 ```text
 status: not_submitted
 status_date: 2026-08-13
-plugin_version: 0.3.2
+plugin_version: 0.3.3
 marketplace_selector: marginal@marginal
 portal_submission_type: skills_only_zip
 portal_access: authentication_required
@@ -32,9 +32,9 @@ and permits repository Tool Enforcement only after a versioned evidence gate pro
 reviewed false stops, and governance overhead. It never reads prompts, source, raw commands, raw
 outputs, transcripts, or Codex credentials for evidence.
 
-**Release notes:** Adds a dependency-free native control plane, repository-scoped hook attestation,
-local Shadow Mode, review workflow, Earned Enforcement gates, fail-open demotion, production logo,
-eight reviewer cases, and a reproducible v0.3.2 archive.
+**Release notes:** Adds automatic compatible-Python discovery, a dependency-free native control
+plane, repository-scoped hook attestation, local Shadow Mode, review workflow, Earned Enforcement
+gates, fail-open demotion, production logo, eight reviewer cases, and a reproducible v0.3.3 archive.
 
 Starter prompts are the three `interface.defaultPrompt` entries in
 `plugins/marginal/.codex-plugin/plugin.json`. The production logo is
@@ -63,14 +63,16 @@ coverage or identity changes.
 - [x] Official plugin validator passes.
 - [x] Skill validator passes.
 - [x] Isolated Codex 0.147.0 marketplace add/install/remove smoke passes.
+- [x] Public `python3` launcher smoke passes from macOS/Xcode Python 3.9.6 by selecting a compatible
+  bundled-runtime interpreter.
 - [x] Four-event direct lifecycle smoke passes with 100% exercised coverage.
 - [x] Secret-marker scan returns zero persisted occurrences.
 - [x] Reproducible smoke evidence is committed with runtime SHA-256 provenance.
 - [x] Privacy, terms, support, and eight reviewer cases exist.
-- [ ] Canonical main contains v0.3.2 after merge and every public Pages URL resolves.
+- [ ] Canonical main contains v0.3.3 after merge and every public Pages URL resolves.
 - [x] A deterministic single-root ZIP builder covers the manifest, skill, hooks, runtime, and logo.
 - [ ] SignalLayer Labs identity and Apps Management write permission are confirmed in Platform.
-- [ ] The v0.3.2 archive is uploaded in Platform and external review is started.
+- [ ] The v0.3.3 archive is uploaded in Platform and external review is started.
 
 Build the exact upload artifact with:
 
@@ -89,4 +91,4 @@ verified SignalLayer Labs identity; none can be inferred from repository or GitH
 external identifier, credential, or reviewer correspondence belongs in this repository.
 
 Acceptance evidence:
-[`codex-plugin-smoke-2026-08-13-v0.3.2.json`](evidence/codex-plugin-smoke-2026-08-13-v0.3.2.json).
+[`codex-plugin-smoke-2026-08-13-v0.3.3.json`](evidence/codex-plugin-smoke-2026-08-13-v0.3.3.json).

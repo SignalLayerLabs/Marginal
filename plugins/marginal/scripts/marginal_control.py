@@ -7,6 +7,8 @@ import os
 import sys
 from pathlib import Path
 
+from runtime_python import compatible_python
+
 
 def _plugin_data() -> Path:
     configured = os.environ.get("PLUGIN_DATA")
@@ -37,6 +39,11 @@ def main(argv: list[str] | None = None) -> int:
     if not runtime.is_file():
         print(f"MARGINAL runtime not found: {runtime}", file=sys.stderr)
         return 1
+    try:
+        python = compatible_python()
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
 
     data = _plugin_data()
     data.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -48,9 +55,9 @@ def main(argv: list[str] | None = None) -> int:
     environment["PLUGIN_DATA"] = str(data)
     environment["PLUGIN_ROOT"] = str(plugin_root)
     os.execve(
-        sys.executable,
+        python[0],
         [
-            sys.executable,
+            *python,
             str(runtime),
             "codex",
             arguments[0],

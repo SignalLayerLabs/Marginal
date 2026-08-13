@@ -1,0 +1,17 @@
+{
+  "codex_version": "codex-cli 0.147.0",
+  "completed_sessions": 1,
+  "directory_archive_sha256": "42edc01ce21753ce9676426f6d89b0a249539545df0d3c2073c1c060e1b39f7b",
+  "evidence_records": 4,
+  "hook_coverage": 1.0,
+  "installed": true,
+  "launcher_python_version": "Python 3.9.6",
+  "marketplace_selector": "marginal@marginal",
+  "native_control_mode": "shadow",
+  "native_control_observed": true,
+  "plugin_version": "0.3.3",
+  "raw_secret_occurrences": 0,
+  "removed": true,
+  "runtime_sha256": "9843b084dd481f29762870e6e6f79a301bdd9c15b7a8c2dc1c4104abc332b259",
+  "shadow_block_count": 0
+}

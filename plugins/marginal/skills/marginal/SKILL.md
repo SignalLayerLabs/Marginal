@@ -20,6 +20,8 @@ Do not require a global `marginal` executable or a pip installation. Resolve the
 
 Pass `--workspace <repository>` and `--json` when inspecting repository-scoped state. The launcher
 uses Codex's native plugin data directory, so hook evidence and control commands share one state.
+It automatically replaces an older `python3` with an available Python 3.10–3.13 interpreter. If
+none is installed, report that exact runtime requirement and do not claim hooks are operational.
 
 ## Workflow
 
