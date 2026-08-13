@@ -6,7 +6,7 @@
   "codeRepository": "https://github.com/SignalLayerLabs/Marginal",
   "issueTracker": "https://github.com/SignalLayerLabs/Marginal/issues",
   "license": "https://spdx.org/licenses/Apache-2.0",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "datePublished": "2026-08-06",
   "programmingLanguage": "Python",
   "runtimePlatform": "Python 3.10-3.13",

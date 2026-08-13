@@ -1,11 +1,20 @@
 {
   "name": "marginal",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Evidence-gated compute governance for Codex, local-first and Shadow Mode by default.",
   "author": {
     "name": "SignalLayer Labs",
     "url": "https://github.com/SignalLayerLabs/Marginal"
   },
+  "homepage": "https://signallayerlabs.github.io/Marginal/",
+  "repository": "https://github.com/SignalLayerLabs/Marginal",
+  "license": "Apache-2.0",
+  "keywords": [
+    "agent-compute",
+    "compute-governance",
+    "codex",
+    "token-efficiency"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Marginal",
@@ -14,6 +23,16 @@
     "developerName": "SignalLayer Labs",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": "Use $marginal to inspect this repository's Shadow Mode evidence and explain whether Tool Enforcement is ready."
+    "websiteURL": "https://signallayerlabs.github.io/Marginal/",
+    "privacyPolicyURL": "https://signallayerlabs.github.io/Marginal/privacy.html",
+    "termsOfServiceURL": "https://signallayerlabs.github.io/Marginal/terms.html",
+    "defaultPrompt": [
+      "Use $marginal to inspect this repository's Shadow Mode evidence and explain whether Tool Enforcement is ready.",
+      "Use $marginal to diagnose this Codex installation without reading credentials or transcripts.",
+      "Use $marginal to review repeated-work candidates and explain which evidence gates remain."
+    ],
+    "brandColor": "#22D3EE",
+    "composerIcon": "./assets/marginal-logo.png",
+    "logo": "./assets/marginal-logo.png"
   }
 }

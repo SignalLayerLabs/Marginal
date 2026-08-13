@@ -4,6 +4,20 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-13
+
+### Added
+
+- production square logo, public listing metadata and three starter prompts for the universal
+  Plugins Directory;
+- deterministic, single-root Plugins Directory ZIP with the native skill, hooks, local runtime and
+  assets, published alongside every release.
+
+### Changed
+
+- the submission packet now records the exact OpenAI Platform access and identity prerequisites
+  separately from completed package, release and public-URL gates.
+
 ## [0.3.0] - 2026-08-13
 
 ### Added
