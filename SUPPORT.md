@@ -9,8 +9,8 @@ a public issue.
 MARGINAL is an early open-source reference implementation. Community support is best effort;
 no service-level agreement is provided.
 
-For Codex integration reports, include the redacted output of `marginal codex doctor`, the Codex
-version, operating system, plugin version, and whether `/hooks` shows the expected lifecycle hooks.
+For Codex integration reports, ask `$marginal` for the redacted native `doctor` output and include
+the Codex version, operating system, plugin version, and whether `/hooks` shows the expected hooks.
 Never attach `auth.json`, prompts, source code, raw commands, raw tool output, transcripts, access
 tokens, or the contents of `PLUGIN_DATA` connection files.
 

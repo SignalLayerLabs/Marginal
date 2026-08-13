@@ -10,7 +10,7 @@ from pathlib import Path
 from .installer import CommandRunner, SubprocessRunner, inspect_codex
 from .promotion import PromotionIdentity
 
-PLUGIN_VERSION = "0.3.1"
+PLUGIN_VERSION = "0.3.2"
 ADAPTER_VERSION = "1"
 POLICY_HASH = hashlib.sha256(b"marginal:no-progress:v1:max-same-evidence=2").hexdigest()
 DEFAULT_HOOK_HASH = "46b7a85a3a542957d055c615ab501f9fee284bb3193ac9ecfbe8951cce5a9942"

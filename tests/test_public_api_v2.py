@@ -23,7 +23,7 @@ def test_v02_public_exports_and_version() -> None:
         "ValueEstimate",
     }
     assert expected.issubset(set(marginal.__all__))
-    assert marginal.__version__ == "0.3.1"
+    assert marginal.__version__ == "0.3.2"
 
 
 def test_json_schemas_exist_and_are_valid() -> None:

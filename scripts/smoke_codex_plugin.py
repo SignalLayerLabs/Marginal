@@ -21,6 +21,8 @@ class CodexPluginSmokeResult:
     hook_coverage: float
     evidence_records: int
     completed_sessions: int
+    native_control_observed: bool
+    native_control_mode: str
     raw_secret_occurrences: int
     removed: bool
     codex_version: str
@@ -116,7 +118,7 @@ def smoke_plugin(
     root = isolation_root.resolve()
     home = root / "home"
     codex_home = root / "codex"
-    plugin_data = root / "plugin-data"
+    plugin_data = codex_home / "plugins" / "data" / "marginal-marginal"
     workspace = root / "workspace"
     for directory in (home, codex_home, plugin_data):
         directory.mkdir(parents=True, exist_ok=True)
@@ -153,6 +155,8 @@ def smoke_plugin(
     secret = "MARGINAL_SMOKE_SECRET_7fcd98"
     completed_hooks = 0
     shadow_blocks = 0
+    native_control_observed = False
+    native_control_mode = "unknown"
     removed = False
     try:
         for payload in _hook_payloads(workspace, secret):
@@ -171,6 +175,21 @@ def smoke_plugin(
         sessions_root = plugin_data / "sessions"
         while list(sessions_root.glob("*.json")) and time.monotonic() < deadline:
             time.sleep(0.02)
+        control = _run(
+            [
+                sys.executable,
+                str(plugin_root / "scripts" / "marginal_control.py"),
+                "status",
+                "--workspace",
+                str(workspace),
+                "--json",
+            ],
+            environment=environment,
+            cwd=workspace,
+        )
+        control_status = json.loads(control.stdout)
+        native_control_observed = control_status.get("hooks_observed") is True
+        native_control_mode = str(control_status.get("mode", "unknown"))
     finally:
         remove = _run(
             [str(codex), "plugin", "remove", "marginal@marginal", "--json"],
@@ -198,6 +217,8 @@ def smoke_plugin(
                 if record.get("event") == "session_end" and record.get("session_hash")
             }
         ),
+        native_control_observed=native_control_observed,
+        native_control_mode=native_control_mode,
         raw_secret_occurrences=_count_secret(plugin_data, secret),
         removed=removed,
         codex_version=version,

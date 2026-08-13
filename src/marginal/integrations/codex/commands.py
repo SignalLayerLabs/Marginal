@@ -19,6 +19,10 @@ from .promotion import (
     write_promotion_receipt,
 )
 from .service import read_mode
+from .transport import ConnectionInfo, request_session
+
+_MAX_SESSION_RECEIPTS = 64
+_MAX_SESSION_RECEIPT_BYTES = 16_384
 
 
 def default_data_dir() -> Path:
@@ -68,6 +72,40 @@ def _emit(payload: dict[str, Any], *, as_json: bool) -> None:
             print(f"{key}: {value}")
 
 
+def _live_session_repository(path: Path) -> str | None:
+    if path.is_symlink() or path.stat().st_size > _MAX_SESSION_RECEIPT_BYTES:
+        return None
+    connection = ConnectionInfo.from_file(path)
+    if connection.host != "127.0.0.1" or len(connection.token.encode("utf-8")) < 16:
+        return None
+    response = request_session(connection, operation="status", payload={}, timeout=0.25)
+    if response.get("ok") is not True:
+        return None
+    result = response.get("result")
+    repository_hash = result.get("repository_hash") if isinstance(result, dict) else None
+    return repository_hash if isinstance(repository_hash, str) else None
+
+
+def _active_hook_sessions(data_dir: Path, *, repository_hash: str) -> tuple[int, int]:
+    sessions_root = data_dir / "sessions"
+    if not sessions_root.is_dir():
+        return 0, 0
+    active = 0
+    stale = 0
+    for index, path in enumerate(sessions_root.glob("*.json")):
+        if index >= _MAX_SESSION_RECEIPTS:
+            break
+        try:
+            session_repository = _live_session_repository(path)
+        except (OSError, ValueError, KeyError):
+            session_repository = None
+        if session_repository is None:
+            stale += 1
+        elif session_repository == repository_hash:
+            active += 1
+    return active, stale
+
+
 def codex_command(
     command: str,
     *,
@@ -84,11 +122,38 @@ def codex_command(
     payload: dict[str, Any]
     if command == "status":
         state = read_mode(root, repository_hash=identity.repository_hash)
+        records = evidence_store.read_all()
+        summary = summarize_evidence(records)
+        hooks_observed = any(
+            record.get("event") in {"session_start", "decision", "outcome", "session_end"}
+            for record in records
+        )
+        coverage_ratio = (
+            summary.covered_actions / summary.coverable_actions
+            if summary.coverable_actions
+            else 0.0
+        )
+        active_hook_sessions, stale_session_receipts = _active_hook_sessions(
+            root,
+            repository_hash=identity.repository_hash,
+        )
+        hooks_active = active_hook_sessions > 0
         _emit(
             {
                 **state,
                 "capability": "Tool Enforcement",
                 "repository_hash": identity.repository_hash,
+                "hook_state": (
+                    "active" if hooks_active else "observed" if hooks_observed else "not_observed"
+                ),
+                "hooks_observed": hooks_observed,
+                "hooks_active": hooks_active,
+                "active_hook_sessions": active_hook_sessions,
+                "stale_session_receipts": stale_session_receipts,
+                "evidence_records": len(records),
+                "covered_actions": summary.covered_actions,
+                "coverable_actions": summary.coverable_actions,
+                "coverage_ratio": coverage_ratio,
             },
             as_json=as_json,
         )

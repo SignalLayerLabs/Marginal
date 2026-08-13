@@ -25,11 +25,10 @@ to an issue is an explicit user action; inspect exports before sharing them.
 
 ## User controls
 
-- `marginal codex status` shows the local mode.
-- `marginal codex demote` returns enforcement to Shadow Mode.
-- `marginal uninstall codex` removes the plugin and preserves evidence.
-- `marginal uninstall codex --purge-data --yes` removes plugin data explicitly.
+- `$marginal` in Codex uses the bundled native control plane to show status or demote.
+- `codex plugin remove marginal@marginal` removes the plugin and preserves evidence.
+- the optional Python package command `marginal uninstall codex --purge-data --yes` removes plugin
+  data explicitly.
 
 Security issues must follow [SECURITY.md](SECURITY.md). Privacy questions can be filed through the
 private contact route described in [SUPPORT.md](SUPPORT.md).
-

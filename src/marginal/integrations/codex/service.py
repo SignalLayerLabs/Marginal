@@ -57,7 +57,10 @@ def _handler(
 ) -> Any:
     def handle(operation: str, payload: dict[str, Any]) -> dict[str, Any] | None:
         if operation == "status":
-            return runtime.summary()
+            return {
+                **runtime.summary(),
+                "repository_hash": identity.repository_hash,
+            }
         if operation == "close":
             runtime.close()
             evidence_store.append(

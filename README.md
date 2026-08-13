@@ -212,19 +212,21 @@ codex plugin marketplace add SignalLayerLabs/Marginal --ref main && codex plugin
 ```
 
 Then open `/hooks` in Codex, review the exact commands, and grant trust only after inspection.
-MARGINAL never bypasses the hook trust boundary. Useful management commands:
+MARGINAL never bypasses the hook trust boundary. No Python package or global executable is needed.
+In Codex, ask the bundled skill directly:
 
-```bash
-marginal codex status
-marginal codex doctor
-marginal codex review
-marginal codex review --candidate ACTION_HASH --verdict waste
-marginal codex promote
-marginal codex demote
-marginal uninstall codex
+```text
+Use $marginal to report whether a live hook service is active, whether hooks were observed, and whether this repository is in Shadow Mode or Tool Enforcement.
 ```
 
-The Python package can perform the same native installation transaction:
+The skill resolves the installed plugin with `codex plugin list --json` and runs its bundled
+`scripts/marginal_control.py`, which reads the same private data store as the hooks. Remove it with:
+
+```bash
+codex plugin remove marginal@marginal
+```
+
+An installed Python package can also perform the native installation transaction:
 
 ```bash
 marginal install codex
@@ -235,7 +237,7 @@ marginal install codex
 Current tagged library install target:
 
 ```bash
-pip install "marginal-ai @ git+https://github.com/SignalLayerLabs/Marginal.git@v0.3.1"
+pip install "marginal-ai @ git+https://github.com/SignalLayerLabs/Marginal.git@v0.3.2"
 ```
 
 Development checkout:

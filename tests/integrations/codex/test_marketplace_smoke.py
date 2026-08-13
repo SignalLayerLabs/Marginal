@@ -22,5 +22,7 @@ def test_marketplace_install_and_remove(tmp_path: Path) -> None:
     assert result.hook_coverage == 1.0
     assert result.evidence_records >= 4
     assert result.completed_sessions == 1
+    assert result.native_control_observed is True
+    assert result.native_control_mode == "shadow"
     assert result.raw_secret_occurrences == 0
     assert result.removed is True
