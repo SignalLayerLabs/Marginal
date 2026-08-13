@@ -9,15 +9,36 @@ Treat compute as scarce and claims as evidence-bound. The plugin starts globally
 it may exercise repository-scoped Tool Enforcement only after a valid Earned Enforcement receipt
 and explicit promotion.
 
+## Native control
+
+Do not require a global `marginal` executable or a pip installation. Resolve the native plugin:
+
+1. Run `codex plugin list --json`.
+2. Select the exact `pluginId` `marginal@marginal` and read its `source.path` as the plugin root.
+3. On macOS/Linux, run `python3 <plugin-root>/scripts/marginal_control.py COMMAND`; on Windows,
+   run `py -3 <plugin-root>\scripts\marginal_control.py COMMAND`.
+
+Pass `--workspace <repository>` and `--json` when inspecting repository-scoped state. The launcher
+uses Codex's native plugin data directory, so hook evidence and control commands share one state.
+
 ## Workflow
 
-1. Run `marginal codex status` before describing the active mode.
-2. Run `marginal codex doctor` when hooks, coverage, or compatibility are uncertain.
-3. Use `/hooks` to inspect and grant trust to the exact lifecycle commands.
-4. Run `marginal codex review`, then label each local redacted candidate with
+1. Run the native `status` command before describing the active mode.
+2. Read live operation, prior evidence, and enforcement as separate facts:
+   - `hooks_active: true` attests a live authenticated MARGINAL lifecycle service for this
+     repository. It is the strongest available operational signal, but does not expose or prove a
+     raw chat session identity.
+   - `hooks_observed: true` proves lifecycle evidence exists for this repository, even when no
+     session is currently live.
+   - `hooks_observed: false` means not yet observed, not that hooks are disabled. Use `/hooks` to
+     review and trust the exact definitions, perform a tool action, then run `status` again.
+   - `mode` reports `shadow` or repository-scoped `enforce`; installation alone never implies
+     enforcement.
+3. Run `doctor` when hooks, coverage, or compatibility remain uncertain.
+4. Run `review`, then label each local redacted candidate with
    `--candidate HASH --verdict waste|helpful` before promotion.
-5. Run `marginal codex promote` only when the evidence receipt is ready.
-6. Run `marginal codex demote` whenever identity, coverage, outcome observability, or policy drifts.
+5. Run `promote` only when the evidence receipt is ready.
+6. Run `demote` whenever identity, coverage, outcome observability, or policy drifts.
 
 ## Claims contract
 
@@ -31,10 +52,10 @@ and explicit promotion.
 
 | Need | Command |
 | --- | --- |
-| Current mode | `marginal codex status` |
-| Capability diagnosis | `marginal codex doctor` |
-| Unreviewed evidence | `marginal codex review` |
-| Evidence-gated enforcement | `marginal codex promote` |
-| Immediate fail-open reset | `marginal codex demote` |
+| Current mode and hook evidence | `python3 <plugin-root>/scripts/marginal_control.py status --workspace <repo> --json` |
+| Capability diagnosis | `python3 <plugin-root>/scripts/marginal_control.py doctor --json` |
+| Unreviewed evidence | `python3 <plugin-root>/scripts/marginal_control.py review --workspace <repo> --json` |
+| Evidence-gated enforcement | `python3 <plugin-root>/scripts/marginal_control.py promote --workspace <repo> --json` |
+| Immediate fail-open reset | `python3 <plugin-root>/scripts/marginal_control.py demote --workspace <repo> --json` |
 
 If evidence is incomplete or contradictory, keep Shadow Mode and report the exact blocking reason.

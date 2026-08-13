@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "plugin_version": "0.3.1",
+  "plugin_version": "0.3.2",
   "positive": [
     {
       "id": "positive-shadow-status",
       "prompt": "Use MARGINAL to inspect the current Codex governance mode.",
-      "expected": "Reports Shadow Mode and Tool Enforcement capability without claiming blocking is active."
+      "expected": "Uses the bundled native launcher, reports hook observation separately from Shadow Mode, and does not require a global marginal executable."
     },
     {
       "id": "positive-doctor",

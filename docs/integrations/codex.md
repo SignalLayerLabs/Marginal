@@ -12,7 +12,7 @@ codex plugin marketplace add SignalLayerLabs/Marginal --ref main && codex plugin
 
 Open `/hooks` in Codex and inspect the four MARGINAL lifecycle commands before granting trust. The
 plugin never uses the bypass-trust flag. Until trust and runtime coverage are observed, MARGINAL is
-inactive or Shadow-only.
+unobserved or Shadow-only; lack of evidence alone does not prove that hooks are disabled.
 
 An installed Python package can perform the same native transaction:
 
@@ -26,17 +26,8 @@ marginal install codex
 codex plugin remove marginal@marginal
 ```
 
-Or:
-
-```bash
-marginal uninstall codex
-```
-
-Removal preserves local evidence. Purge it only through the explicit destructive form:
-
-```bash
-marginal uninstall codex --purge-data --yes
-```
+Removal preserves local evidence. The optional Python package also exposes
+`marginal uninstall codex --purge-data --yes` for an explicit data purge.
 
 ## Earned Enforcement
 
@@ -49,7 +40,7 @@ Global installation never turns blocking on. A repository can enter Tool Enforce
 - p95 decision latency no greater than 75 ms;
 - an unchanged repository, Codex, plugin, adapter, policy, and hook identity;
 - an observable outcome contract for every enforced action family;
-- explicit `marginal codex promote` intent.
+- explicit native `promote` intent.
 
 Any identity drift, lifecycle failure, coverage loss, false stop, or unknown enforced outcome
 invalidates the receipt and demotes to Shadow Mode. Integration failure fails open because MARGINAL
@@ -57,22 +48,32 @@ is an efficiency governor, not a security boundary. Failures and false stops rem
 audit history, then open a fresh evidence window; enforcement can be earned again only with a new
 100-action, five-session clean window.
 
-## Commands
+## Native commands
+
+The plugin bundle does not modify `PATH`. Run `codex plugin list --json`, select the exact
+`marginal@marginal` entry, and use its `source.path` as `<plugin-root>`. Then invoke:
 
 | Command | Purpose |
 | --- | --- |
-| `marginal codex status` | Show mode and capability label |
-| `marginal codex doctor` | Inspect Codex version, stable hooks, and plugins |
-| `marginal codex review` | List redacted, unreviewed stop candidates |
-| `marginal codex promote` | Require a ready, hash-valid local receipt |
-| `marginal codex demote` | Immediately return to Shadow Mode |
+| `python3 <plugin-root>/scripts/marginal_control.py status --workspace <repo> --json` | Show live hook service, prior evidence, mode, and coverage |
+| `python3 <plugin-root>/scripts/marginal_control.py doctor --json` | Inspect Codex version, stable hooks, and plugins |
+| `python3 <plugin-root>/scripts/marginal_control.py review --workspace <repo> --json` | List redacted, unreviewed stop candidates |
+| `python3 <plugin-root>/scripts/marginal_control.py promote --workspace <repo> --json` | Require a ready, hash-valid local receipt |
+| `python3 <plugin-root>/scripts/marginal_control.py demote --workspace <repo> --json` | Immediately return to Shadow Mode |
 
 Label a candidate by hash; no raw command or output is displayed or persisted:
 
 ```bash
-marginal codex review --candidate ACTION_HASH --verdict waste
-marginal codex review --candidate ACTION_HASH --verdict helpful
+python3 <plugin-root>/scripts/marginal_control.py review --workspace <repo> --candidate ACTION_HASH --verdict waste
+python3 <plugin-root>/scripts/marginal_control.py review --workspace <repo> --candidate ACTION_HASH --verdict helpful
 ```
+
+On Windows, replace `python3` with `py -3` and use Windows path separators. From a Codex chat,
+`$marginal` performs plugin discovery and these commands automatically.
+
+`hooks_active` attests at least one live authenticated MARGINAL service for the selected repository;
+`hooks_observed` reports persisted lifecycle evidence. Neither field is the enforcement mode, and
+the privacy-preserving control plane does not expose a raw Codex chat identifier.
 
 `waste` means the repeated action added no useful evidence. `helpful` marks the recommendation as a
 false stop and immediately demotes any active receipt.

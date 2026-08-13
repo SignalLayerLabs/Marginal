@@ -3,7 +3,7 @@
 ```text
 status: not_submitted
 status_date: 2026-08-13
-plugin_version: 0.3.1
+plugin_version: 0.3.2
 marketplace_selector: marginal@marginal
 portal_submission_type: skills_only_zip
 portal_access: authentication_required
@@ -32,9 +32,9 @@ and permits repository Tool Enforcement only after a versioned evidence gate pro
 reviewed false stops, and governance overhead. It never reads prompts, source, raw commands, raw
 outputs, transcripts, or Codex credentials for evidence.
 
-**Release notes:** First universal-directory candidate. Adds MARGINAL's local-first Shadow Mode,
-review workflow, Earned Enforcement gates, fail-open demotion, native Codex lifecycle package,
-production logo, eight reviewer cases, and reproducible v0.3.1 archive.
+**Release notes:** Adds a dependency-free native control plane, repository-scoped hook attestation,
+local Shadow Mode, review workflow, Earned Enforcement gates, fail-open demotion, production logo,
+eight reviewer cases, and a reproducible v0.3.2 archive.
 
 Starter prompts are the three `interface.defaultPrompt` entries in
 `plugins/marginal/.codex-plugin/plugin.json`. The production logo is
@@ -67,10 +67,10 @@ coverage or identity changes.
 - [x] Secret-marker scan returns zero persisted occurrences.
 - [x] Reproducible smoke evidence is committed with runtime SHA-256 provenance.
 - [x] Privacy, terms, support, and eight reviewer cases exist.
-- [x] Canonical main contains v0.3.1 after merge and every public Pages URL resolves.
+- [ ] Canonical main contains v0.3.2 after merge and every public Pages URL resolves.
 - [x] A deterministic single-root ZIP builder covers the manifest, skill, hooks, runtime, and logo.
 - [ ] SignalLayer Labs identity and Apps Management write permission are confirmed in Platform.
-- [ ] The v0.3.1 archive is uploaded in Platform and external review is started.
+- [ ] The v0.3.2 archive is uploaded in Platform and external review is started.
 
 Build the exact upload artifact with:
 
@@ -89,4 +89,4 @@ verified SignalLayer Labs identity; none can be inferred from repository or GitH
 external identifier, credential, or reviewer correspondence belongs in this repository.
 
 Acceptance evidence:
-[`codex-plugin-smoke-2026-08-13-v0.3.1.json`](evidence/codex-plugin-smoke-2026-08-13-v0.3.1.json).
+[`codex-plugin-smoke-2026-08-13-v0.3.2.json`](evidence/codex-plugin-smoke-2026-08-13-v0.3.2.json).

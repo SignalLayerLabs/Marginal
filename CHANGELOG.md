@@ -4,6 +4,21 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-08-13
+
+### Added
+
+- a dependency-free native control launcher inside the Codex plugin bundle;
+- repository-scoped hook attestation fields in `status`, including live authenticated services,
+  observed lifecycle evidence, and action coverage.
+
+### Fixed
+
+- the bundled skill no longer requires a separately installed `marginal` executable or Python
+  package to inspect and manage the native plugin;
+- native management commands now read the same Codex plugin data store used by lifecycle hooks,
+  avoiding split-brain Shadow Mode reports.
+
 ## [0.3.1] - 2026-08-13
 
 ### Added

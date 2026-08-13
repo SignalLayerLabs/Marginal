@@ -12,9 +12,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 _ZIP_TIMESTAMP = (2020, 1, 1, 0, 0, 0)
-_MAIN = (
-    b"from marginal.integrations.codex.service import hook_main\nraise SystemExit(hook_main())\n"
-)
+_MAIN = b"""import sys
+
+if len(sys.argv) > 1 and sys.argv[1] != "--serve":
+    from marginal.cli import main
+
+    raise SystemExit(main(sys.argv[1:]))
+
+from marginal.integrations.codex.service import hook_main
+
+raise SystemExit(hook_main())
+"""
 
 
 @dataclass(frozen=True, slots=True)

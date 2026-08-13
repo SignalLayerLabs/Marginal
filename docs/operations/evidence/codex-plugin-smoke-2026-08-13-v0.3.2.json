@@ -1,0 +1,16 @@
+{
+  "codex_version": "codex-cli 0.147.0",
+  "completed_sessions": 1,
+  "directory_archive_sha256": "c45bb71d78d501e3159939de1db5c205ee380943a97c809499f61fad8a8fae8d",
+  "evidence_records": 4,
+  "hook_coverage": 1.0,
+  "installed": true,
+  "marketplace_selector": "marginal@marginal",
+  "native_control_mode": "shadow",
+  "native_control_observed": true,
+  "plugin_version": "0.3.2",
+  "raw_secret_occurrences": 0,
+  "removed": true,
+  "runtime_sha256": "7ea67b6a17d8f44c03b70e29ec29497a00edd0f9c4262e59cb9082f2015eafe6",
+  "shadow_block_count": 0
+}
