@@ -128,7 +128,7 @@ def test_missing_service_fails_open_and_demotes(tmp_path: Path) -> None:
     workspace.mkdir()
     _repository(workspace)
     data = tmp_path / "data"
-    identity = current_promotion_identity(workspace, codex_version="0.147.0")
+    identity = current_promotion_identity(workspace)
     summary = CoverageSummary(
         covered_actions=100,
         coverable_actions=100,
@@ -218,7 +218,7 @@ def test_ready_repository_enforces_proven_no_progress_and_only_that(tmp_path: Pa
     workspace.mkdir()
     _repository(workspace)
     data = tmp_path / "data"
-    identity = current_promotion_identity(workspace, codex_version="0.147.0")
+    identity = current_promotion_identity(workspace)
     store = EvidenceStore(data / "evidence" / identity.repository_hash)
     _seed_ready_evidence(store)
     summary = summarize_evidence(store.read_all())
