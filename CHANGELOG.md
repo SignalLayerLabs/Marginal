@@ -13,6 +13,13 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
 - gross-versus-net savings and intervention status including Graceful Irrelevance through `pass_through`;
 - governance evidence standard, Codex benchmark-readiness guide and Community Feedback Log;
 - structured documentation information architecture by user intent.
+- native Codex plugin marketplace `marginal@marginal` with reproducible dependency-free runtime;
+- one-command native install/remove plus `status`, `doctor`, `review`, `promote`, and `demote`;
+- strict Codex lifecycle contracts, privacy-safe normalization, Git state hashing, and conservative structured outcome classification;
+- authenticated per-session loopback service with bounded messages and fail-open demotion;
+- provider-neutral No Progress evidence control and versioned Earned Enforcement promotion receipts;
+- isolated Codex 0.147.0 marketplace/lifecycle/privacy/removal smoke and universal directory review packet;
+- public privacy, terms, support, Codex integration, and submission documentation.
 
 ### Changed
 
@@ -22,13 +29,16 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
 - website and README now lead with a concrete illustrative trace and proof standard before architecture theory;
 - roadmap now treats governance tax, false-stop rate, matched OFF/ON evaluation and pass-through as first-class success criteria;
 - the 10-task Codex canary is explicitly classified as integration validation rather than public performance evidence.
+- website and README now lead with native Codex install/remove and the measured n=3 `pass_through` result.
 
 ### Scientific limitations
 
 - diminishing-return thresholds are transparent heuristics until calibrated on representative engine telemetry;
 - false stops require external review/counterfactual labels and are not automatically causal estimates;
 - Graceful Irrelevance classifies the measured configuration, not the universal usefulness of MARGINAL;
-- vendor-specific Codex integration and measured public savings remain future v0.3 evidence.
+- the Codex plugin supports local Tool Enforcement paths, not Full Compute Enforcement;
+- the n=3 result remains integration telemetry and does not establish general token savings;
+- universal directory availability depends on external review and release.
 
 ## [0.2.0] - 2026-08-06
 

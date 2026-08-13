@@ -49,6 +49,13 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; co
 .benchmark-heading { max-width: 900px; }
 .benchmark-heading h1 { font-size: clamp(2.5rem, 5vw, 4.8rem); }
 .benchmark-heading > p:last-child { color: var(--muted); max-width: 820px; font-size: 1.05rem; }
+.install-card { display: grid; gap: .75rem; margin-top: 1.5rem; padding: 1.2rem; border: 1px solid var(--accent); border-radius: 14px; background: var(--accent-soft); }
+.install-card > div { display: grid; }
+.install-card span { color: var(--accent); font-size: .76rem; font-weight: 820; letter-spacing: .08em; text-transform: uppercase; }
+.install-card strong { font-size: 1.2rem; }
+.install-card code { display: block; overflow-x: auto; padding: .75rem; border: 1px solid var(--line); border-radius: 8px; background: #05080c; white-space: nowrap; }
+.install-card p { margin: 0; color: var(--muted); font-size: .9rem; }
+.install-card b { color: var(--text); }
 .benchmark-metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: .75rem; margin-top: 2.4rem; }
 .benchmark-metrics article { display: grid; gap: .3rem; min-height: 145px; padding: 1.15rem; border: 1px solid var(--line); border-radius: 14px; background: rgba(16,21,29,.82); }
 .benchmark-metrics article > span { color: var(--muted); font-size: .73rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }

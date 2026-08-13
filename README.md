@@ -31,6 +31,26 @@ Open source · Local first · Provider neutral · Zero mandatory runtime depende
 
 > **Exploratory 3-task smoke, one paired run per task.** This validates the integration; it is not a general performance claim.
 
+### Install the native Codex plugin
+
+MARGINAL installs through Codex's native plugin marketplace and starts globally in **Shadow Mode**:
+
+```bash
+codex plugin marketplace add SignalLayerLabs/Marginal --ref main && codex plugin add marginal@marginal
+```
+
+Remove it cleanly with:
+
+```bash
+codex plugin remove marginal@marginal
+```
+
+The plugin provides **Tool Enforcement**, not Full Compute Enforcement. Repository blocking is
+disabled until local **Earned Enforcement** evidence proves at least 99% hook coverage, reviewed
+stop candidates, zero false stops, no pending failures, and bounded governance latency. Any drift
+demotes the repository to Shadow Mode. The public directory submission packet is ready, but the
+directory listing remains subject to OpenAI review; the Git marketplace command above works now.
+
 | Metric | Codex OFF | Codex + MARGINAL | Observed change |
 |---|---:|---:|---:|
 | SWE-bench resolved | 0/3 | 0/3 | **0/3 → 0/3** |
@@ -185,7 +205,33 @@ Read the [benchmark protocol](docs/evaluation/public-benchmarks.md) and [governa
 
 ## Install
 
-Current v0.2 install target:
+### Codex — recommended
+
+```bash
+codex plugin marketplace add SignalLayerLabs/Marginal --ref main && codex plugin add marginal@marginal
+```
+
+Then open `/hooks` in Codex, review the exact commands, and grant trust only after inspection.
+MARGINAL never bypasses the hook trust boundary. Useful management commands:
+
+```bash
+marginal codex status
+marginal codex doctor
+marginal codex review
+marginal codex promote
+marginal codex demote
+marginal uninstall codex
+```
+
+The Python package can perform the same native installation transaction:
+
+```bash
+marginal install codex
+```
+
+### Python library
+
+Current tagged library install target:
 
 ```bash
 pip install "marginal-ai @ git+https://github.com/SignalLayerLabs/Marginal.git@v0.2.0"
@@ -199,7 +245,9 @@ cd Marginal
 python -m pip install -e ".[dev]"
 ```
 
-The auditable Codex reference adapter and its first matched smoke are now available in `benchmark/codex_adapter/`. Start from the frozen protocol and treat the current n=3 result as integration evidence, not a performance claim.
+The production Codex adapter lives under `src/marginal/integrations/codex/`; the independent
+benchmark harness remains under `benchmark/codex_adapter/`. Treat the current n=3 result as
+integration evidence, not a performance claim.
 
 ## Quickstart
 
@@ -255,7 +303,10 @@ The engine-specific adapter owns native interception and telemetry. The core own
 
 ## Project status
 
-`v0.2.0` provides the Learning Loop Foundation, privacy profiles, Universal Agent Protocol, versioned evidence and replay. The community-hardening work prepares the core evidence model for **v0.3 — Codex Reference Integration**.
+The v0.3 candidate adds the native Codex plugin, privacy-safe hook contracts, an authenticated
+local service, reversible install/uninstall, and Earned Enforcement receipts to the v0.2 Learning
+Loop Foundation. The universal directory submission is an external review step and is not described
+as live until OpenAI accepts and releases it.
 
 The next milestone must answer a falsifiable question:
 
@@ -271,7 +322,7 @@ If the answer is no, the result should be published as no demonstrated benefit f
 |---|---|
 | Getting started | [Quickstart](docs/getting-started/quickstart.md) |
 | Product model | [Concepts](docs/product/concepts.md) · [Architecture](docs/product/architecture.md) |
-| Integrations | [Integration overview](docs/integrations/overview.md) · [Codex benchmark readiness](docs/integrations/codex-benchmark-readiness.md) |
+| Integrations | [Codex plugin](docs/integrations/codex.md) · [Integration overview](docs/integrations/overview.md) · [Codex benchmark readiness](docs/integrations/codex-benchmark-readiness.md) |
 | Evaluation | [Benchmarking](docs/evaluation/benchmarking.md) · [Public benchmarks](docs/evaluation/public-benchmarks.md) · [Governance evidence](docs/evaluation/governance-evidence.md) |
 | Reference | [API](docs/reference/api.md) |
 | Operations | [Privacy](docs/operations/privacy.md) · [Website](docs/operations/website.md) |

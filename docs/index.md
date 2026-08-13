@@ -15,6 +15,7 @@ MARGINAL documentation is organized by user intent instead of keeping every guid
 ## Integrations
 
 - [Integration overview](integrations/overview.md)
+- [Codex plugin](integrations/codex.md)
 - [Codex benchmark readiness](integrations/codex-benchmark-readiness.md)
 
 ## Evaluation and research
@@ -32,6 +33,10 @@ MARGINAL documentation is organized by user intent instead of keeping every guid
 
 - [Privacy](operations/privacy.md)
 - [Website operations](operations/website.md)
+- [Codex plugin submission](operations/codex-plugin-submission.md)
+- [Privacy notice](../PRIVACY.md)
+- [Terms](../TERMS.md)
+- [Support](../SUPPORT.md)
 
 ## Project
 
