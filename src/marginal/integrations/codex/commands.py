@@ -8,8 +8,17 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from .evidence import EvidenceStore, summarize_evidence
+from .identity import current_promotion_identity
 from .installer import inspect_codex
-from .promotion import PromotionReceipt
+from .promotion import (
+    PromotionCriteria,
+    activate_enforcement,
+    demote_enforcement,
+    evaluate_promotion,
+    write_promotion_receipt,
+)
+from .service import read_mode
 
 
 def default_data_dir() -> Path:
@@ -63,53 +72,122 @@ def codex_command(
     command: str,
     *,
     data_dir: str | Path | None = None,
+    workspace: str | Path | None = None,
+    candidate: str | None = None,
+    verdict: str | None = None,
     as_json: bool = False,
 ) -> int:
     root = Path(data_dir).resolve() if data_dir is not None else default_data_dir()
+    selected_workspace = Path(workspace).resolve() if workspace is not None else Path.cwd()
+    identity = current_promotion_identity(selected_workspace)
+    evidence_store = EvidenceStore(root / "evidence" / identity.repository_hash)
+    payload: dict[str, Any]
     if command == "status":
-        _emit(_read_state(root), as_json=as_json)
+        state = read_mode(root, repository_hash=identity.repository_hash)
+        _emit(
+            {
+                **state,
+                "capability": "Tool Enforcement",
+                "repository_hash": identity.repository_hash,
+            },
+            as_json=as_json,
+        )
         return 0
     if command == "doctor":
         _emit(inspect_codex().to_dict(), as_json=as_json)
         return 0
     if command == "review":
+        records = evidence_store.read_all()
+        candidates = {
+            str(record["action_hash"])
+            for record in records
+            if record.get("event") == "decision"
+            and record.get("recommended_stop") is True
+            and isinstance(record.get("action_hash"), str)
+        }
+        already_reviewed = {
+            str(record["action_hash"])
+            for record in records
+            if record.get("reviewed") is True and isinstance(record.get("action_hash"), str)
+        }
+        if candidate is None and verdict is None:
+            payload = {
+                "review_command": "/hooks",
+                "message": "Review hook trust, then label each redacted candidate explicitly.",
+                "unreviewed_candidates": sorted(candidates - already_reviewed),
+            }
+            _emit(payload, as_json=as_json)
+            return 0
+        if candidate not in candidates or verdict not in {"helpful", "waste"}:
+            _emit(
+                {
+                    "error_code": "INVALID_REVIEW",
+                    "message": (
+                        "Candidate must be identified only by its hash; "
+                        "verdict is helpful or waste."
+                    ),
+                },
+                as_json=as_json,
+            )
+            return 2
+        if candidate in already_reviewed:
+            _emit(
+                {"error_code": "ALREADY_REVIEWED", "candidate": candidate},
+                as_json=as_json,
+            )
+            return 2
+        evidence_store.append(
+            {
+                "schema_version": 1,
+                "event": "review",
+                "action_hash": candidate,
+                "reviewed": True,
+                "false_stop": verdict == "helpful",
+            }
+        )
+        if verdict == "helpful":
+            demote_enforcement(
+                root,
+                repository_hash=identity.repository_hash,
+                reason="FALSE_STOP_REVIEWED",
+            )
+            evidence_store.start_new_window(reason_code="FALSE_STOP_REVIEWED")
         payload = {
-            **_read_state(root),
-            "review_command": "/hooks",
-            "message": "Review and trust the exact MARGINAL hook commands in Codex.",
+            "candidate": candidate,
+            "reviewed": True,
+            "false_stop": verdict == "helpful",
         }
         _emit(payload, as_json=as_json)
         return 0
     if command == "demote":
+        demote_enforcement(
+            root,
+            repository_hash=identity.repository_hash,
+            reason="EXPLICIT_USER_DEMOTION",
+        )
         payload = {
             "schema_version": 1,
             "mode": "shadow",
             "capability": "Tool Enforcement",
             "reason": "Explicit user demotion",
+            "repository_hash": identity.repository_hash,
         }
-        _write_state(root, payload)
         _emit(payload, as_json=as_json)
         return 0
     if command == "promote":
-        receipt_path = root / "promotion-receipt.json"
-        if not receipt_path.exists():
-            payload = {
-                "mode": "shadow",
-                "error_code": "EVIDENCE_NOT_READY",
-                "message": "No ready Earned Enforcement receipt exists.",
-            }
-            _emit(payload, as_json=as_json)
-            return 2
-        receipt_payload = json.loads(receipt_path.read_text(encoding="utf-8"))
-        receipt = PromotionReceipt.from_dict(receipt_payload)
-        if not receipt.is_ready or not receipt.verify_hash():
+        summary = summarize_evidence(evidence_store.read_all())
+        receipt = evaluate_promotion(summary, PromotionCriteria(), identity=identity)
+        write_promotion_receipt(root, receipt)
+        if not receipt.is_ready:
             payload = {
                 "mode": "shadow",
                 "error_code": "EVIDENCE_NOT_READY",
                 "blocking_reasons": list(receipt.blocking_reasons),
+                "receipt_hash": receipt.receipt_hash,
             }
             _emit(payload, as_json=as_json)
             return 2
+        activate_enforcement(root, receipt)
         payload = {
             "schema_version": 1,
             "mode": "enforce",
@@ -117,7 +195,6 @@ def codex_command(
             "receipt_hash": receipt.receipt_hash,
             "reason": "Explicit promotion with a ready evidence receipt",
         }
-        _write_state(root, payload)
         _emit(payload, as_json=as_json)
         return 0
     raise ValueError(f"unsupported Codex command: {command}")
@@ -130,4 +207,3 @@ def purge_data(data_dir: str | Path, *, confirmed: bool) -> bool:
     if root.exists():
         shutil.rmtree(root)
     return True
-

@@ -88,4 +88,3 @@ def workspace_state_hash(workspace: str | Path) -> str:
     digest.update(_git(repo, "diff", "--binary", "HEAD", "--", ".", *exclusions))
     _update_untracked(digest, repo)
     return digest.hexdigest()
-

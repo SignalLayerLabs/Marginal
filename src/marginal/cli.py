@@ -158,6 +158,9 @@ def _build_parser() -> argparse.ArgumentParser:
     codex = subparsers.add_parser("codex", help="manage the Codex integration")
     codex.add_argument("codex_command", choices=["status", "doctor", "review", "promote", "demote"])
     codex.add_argument("--data-dir", type=Path)
+    codex.add_argument("--workspace", type=Path)
+    codex.add_argument("--candidate")
+    codex.add_argument("--verdict", choices=["helpful", "waste"])
     codex.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
@@ -199,6 +202,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return codex_command(
             args.codex_command,
             data_dir=args.data_dir,
+            workspace=args.workspace,
+            candidate=args.candidate,
+            verdict=args.verdict,
             as_json=args.as_json,
         )
 

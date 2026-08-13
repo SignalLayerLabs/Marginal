@@ -124,9 +124,7 @@ def _reason_with_code(reason: str, reason_code: str) -> str:
     return f"{reason.strip()} [{reason_code.strip()}]"
 
 
-def build_pre_tool_output(
-    *, allowed: bool, reason: str, reason_code: str
-) -> dict[str, Any] | None:
+def build_pre_tool_output(*, allowed: bool, reason: str, reason_code: str) -> dict[str, Any] | None:
     """Build the documented Codex PreToolUse denial shape."""
 
     if allowed:
@@ -148,4 +146,3 @@ def build_post_tool_output(
     if not blocked:
         return None
     return {"decision": "block", "reason": _reason_with_code(reason, reason_code)}
-

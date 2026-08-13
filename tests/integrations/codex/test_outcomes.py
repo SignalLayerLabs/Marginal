@@ -59,4 +59,3 @@ def test_conflicting_structured_signals_fail_open() -> None:
     response = {"exit_code": 0, "is_error": True}
 
     assert classify_tool_outcome(_post(response)) is ActionOutcomeStatus.UNKNOWN
-

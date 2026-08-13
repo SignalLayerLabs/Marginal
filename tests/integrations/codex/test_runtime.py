@@ -26,7 +26,7 @@ def _repository(path: Path) -> Path:
     return path
 
 
-def _runtime(workspace: Path) -> CodexSessionRuntime:
+def _runtime(workspace: Path, *, enforcement_enabled: bool = False) -> CodexSessionRuntime:
     universal = UniversalRuntime(
         Treasury(BudgetLimits(max_tokens=100), mode="shadow"),
         engine="codex",
@@ -34,7 +34,11 @@ def _runtime(workspace: Path) -> CodexSessionRuntime:
         task_id="workspace",
         capabilities=AgentCapabilities(block_actions=True),
     )
-    return CodexSessionRuntime(universal, workspace=workspace)
+    return CodexSessionRuntime(
+        universal,
+        workspace=workspace,
+        enforcement_enabled=lambda: enforcement_enabled,
+    )
 
 
 def _pre(action_id: str, *, command: str = "pytest -q") -> PreToolUseEvent:
@@ -125,3 +129,34 @@ def test_close_aborts_pending_actions_as_unknown(tmp_path: Path) -> None:
     assert runtime.pending_action_ids() == ()
     assert runtime.summary()["unknown_observations"] == 2
 
+
+def test_earned_enforcement_denies_third_proven_success_without_progress(
+    tmp_path: Path,
+) -> None:
+    runtime = _runtime(_repository(tmp_path), enforcement_enabled=True)
+    for action_id in ("call-1", "call-2"):
+        decision = runtime.pre_tool_use(_pre(action_id))
+        assert decision.allowed
+        runtime.post_tool_use(_post(action_id, {"exit_code": 0}))
+
+    denied = runtime.pre_tool_use(_pre("call-3"))
+
+    assert denied.allowed is False
+    assert denied.recommended is False
+    assert denied.reason_code == "NO_PROGRESS_ENFORCED"
+    assert runtime.pending_action_ids() == ()
+    assert runtime.summary()["enforced_denials"] == 1
+
+
+def test_shadow_mode_never_applies_no_progress_denial(tmp_path: Path) -> None:
+    runtime = _runtime(_repository(tmp_path), enforcement_enabled=False)
+    for action_id in ("call-1", "call-2"):
+        runtime.pre_tool_use(_pre(action_id))
+        runtime.post_tool_use(_post(action_id, {"exit_code": 0}))
+
+    observed = runtime.pre_tool_use(_pre("call-3"))
+
+    assert observed.allowed is True
+    assert runtime.last_no_progress_signal is not None
+    assert runtime.last_no_progress_signal.enforcement_eligible is True
+    assert runtime.summary()["enforced_denials"] == 0

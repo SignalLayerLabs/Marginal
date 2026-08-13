@@ -30,11 +30,15 @@ MARGINAL conservatively settles the reserved estimate, releases the reservation,
 
 ## Are Codex, Claude Code, Copilot, and OpenCode already supported?
 
-Version `0.2.0` provides the shared protocol, schemas, and local runtime. Vendor-specific adapters remain roadmap milestones and are not claimed complete.
+Version `0.3.0` adds the native Codex reference plugin with local Tool Enforcement and Earned
+Enforcement receipts. Claude Code, GitHub Copilot, and OpenCode remain roadmap milestones and are
+not claimed complete.
 
 ## Does the protocol already generate modify, defer, reuse, stop, and force-verify actions?
 
-The protocol defines those directives so adapters share one contract. The v0.2 reference policy and runtime currently generate allow and deny. Richer automatic directives remain future policy and adapter work.
+The protocol defines those directives so adapters share one contract. The v0.3 reference policy
+and runtime currently generate allow and deny. Richer automatic directives remain future policy
+and adapter work.
 
 ## Does MARGINAL upload code or prompts?
 

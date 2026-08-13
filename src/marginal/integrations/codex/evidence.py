@@ -9,6 +9,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from .promotion import CoverageSummary
+
 _ALLOWED_EVIDENCE_FIELDS = {
     "schema_version",
     "event",
@@ -104,6 +106,17 @@ class EvidenceStore:
                 records.append(value)
         return records
 
+    def start_new_window(self, *, reason_code: str) -> None:
+        if not isinstance(reason_code, str) or not reason_code.strip():
+            raise ValueError("reason_code must be a non-empty string")
+        self.append(
+            {
+                "schema_version": 1,
+                "event": "window_start",
+                "reason_code": reason_code.strip(),
+            }
+        )
+
     def write_checkpoint(self, checkpoint: Mapping[str, Any]) -> None:
         if not isinstance(checkpoint, Mapping):
             raise TypeError("checkpoint must be a mapping")
@@ -136,3 +149,74 @@ class EvidenceStore:
             raise ValueError("checkpoint must decode to an object")
         return value
 
+
+def summarize_evidence(records: list[dict[str, Any]]) -> CoverageSummary:
+    """Reduce redacted evidence into the exact Earned Enforcement gate surface."""
+
+    for index in range(len(records) - 1, -1, -1):
+        if records[index].get("event") == "window_start":
+            records = records[index + 1 :]
+            break
+
+    decisions = [record for record in records if record.get("event") == "decision"]
+    completed_sessions = {
+        str(record.get("session_hash"))
+        for record in records
+        if record.get("event") == "session_end" and record.get("session_hash")
+    }
+    outcomes_by_action = {
+        str(record.get("action_hash")): str(record.get("outcome"))
+        for record in decisions
+        if record.get("outcome") in {"success", "failure", "unknown"} and record.get("action_hash")
+    }
+    outcomes_by_action.update(
+        {
+            str(record.get("action_hash")): str(record.get("outcome"))
+            for record in records
+            if record.get("event") == "outcome" and record.get("action_hash")
+        }
+    )
+    candidates = {
+        str(record.get("action_hash"))
+        for record in decisions
+        if record.get("recommended_stop") is True and record.get("action_hash")
+    }
+    reviewed = {
+        str(record.get("action_hash"))
+        for record in records
+        if record.get("reviewed") is True and record.get("action_hash") in candidates
+    }
+    false_stops = {
+        str(record.get("action_hash"))
+        for record in records
+        if record.get("false_stop") is True and record.get("action_hash") in reviewed
+    }
+    outcomes = [
+        outcomes_by_action[str(record.get("action_hash"))]
+        for record in decisions
+        if str(record.get("action_hash")) in outcomes_by_action
+    ]
+    unknown_outcomes = sum(outcome == "unknown" for outcome in outcomes)
+    latencies = tuple(
+        float(record["latency_ms"])
+        for record in decisions
+        if isinstance(record.get("latency_ms"), (int, float))
+        and not isinstance(record.get("latency_ms"), bool)
+    )
+    return CoverageSummary(
+        covered_actions=sum(record.get("covered") is True for record in decisions),
+        coverable_actions=sum(record.get("coverable") is True for record in decisions),
+        completed_sessions=len(completed_sessions),
+        reviewed_candidates=len(reviewed),
+        false_stops=len(false_stops),
+        integration_failures=sum(record.get("integration_failure") is True for record in records),
+        pending_actions=sum(
+            record.get("pending") is True
+            and str(record.get("action_hash")) not in outcomes_by_action
+            for record in decisions
+        ),
+        unknown_enforceable_outcomes=unknown_outcomes,
+        decision_latencies_ms=latencies,
+        enforceable_outcomes_observable=bool(outcomes) and unknown_outcomes == 0,
+        intervention_candidates=len(candidates),
+    )

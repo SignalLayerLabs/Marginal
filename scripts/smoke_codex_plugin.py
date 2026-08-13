@@ -19,6 +19,8 @@ class CodexPluginSmokeResult:
     installed: bool
     shadow_block_count: int
     hook_coverage: float
+    evidence_records: int
+    completed_sessions: int
     raw_secret_occurrences: int
     removed: bool
     codex_version: str
@@ -93,6 +95,16 @@ def _count_secret(root: Path, secret: str) -> int:
     return occurrences
 
 
+def _read_evidence(plugin_data: Path) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for path in (plugin_data / "evidence").glob("*/evidence.jsonl"):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            payload = json.loads(line)
+            if isinstance(payload, dict):
+                records.append(payload)
+    return records
+
+
 def smoke_plugin(
     *,
     codex: Path,
@@ -155,9 +167,9 @@ def smoke_plugin(
                 hook_output = json.loads(result.stdout)
                 decision = hook_output.get("hookSpecificOutput", {}).get("permissionDecision")
                 shadow_blocks += int(decision == "deny")
-        connection = plugin_data / "sessions" / "smoke-session.json"
         deadline = time.monotonic() + 2.0
-        while connection.exists() and time.monotonic() < deadline:
+        sessions_root = plugin_data / "sessions"
+        while list(sessions_root.glob("*.json")) and time.monotonic() < deadline:
             time.sleep(0.02)
     finally:
         remove = _run(
@@ -167,10 +179,25 @@ def smoke_plugin(
         )
         removed = json.loads(remove.stdout).get("pluginId") == "marginal@marginal"
 
+    evidence = _read_evidence(plugin_data)
+    decisions = [record for record in evidence if record.get("event") == "decision"]
+    coverable = sum(record.get("coverable") is True for record in decisions)
+    covered = sum(record.get("covered") is True for record in decisions)
+    if completed_hooks != 4:
+        raise RuntimeError("direct hook lifecycle did not complete")
+
     return CodexPluginSmokeResult(
         installed=True,
         shadow_block_count=shadow_blocks,
-        hook_coverage=completed_hooks / 4,
+        hook_coverage=covered / coverable if coverable else 0.0,
+        evidence_records=len(evidence),
+        completed_sessions=len(
+            {
+                str(record.get("session_hash"))
+                for record in evidence
+                if record.get("event") == "session_end" and record.get("session_hash")
+            }
+        ),
         raw_secret_occurrences=_count_secret(plugin_data, secret),
         removed=removed,
         codex_version=version,
@@ -185,9 +212,9 @@ def main() -> int:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
     result = smoke_plugin(
-        codex=args.codex,
-        isolation_root=args.isolation_root,
-        marketplace=args.marketplace,
+        codex=args.codex.resolve(),
+        isolation_root=args.isolation_root.resolve(),
+        marketplace=args.marketplace.resolve(),
     )
     if args.json:
         print(json.dumps(asdict(result), sort_keys=True))

@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 from dataclasses import asdict, dataclass, replace
+from pathlib import Path
 from typing import Any
 
 
@@ -31,6 +33,7 @@ class CoverageSummary:
     unknown_enforceable_outcomes: int
     decision_latencies_ms: tuple[float, ...]
     enforceable_outcomes_observable: bool
+    intervention_candidates: int = 0
 
     def __post_init__(self) -> None:
         for name in (
@@ -42,6 +45,7 @@ class CoverageSummary:
             "integration_failures",
             "pending_actions",
             "unknown_enforceable_outcomes",
+            "intervention_candidates",
         ):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
@@ -133,7 +137,7 @@ def _hash(payload: dict[str, Any]) -> str:
 
 def _p95(values: tuple[float, ...]) -> float:
     if not values:
-        return math.inf
+        return 0.0
     ordered = sorted(values)
     return ordered[max(0, math.ceil(len(ordered) * 0.95) - 1)]
 
@@ -147,9 +151,7 @@ def evaluate_promotion(
     """Create a self-verifying receipt for the conservative default evidence gate."""
 
     ratio = (
-        summary.covered_actions / summary.coverable_actions
-        if summary.coverable_actions
-        else 0.0
+        summary.covered_actions / summary.coverable_actions if summary.coverable_actions else 0.0
     )
     latency = _p95(summary.decision_latencies_ms)
     reasons: list[str] = []
@@ -161,6 +163,8 @@ def evaluate_promotion(
         reasons.append("COVERAGE")
     if summary.reviewed_candidates < criteria.minimum_reviewed_candidates:
         reasons.append("MINIMUM_REVIEWS")
+    if summary.reviewed_candidates < summary.intervention_candidates:
+        reasons.append("UNREVIEWED_CANDIDATES")
     if summary.false_stops > criteria.maximum_false_stops:
         reasons.append("FALSE_STOPS")
     if summary.integration_failures:
@@ -186,3 +190,145 @@ def evaluate_promotion(
         receipt_hash="",
     )
     return replace(provisional, receipt_hash=_hash(provisional._hash_payload()))
+
+
+def _repositories_root(data_root: str | Path) -> Path:
+    root = Path(data_root).resolve() / "repositories"
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if os.name == "posix":
+        root.chmod(0o700)
+    return root
+
+
+def _receipt_path(data_root: str | Path, repository_hash: str) -> Path:
+    return _repositories_root(data_root) / f"{repository_hash}.receipt.json"
+
+
+def _state_path(data_root: str | Path, repository_hash: str) -> Path:
+    return _repositories_root(data_root) / f"{repository_hash}.json"
+
+
+def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
+    serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n"
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    descriptor = os.open(temporary, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
+    try:
+        os.write(descriptor, serialized.encode("utf-8"))
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    os.replace(temporary, path)
+    if os.name == "posix":
+        path.chmod(0o600)
+
+
+def write_promotion_receipt(data_root: str | Path, receipt: PromotionReceipt) -> Path:
+    if not receipt.verify_hash():
+        raise ValueError("promotion receipt hash is invalid")
+    path = _receipt_path(data_root, receipt.identity.repository_hash)
+    _atomic_json(path, receipt.to_dict())
+    return path
+
+
+def read_promotion_receipt(
+    data_root: str | Path,
+    repository_hash: str,
+) -> PromotionReceipt | None:
+    path = _receipt_path(data_root, repository_hash)
+    if not path.exists():
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("promotion receipt must be a JSON object")
+    return PromotionReceipt.from_dict(payload)
+
+
+def activate_enforcement(data_root: str | Path, receipt: PromotionReceipt) -> Path:
+    if not receipt.is_ready or not receipt.verify_hash():
+        raise ValueError("a ready, hash-valid receipt is required for enforcement")
+    stored = read_promotion_receipt(data_root, receipt.identity.repository_hash)
+    if stored != receipt:
+        raise ValueError("promotion receipt must be persisted before enforcement")
+    path = _state_path(data_root, receipt.identity.repository_hash)
+    _atomic_json(
+        path,
+        {
+            "schema_version": 1,
+            "mode": "enforce",
+            "reason": "EARNED_ENFORCEMENT_PROMOTED",
+            "receipt_hash": receipt.receipt_hash,
+            "identity": asdict(receipt.identity),
+        },
+    )
+    return path
+
+
+def demote_enforcement(
+    data_root: str | Path,
+    *,
+    repository_hash: str,
+    reason: str,
+) -> Path:
+    path = _state_path(data_root, repository_hash)
+    _atomic_json(
+        path,
+        {"schema_version": 1, "mode": "shadow", "reason": reason},
+    )
+    return path
+
+
+def enforcement_is_active(
+    data_root: str | Path,
+    *,
+    identity: PromotionIdentity,
+    summary: CoverageSummary | None = None,
+) -> bool:
+    state_path = _state_path(data_root, identity.repository_hash)
+    if not state_path.exists():
+        return False
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        if not isinstance(state, dict) or state.get("mode") != "enforce":
+            return False
+        receipt = read_promotion_receipt(data_root, identity.repository_hash)
+        if (
+            receipt is None
+            or state.get("receipt_hash") != receipt.receipt_hash
+            or not receipt.valid_for(identity)
+        ):
+            demote_enforcement(
+                data_root,
+                repository_hash=identity.repository_hash,
+                reason="IDENTITY_DRIFT",
+            )
+            return False
+        if summary is not None:
+            coverage_ratio = (
+                summary.covered_actions / summary.coverable_actions
+                if summary.coverable_actions
+                else 0.0
+            )
+            evidence_drift = (
+                coverage_ratio < receipt.criteria.minimum_coverage_ratio
+                or summary.false_stops > receipt.summary.false_stops
+                or summary.integration_failures > 0
+                or summary.pending_actions > 0
+                or summary.unknown_enforceable_outcomes > 0
+                or summary.reviewed_candidates < summary.intervention_candidates
+                or _p95(summary.decision_latencies_ms) > receipt.criteria.maximum_p95_latency_ms
+            )
+            if evidence_drift:
+                demote_enforcement(
+                    data_root,
+                    repository_hash=identity.repository_hash,
+                    reason="EVIDENCE_DRIFT",
+                )
+                return False
+        return True
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        demote_enforcement(
+            data_root,
+            repository_hash=identity.repository_hash,
+            reason="RECEIPT_INVALID",
+        )
+        return False

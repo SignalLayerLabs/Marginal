@@ -4,6 +4,8 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-13
+
 ### Added
 
 - opt-in, provider-neutral `DiminishingReturnDetector` with same-state/evidence-aware gain decay;

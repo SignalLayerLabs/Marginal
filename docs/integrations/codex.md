@@ -53,7 +53,9 @@ Global installation never turns blocking on. A repository can enter Tool Enforce
 
 Any identity drift, lifecycle failure, coverage loss, false stop, or unknown enforced outcome
 invalidates the receipt and demotes to Shadow Mode. Integration failure fails open because MARGINAL
-is an efficiency governor, not a security boundary.
+is an efficiency governor, not a security boundary. Failures and false stops remain in the local
+audit history, then open a fresh evidence window; enforcement can be earned again only with a new
+100-action, five-session clean window.
 
 ## Commands
 
@@ -61,9 +63,19 @@ is an efficiency governor, not a security boundary.
 | --- | --- |
 | `marginal codex status` | Show mode and capability label |
 | `marginal codex doctor` | Inspect Codex version, stable hooks, and plugins |
-| `marginal codex review` | Show hook-trust guidance |
+| `marginal codex review` | List redacted, unreviewed stop candidates |
 | `marginal codex promote` | Require a ready, hash-valid local receipt |
 | `marginal codex demote` | Immediately return to Shadow Mode |
+
+Label a candidate by hash; no raw command or output is displayed or persisted:
+
+```bash
+marginal codex review --candidate ACTION_HASH --verdict waste
+marginal codex review --candidate ACTION_HASH --verdict helpful
+```
+
+`waste` means the repeated action added no useful evidence. `helpful` marks the recommendation as a
+false stop and immediately demotes any active receipt.
 
 ## Privacy and limits
 
@@ -81,3 +93,5 @@ The repository contains a validation-ready marketplace plugin and the external s
 The Git marketplace command works immediately. Appearance in the universal directory requires a
 separate OpenAI review and release step, so it is not represented as available there yet.
 
+The reproducible isolated acceptance result is preserved in
+[`codex-plugin-smoke-2026-08-13.json`](../operations/evidence/codex-plugin-smoke-2026-08-13.json).

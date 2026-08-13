@@ -178,4 +178,3 @@ def uninstall(*, runner: CommandRunner | None = None) -> CodexInstallation:
             message=result.stderr.strip(),
         )
     return CodexInstallation(False, True, message="plugin removed; local evidence preserved")
-

@@ -19,9 +19,7 @@ def _structured_signals(response: Mapping[str, Any]) -> set[ActionOutcomeStatus]
     signals: set[ActionOutcomeStatus] = set()
     exit_code = response.get("exit_code")
     if isinstance(exit_code, int) and not isinstance(exit_code, bool):
-        signals.add(
-            ActionOutcomeStatus.SUCCESS if exit_code == 0 else ActionOutcomeStatus.FAILURE
-        )
+        signals.add(ActionOutcomeStatus.SUCCESS if exit_code == 0 else ActionOutcomeStatus.FAILURE)
     success = response.get("success")
     if isinstance(success, bool):
         signals.add(ActionOutcomeStatus.SUCCESS if success else ActionOutcomeStatus.FAILURE)
@@ -71,4 +69,3 @@ def completion_evidence_hash(response: Any) -> str:
     except (TypeError, ValueError):
         return ""
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-

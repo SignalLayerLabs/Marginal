@@ -102,4 +102,3 @@ def test_blocking_post_replaces_result_with_redacted_feedback() -> None:
         "decision": "block",
         "reason": "Review this result [REVIEW_REQUIRED]",
     }
-

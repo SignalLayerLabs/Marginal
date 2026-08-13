@@ -38,7 +38,7 @@ This roadmap is milestone-driven rather than date-driven. GitHub Issues and pull
 | Milestone | Status | Primary outcome |
 |---|---|---|
 | **v0.1 — Reference Allocator Foundation** | Complete | Provider-neutral allocation, accounting, tracing and first release |
-| **v0.2 — Learning Loop Foundation** | Validation | Universal protocol, non-blocking observation, versioned evidence, privacy and replay |
+| **v0.2 — Learning Loop Foundation** | Complete | Universal protocol, non-blocking observation, versioned evidence, privacy and replay |
 | **Community hardening** | In progress | Governance tax, false-stop accounting, diminishing-return control and clearer evidence UX |
 | **v0.3 — Codex Reference Integration** | Validation | Native plugin, one-command install, Earned Enforcement, and measured smoke |
 | **v0.4 — Multi-Engine Developer Preview** | Planned | Shared core across materially different coding agents |
@@ -60,7 +60,7 @@ Delivered provider-neutral `Action`, `Cost`, `Decision` and `Allocation` primiti
 
 ## v0.2 — Learning Loop Foundation
 
-**Status:** Validation
+**Status:** Complete
 
 The v0.2 release candidate adds:
 
@@ -77,10 +77,10 @@ The v0.2 release candidate adds:
 - task outcomes separated from action-level realized gain;
 - non-causal replay and ledger/reporting CLI support.
 
-### Remaining exit criteria
+### Exit criteria
 
-- [ ] Ruff, mypy strict, full tests, package build and Twine validation pass in canonical CI.
-- [ ] `v0.2.0` is tagged/released from the canonical repository.
+- [x] Ruff, mypy strict, full tests, package build and Twine validation pass in canonical CI.
+- [x] `v0.2.0` is tagged/released from the canonical repository.
 
 Vendor-specific adapters and measured production savings are intentionally outside v0.2.
 

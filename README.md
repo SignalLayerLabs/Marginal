@@ -48,7 +48,7 @@ codex plugin remove marginal@marginal
 The plugin provides **Tool Enforcement**, not Full Compute Enforcement. Repository blocking is
 disabled until local **Earned Enforcement** evidence proves at least 99% hook coverage, reviewed
 stop candidates, zero false stops, no pending failures, and bounded governance latency. Any drift
-demotes the repository to Shadow Mode. The public directory submission packet is ready, but the
+demotes the repository to Shadow Mode and requires a fresh clean evidence window. The public directory submission packet is ready, but the
 directory listing remains subject to OpenAI review; the Git marketplace command above works now.
 
 | Metric | Codex OFF | Codex + MARGINAL | Observed change |
@@ -218,6 +218,7 @@ MARGINAL never bypasses the hook trust boundary. Useful management commands:
 marginal codex status
 marginal codex doctor
 marginal codex review
+marginal codex review --candidate ACTION_HASH --verdict waste
 marginal codex promote
 marginal codex demote
 marginal uninstall codex
@@ -234,7 +235,7 @@ marginal install codex
 Current tagged library install target:
 
 ```bash
-pip install "marginal-ai @ git+https://github.com/SignalLayerLabs/Marginal.git@v0.2.0"
+pip install "marginal-ai @ git+https://github.com/SignalLayerLabs/Marginal.git@v0.3.0"
 ```
 
 Development checkout:

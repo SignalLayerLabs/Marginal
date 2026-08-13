@@ -44,6 +44,7 @@ coverage or identity changes.
 - [x] Isolated Codex 0.147.0 marketplace add/install/remove smoke passes.
 - [x] Four-event direct lifecycle smoke passes with 100% exercised coverage.
 - [x] Secret-marker scan returns zero persisted occurrences.
+- [x] Reproducible smoke evidence is committed with runtime SHA-256 provenance.
 - [x] Privacy, terms, support, and eight reviewer cases exist.
 - [ ] Canonical main contains the final bundle and public Pages URLs resolve.
 - [ ] SignalLayer Labs identity and Apps Management write permission are confirmed in Platform.
@@ -52,3 +53,5 @@ coverage or identity changes.
 The status above changes only after the external portal accepts the final submission. No external
 identifier, credential, or reviewer correspondence belongs in this repository.
 
+Acceptance evidence:
+[`codex-plugin-smoke-2026-08-13.json`](evidence/codex-plugin-smoke-2026-08-13.json).

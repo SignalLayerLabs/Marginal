@@ -7,6 +7,7 @@ from pathlib import Path
 from marginal.integrations.codex.transport import (
     MAX_MESSAGE_BYTES,
     SessionServer,
+    connection_filename,
     request_session,
 )
 
@@ -70,3 +71,5 @@ def test_oversized_request_is_rejected_client_side(tmp_path: Path) -> None:
 def test_connection_file_is_user_private(tmp_path: Path) -> None:
     with _server(tmp_path) as server:
         assert server.connection.connection_file.stat().st_mode & 0o077 == 0
+        assert server.connection.connection_file.name == connection_filename("session-1")
+        assert "session-1" not in server.connection.connection_file.name

@@ -95,4 +95,3 @@ def normalize_pre_tool_use(
         deduplication_scope=DeduplicationScope.ONCE_PER_STATE,
         metadata=metadata,
     )
-

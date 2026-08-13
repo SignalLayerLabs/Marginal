@@ -76,4 +76,3 @@ def test_non_json_tool_input_is_rejected() -> None:
 
     with pytest.raises(ValueError, match="canonical JSON"):
         normalize_pre_tool_use(event, state_hash="state")
-

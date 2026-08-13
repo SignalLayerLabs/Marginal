@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import json
 import os
@@ -14,6 +15,15 @@ from pathlib import Path
 from typing import Any
 
 MAX_MESSAGE_BYTES = 256 * 1024
+
+
+def connection_filename(session_id: str) -> str:
+    """Return a stable receipt name without exposing the raw Codex session identity."""
+
+    if not isinstance(session_id, str) or not session_id:
+        raise ValueError("session_id must be a non-empty string")
+    digest = hashlib.sha256(session_id.encode("utf-8")).hexdigest()
+    return f"{digest}.json"
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,7 +141,7 @@ class SessionServer:
             self.sessions_root.chmod(0o700)
         self._server = _LoopbackServer(token, handler)
         self._thread: threading.Thread | None = None
-        connection_path = self.sessions_root / f"{session_id}.json"
+        connection_path = self.sessions_root / connection_filename(session_id)
         self.connection = ConnectionInfo(
             session_id=session_id,
             host="127.0.0.1",
@@ -209,4 +219,3 @@ def request_session(
     if not isinstance(response, dict):
         return _error("INVALID_RESPONSE")
     return response
-

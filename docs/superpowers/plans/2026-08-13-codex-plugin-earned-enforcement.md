@@ -99,9 +99,15 @@ class NoProgressDetector:
             ),
         )
 
-    def observe(self, semantic_key: str, state_hash: str, evidence_hash: str, outcome: ActionOutcomeStatus) -> None:
+    def observe(
+        self, semantic_key: str, state_hash: str, evidence_hash: str, outcome: ActionOutcomeStatus
+    ) -> None:
         previous = self._observations.get(semantic_key)
-        count = previous[3] + 1 if previous is not None and previous[:2] == (state_hash, evidence_hash) else 1
+        count = (
+            previous[3] + 1
+            if previous is not None and previous[:2] == (state_hash, evidence_hash)
+            else 1
+        )
         self._observations[semantic_key] = (state_hash, evidence_hash, outcome, count)
 ```
 
@@ -140,7 +146,12 @@ def test_pre_tool_event_requires_tool_identity() -> None:
 
 
 def test_denial_uses_official_shape() -> None:
-    assert build_pre_tool_output(False, "No progress", "NO_PROGRESS")["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert (
+        build_pre_tool_output(False, "No progress", "NO_PROGRESS")["hookSpecificOutput"][
+            "permissionDecision"
+        ]
+        == "deny"
+    )
 ```
 
 - [ ] **Step 2: Verify RED, implement events, verify GREEN**
@@ -189,12 +200,19 @@ git commit -m "feat: add strict redacted Codex hook contracts"
 
 ```python
 def test_model_facing_shell_prose_remains_unknown() -> None:
-    assert classify_tool_outcome(post_event(response="Process exited with code 0")) is ActionOutcomeStatus.UNKNOWN
+    assert (
+        classify_tool_outcome(post_event(response="Process exited with code 0"))
+        is ActionOutcomeStatus.UNKNOWN
+    )
 
 
 def test_structured_exit_status_is_classified() -> None:
-    assert classify_tool_outcome(post_event(response={"exit_code": 0})) is ActionOutcomeStatus.SUCCESS
-    assert classify_tool_outcome(post_event(response={"exit_code": 7})) is ActionOutcomeStatus.FAILURE
+    assert (
+        classify_tool_outcome(post_event(response={"exit_code": 0})) is ActionOutcomeStatus.SUCCESS
+    )
+    assert (
+        classify_tool_outcome(post_event(response={"exit_code": 7})) is ActionOutcomeStatus.FAILURE
+    )
 ```
 
 - [ ] **Step 2: Verify RED, implement the allowlisted classifier, verify GREEN**

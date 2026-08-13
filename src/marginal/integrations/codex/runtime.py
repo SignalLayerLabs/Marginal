@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from marginal.controls import ActionOutcomeStatus, NoProgressDetector, NoProgressSignal
-from marginal.models import Cost
+from marginal.models import Cost, Decision
 from marginal.protocol import AgentAction, AgentDecision
 from marginal.runtime import UniversalRuntime
 
@@ -36,6 +38,7 @@ class CodexSessionRuntime:
         *,
         workspace: str | Path,
         detector: NoProgressDetector | None = None,
+        enforcement_enabled: Callable[[], bool] | None = None,
     ) -> None:
         if not isinstance(runtime, UniversalRuntime):
             raise TypeError("runtime must be a UniversalRuntime")
@@ -43,25 +46,30 @@ class CodexSessionRuntime:
         self.workspace = Path(workspace).resolve()
         workspace_state_hash(self.workspace)
         self.detector = detector or NoProgressDetector()
+        self._enforcement_enabled = enforcement_enabled or (lambda: False)
         self._pending: dict[str, _PendingAction] = {}
         self._evidence_by_semantic_key: dict[str, str] = {}
         self._last_signal: NoProgressSignal | None = None
+        self._last_action_evidence: dict[str, str] | None = None
         self._successful = 0
         self._failed = 0
         self._unknown = 0
+        self._enforced_denials = 0
         self._closed = False
 
     @property
     def last_no_progress_signal(self) -> NoProgressSignal | None:
         return self._last_signal
 
+    @property
+    def last_action_evidence(self) -> dict[str, str] | None:
+        return dict(self._last_action_evidence) if self._last_action_evidence else None
+
     def pre_tool_use(self, event: PreToolUseEvent) -> AgentDecision:
         self._ensure_open()
         self._validate_session(event.session_id)
         if event.tool_use_id in self._pending:
-            raise CodexIntegrationError(
-                f"tool identity is already pending: {event.tool_use_id}"
-            )
+            raise CodexIntegrationError(f"tool identity is already pending: {event.tool_use_id}")
         state_hash = workspace_state_hash(self.workspace)
         action = normalize_pre_tool_use(event, state_hash=state_hash)
         semantic_key = str(action.metadata["semantic_key"])
@@ -72,11 +80,29 @@ class CodexSessionRuntime:
                 state_hash=state_hash,
                 previous_evidence_hash=evidence_hash,
             )
+        self._last_action_evidence = self._safe_action_evidence(action)
         self._last_signal = self.detector.evaluate(
             semantic_key,
             state_hash,
             evidence_hash,
         )
+        if self._last_signal.enforcement_eligible and self._is_enforcement_enabled():
+            self._enforced_denials += 1
+            return AgentDecision.from_core(
+                event.tool_use_id,
+                Decision(
+                    allowed=False,
+                    reason="Repeated proven-success action produced no new state or evidence",
+                    recommended=False,
+                    recommendation_reason=(
+                        "Repeated proven-success action produced no new state or evidence"
+                    ),
+                    reason_code="NO_PROGRESS_ENFORCED",
+                    recommendation_reason_code="NO_PROGRESS_ENFORCED",
+                    mode="enforce",
+                    confidence=1.0,
+                ),
+            )
         decision = self.runtime.before_action(action)
         if decision.allowed:
             self._pending[event.tool_use_id] = _PendingAction(event=event, action=action)
@@ -123,6 +149,10 @@ class CodexSessionRuntime:
     def pending_action_ids(self) -> tuple[str, ...]:
         return tuple(sorted(self._pending))
 
+    def action_evidence(self, action_id: str) -> dict[str, str] | None:
+        pending = self._pending.get(action_id)
+        return self._safe_action_evidence(pending.action) if pending is not None else None
+
     def summary(self) -> dict[str, int]:
         return {
             "successful_observations": self._successful,
@@ -130,6 +160,7 @@ class CodexSessionRuntime:
             "unknown_observations": self._unknown,
             "completed_observations": self._successful + self._failed + self._unknown,
             "pending_actions": len(self._pending),
+            "enforced_denials": self._enforced_denials,
         }
 
     def close(self) -> None:
@@ -147,6 +178,22 @@ class CodexSessionRuntime:
     def _ensure_open(self) -> None:
         if self._closed:
             raise CodexIntegrationError("Codex session runtime is closed")
+
+    def _is_enforcement_enabled(self) -> bool:
+        try:
+            enabled = self._enforcement_enabled()
+        except Exception:
+            return False
+        return enabled if isinstance(enabled, bool) else False
+
+    @staticmethod
+    def _safe_action_evidence(action: AgentAction) -> dict[str, str]:
+        return {
+            "action_hash": hashlib.sha256(action.action_id.encode("utf-8")).hexdigest(),
+            "semantic_key": str(action.metadata.get("semantic_key", "")),
+            "state_hash": action.state_hash,
+            "evidence_hash": str(action.metadata.get("evidence_hash", "")),
+        }
 
     def _validate_session(self, session_id: str) -> None:
         if session_id != self.runtime.session_id:
@@ -173,4 +220,3 @@ class CodexSessionRuntime:
         )
         if expected != observed:
             raise CodexIntegrationError("PreToolUse and PostToolUse identity does not match")
-

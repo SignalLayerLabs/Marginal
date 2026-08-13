@@ -92,4 +92,3 @@ def test_uninstall_uses_native_command() -> None:
 
     assert result.installed is False
     assert ["codex", "plugin", "remove", "marginal@marginal", "--json"] in runner.calls
-

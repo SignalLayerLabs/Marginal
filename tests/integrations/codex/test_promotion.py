@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import json
+
 from marginal.integrations.codex.promotion import (
     CoverageSummary,
     PromotionCriteria,
     PromotionIdentity,
     PromotionReceipt,
+    activate_enforcement,
+    enforcement_is_active,
     evaluate_promotion,
+    read_promotion_receipt,
+    write_promotion_receipt,
 )
 
 
@@ -68,6 +74,10 @@ def test_each_safety_failure_blocks_promotion() -> None:
         "LATENCY": {"decision_latencies_ms": (76.0,)},
         "OUTCOME_UNOBSERVABLE": {"enforceable_outcomes_observable": False},
         "UNKNOWN_ENFORCEABLE_OUTCOMES": {"unknown_enforceable_outcomes": 1},
+        "UNREVIEWED_CANDIDATES": {
+            "intervention_candidates": 6,
+            "reviewed_candidates": 5,
+        },
     }
     for reason, overrides in cases.items():
         receipt = evaluate_promotion(
@@ -90,3 +100,50 @@ def test_receipt_round_trip_is_hash_verifiable() -> None:
     assert restored == receipt
     assert restored.verify_hash()
 
+
+def test_active_enforcement_requires_ready_matching_receipt(tmp_path) -> None:
+    identity = _identity()
+    receipt = evaluate_promotion(_summary(), PromotionCriteria(), identity=identity)
+    write_promotion_receipt(tmp_path, receipt)
+
+    activate_enforcement(tmp_path, receipt)
+
+    assert enforcement_is_active(tmp_path, identity=identity) is True
+    assert read_promotion_receipt(tmp_path, identity.repository_hash) == receipt
+
+
+def test_identity_drift_automatically_demotes_receipt(tmp_path) -> None:
+    identity = _identity()
+    receipt = evaluate_promotion(_summary(), PromotionCriteria(), identity=identity)
+    write_promotion_receipt(tmp_path, receipt)
+    activate_enforcement(tmp_path, receipt)
+
+    assert (
+        enforcement_is_active(
+            tmp_path,
+            identity=_identity(policy_hash="changed"),
+        )
+        is False
+    )
+    state = json.loads((tmp_path / "repositories" / f"{identity.repository_hash}.json").read_text())
+    assert state["mode"] == "shadow"
+    assert state["reason"] == "IDENTITY_DRIFT"
+
+
+def test_evidence_drift_automatically_demotes_receipt(tmp_path) -> None:
+    identity = _identity()
+    receipt = evaluate_promotion(_summary(), PromotionCriteria(), identity=identity)
+    write_promotion_receipt(tmp_path, receipt)
+    activate_enforcement(tmp_path, receipt)
+
+    assert (
+        enforcement_is_active(
+            tmp_path,
+            identity=identity,
+            summary=_summary(integration_failures=1),
+        )
+        is False
+    )
+    state = json.loads((tmp_path / "repositories" / f"{identity.repository_hash}.json").read_text())
+    assert state["mode"] == "shadow"
+    assert state["reason"] == "EVIDENCE_DRIFT"

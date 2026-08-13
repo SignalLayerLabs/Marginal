@@ -22,10 +22,10 @@ def main() -> int:
         if (value := os.environ.get(name)) is not None
     }
     environment["PLUGIN_DATA"] = str(Path(plugin_data).resolve())
+    environment["PLUGIN_ROOT"] = str(Path(plugin_root).resolve())
     os.execve(sys.executable, [sys.executable, str(runtime)], environment)
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

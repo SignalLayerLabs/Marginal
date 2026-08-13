@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from marginal.integrations.codex.evidence import EvidenceStore
+from marginal.integrations.codex.evidence import EvidenceStore, summarize_evidence
 
 
 def _record() -> dict[str, object]:
@@ -61,3 +61,56 @@ def test_checkpoint_is_atomic_canonical_and_private(tmp_path: Path) -> None:
     assert store.read_checkpoint() == checkpoint
     assert stat.S_IMODE(store.checkpoint_path.stat().st_mode) == 0o600
 
+
+def test_redacted_records_build_a_promotion_summary(tmp_path: Path) -> None:
+    store = EvidenceStore(tmp_path)
+    for index in range(100):
+        store.append(
+            {
+                **_record(),
+                "session_hash": f"session-{index % 5}",
+                "action_hash": f"action-{index}",
+                "outcome": "success",
+                "latency_ms": 2.0,
+                "recommended_stop": index < 5,
+                "reviewed": index < 5,
+            }
+        )
+    for index in range(5):
+        store.append(
+            {
+                "schema_version": 1,
+                "event": "session_end",
+                "session_hash": f"session-{index}",
+            }
+        )
+
+    summary = summarize_evidence(store.read_all())
+
+    assert summary.covered_actions == 100
+    assert summary.coverable_actions == 100
+    assert summary.completed_sessions == 5
+    assert summary.reviewed_candidates == 5
+    assert summary.false_stops == 0
+    assert summary.enforceable_outcomes_observable is True
+
+
+def test_new_window_preserves_audit_history_but_requires_fresh_evidence(tmp_path: Path) -> None:
+    store = EvidenceStore(tmp_path)
+    store.append(
+        {
+            "schema_version": 1,
+            "event": "integration_failure",
+            "reason_code": "SERVICE_UNAVAILABLE",
+            "integration_failure": True,
+        }
+    )
+
+    store.start_new_window(reason_code="SERVICE_UNAVAILABLE")
+
+    records = store.read_all()
+    summary = summarize_evidence(records)
+    assert any(record.get("integration_failure") is True for record in records)
+    assert records[-1]["event"] == "window_start"
+    assert summary.integration_failures == 0
+    assert summary.covered_actions == 0

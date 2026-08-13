@@ -13,8 +13,9 @@ and explicit promotion.
 
 1. Run `marginal codex status` before describing the active mode.
 2. Run `marginal codex doctor` when hooks, coverage, or compatibility are uncertain.
-3. Use `marginal codex review` to direct the user to the required `/hooks` trust review.
-4. Review local redacted candidates and false-stop labels before promotion.
+3. Use `/hooks` to inspect and grant trust to the exact lifecycle commands.
+4. Run `marginal codex review`, then label each local redacted candidate with
+   `--candidate HASH --verdict waste|helpful` before promotion.
 5. Run `marginal codex promote` only when the evidence receipt is ready.
 6. Run `marginal codex demote` whenever identity, coverage, outcome observability, or policy drifts.
 
@@ -32,9 +33,8 @@ and explicit promotion.
 | --- | --- |
 | Current mode | `marginal codex status` |
 | Capability diagnosis | `marginal codex doctor` |
-| Hook trust instructions | `marginal codex review` |
+| Unreviewed evidence | `marginal codex review` |
 | Evidence-gated enforcement | `marginal codex promote` |
 | Immediate fail-open reset | `marginal codex demote` |
 
 If evidence is incomplete or contradictory, keep Shadow Mode and report the exact blocking reason.
-
