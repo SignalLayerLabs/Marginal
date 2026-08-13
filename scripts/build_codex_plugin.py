@@ -13,8 +13,7 @@ from pathlib import Path
 
 _ZIP_TIMESTAMP = (2020, 1, 1, 0, 0, 0)
 _MAIN = (
-    b"from marginal.integrations.codex.service import hook_main\n"
-    b"raise SystemExit(hook_main())\n"
+    b"from marginal.integrations.codex.service import hook_main\nraise SystemExit(hook_main())\n"
 )
 
 
@@ -30,11 +29,7 @@ def _source_files(repo: Path) -> list[Path]:
     return sorted(
         path
         for path in package.rglob("*")
-        if (
-            path.is_file()
-            and "__pycache__" not in path.parts
-            and path.suffix in {".py", ".json"}
-        )
+        if (path.is_file() and "__pycache__" not in path.parts and path.suffix in {".py", ".json"})
         or path == package / "py.typed"
     )
 
@@ -53,18 +48,17 @@ def _write_archive(target: Path, repo: Path, files: list[Path]) -> None:
     with zipfile.ZipFile(
         target,
         "w",
-        compression=zipfile.ZIP_DEFLATED,
-        compresslevel=9,
+        compression=zipfile.ZIP_STORED,
     ) as archive:
         entries = [("__main__.py", _MAIN)] + [
             (path.relative_to(repo / "src").as_posix(), path.read_bytes()) for path in files
         ]
         for name, content in sorted(entries):
             info = zipfile.ZipInfo(name, date_time=_ZIP_TIMESTAMP)
-            info.compress_type = zipfile.ZIP_DEFLATED
+            info.compress_type = zipfile.ZIP_STORED
             info.external_attr = 0o100644 << 16
             info.create_system = 3
-            archive.writestr(info, content, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+            archive.writestr(info, content, compress_type=zipfile.ZIP_STORED)
 
 
 def build_plugin_runtime(repo: str | Path, *, output_dir: str | Path) -> PluginBuild:
@@ -102,9 +96,7 @@ def main() -> int:
         with tempfile.TemporaryDirectory(prefix="marginal-plugin-check-") as temporary:
             build = build_plugin_runtime(repo, output_dir=temporary)
             committed = committed_dir / "marginal_runtime.pyz"
-            provenance = json.loads(
-                (committed_dir / "provenance.json").read_text(encoding="utf-8")
-            )
+            provenance = json.loads((committed_dir / "provenance.json").read_text(encoding="utf-8"))
             if not committed.exists() or committed.read_bytes() != build.zipapp.read_bytes():
                 raise SystemExit("committed Codex runtime is stale")
             if provenance.get("sha256") != build.sha256:

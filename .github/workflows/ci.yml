@@ -27,5 +27,6 @@ jobs:
       - run: ruff check .
       - run: mypy src/marginal
       - run: pytest -q
+      - run: python scripts/build_codex_plugin.py --check
       - run: python -m build
       - run: python -m twine check dist/*

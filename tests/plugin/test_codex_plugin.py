@@ -6,6 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from scripts.build_codex_plugin import build_plugin_runtime
 
 REPO = Path(__file__).resolve().parents[2]
@@ -31,6 +32,8 @@ def test_marketplace_points_to_native_plugin() -> None:
 
 
 def test_manifest_is_validator_clean() -> None:
+    if not VALIDATOR.exists():
+        pytest.skip("official Codex plugin validator is not installed")
     completed = subprocess.run(
         [sys.executable, str(VALIDATOR), str(PLUGIN)],
         cwd=REPO,
@@ -56,9 +59,7 @@ def test_hooks_cover_exact_supported_lifecycle() -> None:
 
 def test_generated_runtime_matches_provenance(tmp_path: Path) -> None:
     rebuilt = build_plugin_runtime(REPO, output_dir=tmp_path)
-    provenance = json.loads(
-        (PLUGIN / "runtime" / "provenance.json").read_text(encoding="utf-8")
-    )
+    provenance = json.loads((PLUGIN / "runtime" / "provenance.json").read_text(encoding="utf-8"))
 
     assert _sha256(rebuilt.zipapp) == provenance["sha256"]
     assert _sha256(PLUGIN / "runtime" / "marginal_runtime.pyz") == provenance["sha256"]
