@@ -1,0 +1,60 @@
+{
+  "description": "Local-only MARGINAL observation and Earned Enforcement hooks.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$PLUGIN_ROOT/scripts/marginal_hook.py\"",
+            "commandWindows": "py -3 \"%PLUGIN_ROOT%\\scripts\\marginal_hook.py\"",
+            "timeout": 10,
+            "statusMessage": "Starting MARGINAL Shadow Mode"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|MCP|Read|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$PLUGIN_ROOT/scripts/marginal_hook.py\"",
+            "commandWindows": "py -3 \"%PLUGIN_ROOT%\\scripts\\marginal_hook.py\"",
+            "timeout": 5,
+            "statusMessage": "Measuring marginal value"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|MCP|Read|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$PLUGIN_ROOT/scripts/marginal_hook.py\"",
+            "commandWindows": "py -3 \"%PLUGIN_ROOT%\\scripts\\marginal_hook.py\"",
+            "timeout": 5,
+            "statusMessage": "Recording redacted completion evidence"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$PLUGIN_ROOT/scripts/marginal_hook.py\"",
+            "commandWindows": "py -3 \"%PLUGIN_ROOT%\\scripts\\marginal_hook.py\"",
+            "timeout": 5,
+            "statusMessage": "Closing MARGINAL session"
+          }
+        ]
+      }
+    ]
+  }
+}
+

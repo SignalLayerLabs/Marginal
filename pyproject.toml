@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "marginal-ai"
-version = "0.2.0"
+version = "0.3.0"
 description = "Universal learning-loop and compute-governance foundation for economically disciplined AI agents."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -59,6 +59,7 @@ dev = [
   "build>=1.2.2",
   "mypy>=1.17",
   "pytest>=8.3",
+  "PyYAML>=6.0",
   "jsonschema>=4.23",
   "ruff==0.16.2",
   "twine>=6.1",

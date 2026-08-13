@@ -1,16 +1,19 @@
 # Codex Benchmark Readiness
 
-This document prepares v0.3 without presenting a Codex adapter as already implemented.
+This document records the v0.3 Codex benchmark contract and the remaining evidence gates. The
+native adapter and one-command plugin path are implemented; the larger repeated canary remains a
+future scientific gate.
 
 ## Target user experience
 
-The milestone target remains a one-command installation path:
+The release provides both the native Codex marketplace path and a Python CLI transaction:
 
 ```bash
+codex plugin marketplace add SignalLayerLabs/Marginal --ref main && codex plugin add marginal@marginal
 marginal install codex
 ```
 
-The command is a **v0.3 target**, not part of v0.2.0.
+The benchmark command and native plugin are part of v0.3.0.
 
 ## Adapter responsibilities
 
@@ -42,14 +45,14 @@ The recommended sequence is:
 
 ## One-command installer requirements
 
-Before the public benchmark, `marginal install codex` should be able to:
+`marginal install codex` now:
 
 - detect a supported Codex installation/version;
 - explain the detected capability level;
-- back up any configuration it changes;
+- uses native plugin transactions instead of editing user configuration;
 - install the thin adapter without source-code edits to user projects;
 - default to Shadow Mode;
-- expose `marginal status` / diagnostics for the integration;
+- exposes repository-scoped status and diagnostics;
 - uninstall cleanly and restore prior configuration;
 - fail without leaving Codex unusable.
 

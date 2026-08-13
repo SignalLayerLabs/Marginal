@@ -64,3 +64,10 @@ def test_demo_matches_committed_benchmark(capsys) -> None:
 
     assert exit_code == 0
     assert capsys.readouterr().out == render_markdown(run_benchmark())
+
+
+def test_codex_status_dispatches_without_importing_at_cli_module_load(tmp_path, capsys) -> None:
+    exit_code = main(["codex", "status", "--data-dir", str(tmp_path), "--json"])
+
+    assert exit_code == 0
+    assert json.loads(capsys.readouterr().out)["mode"] == "shadow"

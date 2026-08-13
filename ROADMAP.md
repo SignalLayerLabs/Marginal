@@ -38,9 +38,9 @@ This roadmap is milestone-driven rather than date-driven. GitHub Issues and pull
 | Milestone | Status | Primary outcome |
 |---|---|---|
 | **v0.1 — Reference Allocator Foundation** | Complete | Provider-neutral allocation, accounting, tracing and first release |
-| **v0.2 — Learning Loop Foundation** | Validation | Universal protocol, non-blocking observation, versioned evidence, privacy and replay |
+| **v0.2 — Learning Loop Foundation** | Complete | Universal protocol, non-blocking observation, versioned evidence, privacy and replay |
 | **Community hardening** | In progress | Governance tax, false-stop accounting, diminishing-return control and clearer evidence UX |
-| **v0.3 — Codex Reference Integration** | Planned | One-command target, real telemetry and first matched public benchmark |
+| **v0.3 — Codex Reference Integration** | Validation | Native plugin, one-command install, Earned Enforcement, and measured smoke |
 | **v0.4 — Multi-Engine Developer Preview** | Planned | Shared core across materially different coding agents |
 | **v0.5 — One-Command Universal Installation** | Planned | Detection, installation, diagnostics and rollback across engines |
 | **v0.6 — Adaptive and Causal Allocation** | Planned | Calibrated learning, exploration and stronger identification strategies |
@@ -60,7 +60,7 @@ Delivered provider-neutral `Action`, `Cost`, `Decision` and `Allocation` primiti
 
 ## v0.2 — Learning Loop Foundation
 
-**Status:** Validation
+**Status:** Complete
 
 The v0.2 release candidate adds:
 
@@ -77,10 +77,10 @@ The v0.2 release candidate adds:
 - task outcomes separated from action-level realized gain;
 - non-causal replay and ledger/reporting CLI support.
 
-### Remaining exit criteria
+### Exit criteria
 
-- [ ] Ruff, mypy strict, full tests, package build and Twine validation pass in canonical CI.
-- [ ] `v0.2.0` is tagged/released from the canonical repository.
+- [x] Ruff, mypy strict, full tests, package build and Twine validation pass in canonical CI.
+- [x] `v0.2.0` is tagged/released from the canonical repository.
 
 Vendor-specific adapters and measured production savings are intentionally outside v0.2.
 
@@ -120,28 +120,30 @@ Vendor-specific adapters and measured production savings are intentionally outsi
 
 ## v0.3 — Codex Reference Integration
 
-**Status:** Planned
+**Status:** Validation
 
 **Objective:** integrate MARGINAL into Codex and produce the first real matched benchmark with measured telemetry and net-value accounting.
 
 ### Integration deliverables
 
-- [ ] Build a thin Codex adapter against the Universal Agent Protocol.
-- [ ] Target `marginal install codex` with safe backup, Shadow Mode default and clean uninstall.
-- [ ] Detect Codex version/capability level and refuse unsupported enforcement claims.
-- [ ] Capture measured input, cached input, output, reasoning and total tokens.
-- [ ] Correlate model/tool/retry/verification actions with session, task and workspace state.
-- [ ] Record evidence hashes where deterministic evidence boundaries exist.
-- [ ] Capture governance tokens, USD and latency separately from workload usage.
-- [ ] Define and record repeated-call metrics consistently in OFF and ON arms.
-- [ ] Export raw paired JSONL sufficient to reproduce the public report.
+- [x] Build a thin Codex adapter against the Universal Agent Protocol.
+- [x] Ship native `marginal@marginal` installation plus `marginal install codex`, Shadow Mode default and clean uninstall.
+- [x] Detect Codex version/capability level and refuse unsupported enforcement claims.
+- [x] Capture measured input, cached input, output, reasoning and total tokens in the benchmark adapter.
+- [x] Correlate tool and verification actions with session, turn, call, task and workspace state.
+- [x] Record evidence hashes where deterministic evidence boundaries exist without persisting raw payloads.
+- [x] Capture governance tokens, USD and latency separately from workload usage.
+- [x] Define and record repeated-call metrics consistently in OFF and ON arms.
+- [x] Export raw paired JSONL sufficient to reproduce the public report.
+- [x] Add Earned Enforcement receipts with explicit promotion and automatic fail-open demotion.
+- [x] Validate add/install/four-hook lifecycle/privacy/remove in an isolated Codex home.
 
 ### Canary: engineering validation only
 
 - [ ] Run a 10-task matched canary with identical model, prompt, tools, limits and verifier.
-- [ ] Confirm event/session/state correlation and no orphaned reservations.
-- [ ] Confirm telemetry is measured rather than declared.
-- [ ] Confirm governance overhead is separately accounted.
+- [x] Confirm event/session/state correlation and no orphaned reservations in focused lifecycle tests.
+- [x] Confirm telemetry is measured rather than declared in the exploratory paired smoke.
+- [x] Confirm governance overhead is separately accounted.
 - [ ] Review deny recommendations for false-stop candidates.
 - [ ] Preserve pass-through and negative results instead of filtering them out.
 
@@ -179,12 +181,14 @@ Report:
 
 ### v0.3 exit criteria
 
-- Codex baseline and Codex + MARGINAL run under matched conditions.
-- Telemetry comes from the runtime/provider integration rather than declared demo estimates.
-- The canary completes without integration failures.
-- Public results are reproducible from raw paired artifacts.
-- Headline claims use **net** metrics after governance tax.
-- If the preregistered gate is not met, the published conclusion says so.
+- [x] Codex baseline and Codex + MARGINAL run under matched conditions for the n=3 integration smoke.
+- [x] Telemetry comes from the runtime/provider integration rather than declared demo estimates.
+- [x] The authoritative Docker verifier completes without infrastructure errors.
+- [x] Public results are reproducible from raw paired artifacts.
+- [x] Headline claims use **net** metrics after governance tax.
+- [x] The published conclusion says `pass_through` because the support gate was not met.
+- [ ] A preregistered repeated run large enough for a general efficiency claim is complete.
+- [ ] The external universal directory review is accepted and released.
 
 See [Codex benchmark readiness](docs/integrations/codex-benchmark-readiness.md).
 

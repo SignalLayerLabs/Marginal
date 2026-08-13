@@ -70,4 +70,11 @@ A prompt instruction, skill, or advisory middleware is not equivalent to enforce
 
 ## Current status
 
-Version `0.2.0` implements the universal adapter foundation, schemas, runtime, and conformance tests. Vendor-specific Codex, OpenCode, Claude Code, and GitHub Copilot adapters are roadmap work and must not be advertised as complete until tested against official control surfaces.
+The v0.3 candidate implements and validates the native Codex plugin against Codex CLI 0.147.0.
+It provides lifecycle correlation, privacy-safe normalization, outcome classification, an
+authenticated local service, Shadow Mode, Earned Enforcement receipts, and reversible native
+installation. See [Codex plugin](codex.md).
+
+OpenCode, Claude Code, and GitHub Copilot remain roadmap work. Codex is labeled Tool Enforcement,
+not Full Compute Enforcement, because specialized and hosted tool paths can fall outside local
+hook coverage.
