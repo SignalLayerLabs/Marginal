@@ -114,7 +114,7 @@ Expected: all local links resolve, formatting and diff checks pass, and length i
 Reject duplicated install commands, vague adjectives, community-response narrative, unsupported
 claims, repeated concepts, and paragraphs longer than four sentences.
 
-- [ ] **Step 6: Commit and publish**
+- [x] **Step 6: Commit and publish**
 
 ```bash
 git add README.md docs/superpowers/plans/2026-08-14-readme-rewrite.md
