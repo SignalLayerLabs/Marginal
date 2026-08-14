@@ -7,7 +7,11 @@ from pathlib import Path
 
 import marginal.integrations.codex.service as service_module
 from marginal.integrations.codex.events import SessionEvent
-from marginal.integrations.codex.evidence import EvidenceStore, summarize_evidence
+from marginal.integrations.codex.evidence import (
+    EvidenceStore,
+    summarize_evidence,
+    summarize_verified_evidence,
+)
 from marginal.integrations.codex.identity import current_promotion_identity
 from marginal.integrations.codex.promotion import (
     CoverageSummary,
@@ -121,6 +125,7 @@ def test_bootstrap_redacts_transcript_and_hashes_session_filename(tmp_path: Path
     assert event.session_id not in bootstrap.name
     assert "transcript_path" not in payload
     assert "/private/raw-transcript.jsonl" not in json.dumps(payload)
+    assert "source" not in payload
 
 
 def test_missing_service_fails_open_and_demotes(tmp_path: Path) -> None:
@@ -141,9 +146,19 @@ def test_missing_service_fails_open_and_demotes(tmp_path: Path) -> None:
         decision_latencies_ms=(1.0,),
         enforceable_outcomes_observable=True,
     )
-    receipt = evaluate_promotion(summary, PromotionCriteria(), identity=identity)
+    store = EvidenceStore(data / "evidence" / identity.repository_hash)
+    store.append({"schema_version": 1, "event": "session_start", "session_hash": "seed"})
+    root = store.verified_governance_root()
+    receipt = evaluate_promotion(
+        summary,
+        PromotionCriteria(),
+        identity=identity,
+        evidence_root=root.root_hash,
+        ledger_records=root.records,
+        ledger_path=store.governance_ledger_path,
+    )
     write_promotion_receipt(data, receipt)
-    activate_enforcement(data, receipt)
+    activate_enforcement(data, receipt, ledger_path=store.governance_ledger_path)
     pre_payload = {
         "session_id": "missing",
         "cwd": str(workspace),
@@ -213,6 +228,36 @@ def test_session_start_and_end_are_complete_hook_lifecycle(tmp_path: Path) -> No
     assert not (data / "sessions" / connection_filename("session-1")).exists()
 
 
+def test_user_prompt_submit_reaches_only_the_authenticated_session_and_is_not_persisted(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    _repository(workspace)
+    data = tmp_path / "data"
+    start = json.loads(json.dumps(asdict(_start(workspace))))
+    prompt = {
+        **start,
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "MARGINAL_PROMPT_SECRET: esegui di nuovo",
+    }
+    end = {**start, "hook_event_name": "SessionEnd", "source": None, "reason": "other"}
+
+    assert run_hook(start, data_root=data).exit_code == 0
+    try:
+        prompt_result = run_hook(prompt, data_root=data)
+        assert prompt_result.output is None
+        assert prompt_result.warning_code == ""
+    finally:
+        run_hook(end, data_root=data)
+
+    persisted = "\n".join(
+        path.read_text(encoding="utf-8") for path in data.rglob("*") if path.is_file()
+    )
+    assert "MARGINAL_PROMPT_SECRET" not in persisted
+    assert "prompt_hash" not in persisted
+
+
 def test_ready_repository_enforces_proven_no_progress_and_only_that(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
@@ -221,10 +266,17 @@ def test_ready_repository_enforces_proven_no_progress_and_only_that(tmp_path: Pa
     identity = current_promotion_identity(workspace)
     store = EvidenceStore(data / "evidence" / identity.repository_hash)
     _seed_ready_evidence(store)
-    summary = summarize_evidence(store.read_all())
-    receipt = evaluate_promotion(summary, PromotionCriteria(), identity=identity)
+    summary, root = summarize_verified_evidence(store)
+    receipt = evaluate_promotion(
+        summary,
+        PromotionCriteria(),
+        identity=identity,
+        evidence_root=root.root_hash,
+        ledger_records=root.records,
+        ledger_path=store.governance_ledger_path,
+    )
     write_promotion_receipt(data, receipt)
-    activate_enforcement(data, receipt)
+    activate_enforcement(data, receipt, ledger_path=store.governance_ledger_path)
     start_payload = json.loads(json.dumps(asdict(_start(workspace))))
     assert run_hook(start_payload, data_root=data).exit_code == 0
     try:

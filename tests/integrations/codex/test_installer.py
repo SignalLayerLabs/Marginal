@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from marginal.integrations.codex.installer import (
     CommandResult,
+    autopilot_consent_configured,
     inspect_codex,
     install,
     uninstall,
@@ -92,3 +93,11 @@ def test_uninstall_uses_native_command() -> None:
 
     assert result.installed is False
     assert ["codex", "plugin", "remove", "marginal@marginal", "--json"] in runner.calls
+
+
+def test_install_can_persist_explicit_user_autopilot_consent(tmp_path) -> None:
+    result = install(runner=RecordingRunner(), data_dir=tmp_path, autopilot_consent=True)
+
+    assert result.installed is True
+    assert result.autopilot_consent is True
+    assert autopilot_consent_configured(tmp_path) is True

@@ -6,7 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from marginal.integrations.codex.evidence import EvidenceStore, summarize_evidence
+from marginal.integrations.codex.evidence import (
+    EvidenceStore,
+    summarize_evidence,
+    summarize_verified_evidence,
+)
 
 
 def _record() -> dict[str, object]:
@@ -29,7 +33,9 @@ def _record() -> dict[str, object]:
     }
 
 
-@pytest.mark.parametrize("field", ["tool_input", "tool_response", "prompt", "command", "source"])
+@pytest.mark.parametrize(
+    "field", ["tool_input", "tool_response", "prompt", "prompt_hash", "command", "source"]
+)
 def test_store_rejects_raw_payload_fields(tmp_path: Path, field: str) -> None:
     with pytest.raises(ValueError, match="forbidden evidence field"):
         EvidenceStore(tmp_path).append({**_record(), field: "secret"})
@@ -114,3 +120,30 @@ def test_new_window_preserves_audit_history_but_requires_fresh_evidence(tmp_path
     assert records[-1]["event"] == "window_start"
     assert summary.integration_failures == 0
     assert summary.covered_actions == 0
+
+
+def test_evidence_records_are_anchored_to_a_verified_v3_prefix(tmp_path: Path) -> None:
+    store = EvidenceStore(tmp_path)
+    store.append(_record())
+    receipt_root = store.verified_governance_root()
+    store.append({**_record(), "action_hash": "second-action"})
+
+    assert receipt_root.valid is True
+    assert receipt_root.root_hash is not None
+    assert store.verifies_governance_prefix(
+        root_hash=receipt_root.root_hash, records=receipt_root.records
+    )
+
+
+def test_verified_summary_ignores_mutable_jsonl_tampering(tmp_path: Path) -> None:
+    store = EvidenceStore(tmp_path)
+    store.append(_record())
+    store.path.write_text(
+        '{"schema_version":1,"event":"decision","covered":true,"coverable":true}\n',
+        encoding="utf-8",
+    )
+
+    summary, report = summarize_verified_evidence(store)
+
+    assert report.valid is True
+    assert summary.covered_actions == 1

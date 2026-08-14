@@ -75,6 +75,17 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     ledger_validate.add_argument("ledger", type=Path)
 
+    verify = subparsers.add_parser("verify", help="verify a MARGINAL governance ledger v3")
+    verify.add_argument("ledger", type=Path)
+    verify.add_argument("--expected-root")
+    verify.add_argument("--json", action="store_true", dest="as_json")
+
+    ledger_migrate = subparsers.add_parser(
+        "ledger-migrate", help="migrate a MARGINAL decision ledger v2 to governance ledger v3"
+    )
+    ledger_migrate.add_argument("source", type=Path)
+    ledger_migrate.add_argument("destination", type=Path)
+
     ledger_export = subparsers.add_parser(
         "ledger-export",
         help="export a decision ledger with a privacy-preserving profile",
@@ -146,6 +157,8 @@ def _build_parser() -> argparse.ArgumentParser:
     install_parser.add_argument("target", choices=["codex"])
     install_parser.add_argument("--repository", default="SignalLayerLabs/Marginal")
     install_parser.add_argument("--ref", default="main")
+    install_parser.add_argument("--data-dir", type=Path)
+    install_parser.add_argument("--autopilot-consent", action="store_true")
     install_parser.add_argument("--json", action="store_true", dest="as_json")
 
     uninstall_parser = subparsers.add_parser("uninstall", help="remove a native integration")
@@ -162,6 +175,24 @@ def _build_parser() -> argparse.ArgumentParser:
     codex.add_argument("--candidate")
     codex.add_argument("--verdict", choices=["helpful", "waste"])
     codex.add_argument("--json", action="store_true", dest="as_json")
+
+    for name, help_text in (
+        ("status", "show authority, trust, evidence, and readiness"),
+        ("doctor", "diagnose the local Codex integration"),
+    ):
+        diagnostic = subparsers.add_parser(name, help=help_text)
+        diagnostic.add_argument("--data-dir", type=Path)
+        diagnostic.add_argument("--workspace", type=Path)
+        diagnostic.add_argument("--json", action="store_true", dest="as_json")
+    explain = subparsers.add_parser("explain", help="explain a redacted decision receipt")
+    explain.add_argument("decision_id")
+    explain.add_argument("--data-dir", type=Path)
+    explain.add_argument("--workspace", type=Path)
+    explain.add_argument("--json", action="store_true", dest="as_json")
+    privacy = subparsers.add_parser("privacy", help="inspect local persistence categories")
+    privacy_commands = privacy.add_subparsers(dest="privacy_command", required=True)
+    privacy_inspect = privacy_commands.add_parser("inspect", help="show persisted data categories")
+    privacy_inspect.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
 
@@ -172,7 +203,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "install":
         from .integrations.codex.installer import install
 
-        result = install(repository=args.repository, ref=args.ref)
+        result = install(
+            repository=args.repository,
+            ref=args.ref,
+            data_dir=args.data_dir,
+            autopilot_consent=args.autopilot_consent,
+        )
         payload = result.to_dict()
         if args.as_json:
             print(json.dumps(payload, sort_keys=True))
@@ -208,6 +244,38 @@ def main(argv: Sequence[str] | None = None) -> int:
             as_json=args.as_json,
         )
 
+    if args.command in {"status", "doctor", "explain", "privacy"}:
+        from .diagnostics import (
+            decision_explanation,
+            doctor_report,
+            inspect_privacy,
+            render_human,
+            status_report,
+        )
+        from .integrations.codex.commands import default_data_dir
+
+        data_dir = getattr(args, "data_dir", None) or default_data_dir()
+        workspace = getattr(args, "workspace", None) or Path.cwd()
+        if args.command == "status":
+            payload = status_report(data_root=data_dir, workspace=workspace).to_dict()
+            exit_code = 0
+        elif args.command == "doctor":
+            payload = doctor_report(data_root=data_dir, workspace=workspace).to_dict()
+            exit_code = 0
+        elif args.command == "explain":
+            payload = decision_explanation(
+                args.decision_id, data_root=data_dir, workspace=workspace
+            ).to_dict()
+            exit_code = 0 if payload["found"] is True else 1
+        else:
+            payload = inspect_privacy().to_dict()
+            exit_code = 0
+        if args.as_json:
+            print(json.dumps(payload, sort_keys=True))
+        else:
+            print(render_human(payload), end="")
+        return exit_code
+
     if args.command == "ledger-export":
         from .ledger import export_decision_ledger
 
@@ -224,6 +292,51 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
         print(f"exported {exported} records to {args.destination} with {args.privacy_profile}")
         return 0
+
+    if args.command == "verify":
+        from .governance_ledger import GovernanceLedger, LedgerVerificationReport
+
+        try:
+            verification_report = GovernanceLedger(args.ledger).verify(
+                expected_root=args.expected_root
+            )
+        except (OSError, ValueError):
+            verification_report = LedgerVerificationReport(False, 0, None, None, ("IO_ERROR",))
+        payload = {
+            "valid": verification_report.valid,
+            "records": verification_report.records,
+            "root_hash": verification_report.root_hash,
+            "first_invalid_sequence": verification_report.first_invalid_sequence,
+            "error_codes": list(verification_report.error_codes),
+        }
+        if args.as_json:
+            print(json.dumps(payload, sort_keys=True))
+        elif verification_report.valid:
+            print(
+                "valid governance ledger: "
+                f"{verification_report.records} records; root {verification_report.root_hash}"
+            )
+        else:
+            print(
+                "invalid governance ledger: " + ", ".join(verification_report.error_codes),
+                file=sys.stderr,
+            )
+        return 0 if verification_report.valid else 1
+
+    if args.command == "ledger-migrate":
+        from .governance_ledger import migrate_v2_to_v3
+
+        try:
+            migration_report = migrate_v2_to_v3(args.source, args.destination)
+        except (OSError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(
+            "migrated "
+            f"{migration_report.records} records to {args.destination}; "
+            f"root {migration_report.root_hash}",
+        )
+        return 0 if migration_report.valid else 1
 
     if args.command in {"ledger-report", "ledger-validate"}:
         from .ledger import read_decision_ledger, summarize_decision_ledger

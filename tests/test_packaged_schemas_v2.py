@@ -12,9 +12,13 @@ EXPECTED = {
     "agent-decision-v1.json",
     "agent-event-v1.json",
     "decision-ledger-v2.json",
+    "decision-receipt-v1.json",
+    "governance-ledger-v3.json",
     "outcome-v1.json",
+    "progress-evidence-v1.json",
     "safe-telemetry-v1.json",
     "token-usage-v2.json",
+    "trust-snapshot-v1.json",
 }
 
 

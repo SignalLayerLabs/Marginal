@@ -9,6 +9,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from marginal.governance_ledger import GovernanceLedger, LedgerVerificationReport
+
 from .promotion import CoverageSummary
 
 _ALLOWED_EVIDENCE_FIELDS = {
@@ -36,6 +38,7 @@ _FORBIDDEN_FIELDS = {
     "command",
     "credential",
     "prompt",
+    "prompt_hash",
     "source",
     "tool_input",
     "tool_response",
@@ -69,6 +72,8 @@ class EvidenceStore:
         if os.name == "posix":
             self.root.chmod(0o700)
         self.path = self.root / "evidence.jsonl"
+        self.governance_ledger_path = self.root / "governance-v3.jsonl"
+        self._governance_ledger = GovernanceLedger(self.governance_ledger_path)
         self.checkpoint_path = self.root / "checkpoint.json"
         self.max_record_bytes = max_record_bytes
 
@@ -93,6 +98,32 @@ class EvidenceStore:
             os.close(descriptor)
         if os.name == "posix":
             self.path.chmod(0o600)
+        self._governance_ledger.append({"event": "codex_evidence", "evidence": dict(record)})
+
+    def verified_governance_root(self) -> LedgerVerificationReport:
+        """Return the verified v3 root that can anchor an enforcement receipt."""
+
+        return self._governance_ledger.verify()
+
+    def verifies_governance_prefix(self, *, root_hash: str, records: int) -> bool:
+        report = self._governance_ledger.verify_prefix(records, expected_root=root_hash)
+        return report.valid and report.root_hash == root_hash
+
+    def verified_records(self) -> tuple[list[dict[str, Any]], LedgerVerificationReport]:
+        """Read only the evidence records committed by a verified v3 chain."""
+
+        report, payloads = self._governance_ledger.read_verified_payloads()
+        if not report.valid:
+            return [], report
+        records: list[dict[str, Any]] = []
+        for payload in payloads:
+            if payload.get("event") != "codex_evidence":
+                continue
+            evidence = payload.get("evidence")
+            if not isinstance(evidence, dict):
+                raise ValueError("Codex governance evidence payload is invalid")
+            records.append(dict(evidence))
+        return records, report
 
     def read_all(self) -> list[dict[str, Any]]:
         if not self.path.exists():
@@ -220,3 +251,12 @@ def summarize_evidence(records: list[dict[str, Any]]) -> CoverageSummary:
         enforceable_outcomes_observable=bool(outcomes) and unknown_outcomes == 0,
         intervention_candidates=len(candidates),
     )
+
+
+def summarize_verified_evidence(
+    store: EvidenceStore,
+) -> tuple[CoverageSummary, LedgerVerificationReport]:
+    """Summarize only records cryptographically committed to v3 governance evidence."""
+
+    records, report = store.verified_records()
+    return summarize_evidence(records), report

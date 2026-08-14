@@ -167,54 +167,54 @@ def read_decision_ledger(path: str | Path) -> list[dict[str, Any]]:
     """Load and structurally validate a MARGINAL v2 decision ledger."""
 
     ledger_path = Path(path)
+    with _open_readonly_text(ledger_path) as stream:
+        return _read_decision_ledger_stream(stream)
+
+
+def _read_decision_ledger_stream(stream: TextIO) -> list[dict[str, Any]]:
+    """Validate v2 ledger data from an already-secured text stream."""
+
     records: list[dict[str, Any]] = []
     previous_sequence = 0
-    with _open_readonly_text(ledger_path) as stream:
-        for line_number, raw in enumerate(stream, start=1):
-            if not raw.strip():
-                continue
+    for line_number, raw in enumerate(stream, start=1):
+        if not raw.strip():
+            continue
+        try:
+            record = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"invalid ledger JSON on line {line_number}") from exc
+        if not isinstance(record, dict):
+            raise ValueError(f"ledger record on line {line_number} must be an object")
+        if record.get("schema_version") != LEDGER_SCHEMA_VERSION:
+            raise ValueError(f"unsupported ledger schema on line {line_number}")
+        try:
+            privacy_profile = PrivacyProfile.parse(record.get("privacy_profile", "local_full"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"unsupported privacy profile on line {line_number}") from exc
+        if privacy_profile is PrivacyProfile.SAFE_TELEMETRY:
             try:
-                record = json.loads(raw)
-            except json.JSONDecodeError as exc:
-                raise ValueError(f"invalid ledger JSON on line {line_number}") from exc
-            if not isinstance(record, dict):
-                raise ValueError(f"ledger record on line {line_number} must be an object")
-            if record.get("schema_version") != LEDGER_SCHEMA_VERSION:
-                raise ValueError(f"unsupported ledger schema on line {line_number}")
-            try:
-                privacy_profile = PrivacyProfile.parse(record.get("privacy_profile", "local_full"))
-            except (TypeError, ValueError) as exc:
-                raise ValueError(f"unsupported privacy profile on line {line_number}") from exc
-            if privacy_profile is PrivacyProfile.SAFE_TELEMETRY:
-                try:
-                    validate_safe_telemetry_record(record)
-                except ValueError as exc:
-                    raise ValueError(
-                        f"invalid safe telemetry on line {line_number}: {exc}"
-                    ) from exc
-            for field_name in ("event_id", "timestamp", "run_id", "event"):
-                value = record.get(field_name)
-                if not isinstance(value, str) or not value.strip():
-                    raise ValueError(
-                        f"ledger {field_name} missing or invalid on line {line_number}"
-                    )
-            for field_name in ("task_id", "trajectory_id", "engine", "model"):
-                value = record.get(field_name, "")
-                if not isinstance(value, str):
-                    raise ValueError(f"ledger {field_name} must be a string on line {line_number}")
-            try:
-                datetime.fromisoformat(record["timestamp"])
+                validate_safe_telemetry_record(record)
             except ValueError as exc:
-                raise ValueError(f"ledger timestamp invalid on line {line_number}") from exc
-            sequence = record.get("sequence")
-            if isinstance(sequence, bool) or not isinstance(sequence, int):
-                raise ValueError(f"invalid ledger sequence on line {line_number}")
-            if sequence <= previous_sequence:
-                raise ValueError(
-                    f"ledger sequence is not strictly increasing on line {line_number}"
-                )
-            previous_sequence = sequence
-            records.append(record)
+                raise ValueError(f"invalid safe telemetry on line {line_number}: {exc}") from exc
+        for field_name in ("event_id", "timestamp", "run_id", "event"):
+            value = record.get(field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"ledger {field_name} missing or invalid on line {line_number}")
+        for field_name in ("task_id", "trajectory_id", "engine", "model"):
+            value = record.get(field_name, "")
+            if not isinstance(value, str):
+                raise ValueError(f"ledger {field_name} must be a string on line {line_number}")
+        try:
+            datetime.fromisoformat(record["timestamp"])
+        except ValueError as exc:
+            raise ValueError(f"ledger timestamp invalid on line {line_number}") from exc
+        sequence = record.get("sequence")
+        if isinstance(sequence, bool) or not isinstance(sequence, int):
+            raise ValueError(f"invalid ledger sequence on line {line_number}")
+        if sequence <= previous_sequence:
+            raise ValueError(f"ledger sequence is not strictly increasing on line {line_number}")
+        previous_sequence = sequence
+        records.append(record)
     if not records:
         raise ValueError("decision ledger is empty")
     return records

@@ -6,7 +6,12 @@ from pathlib import Path
 import pytest
 
 from marginal import BudgetLimits, Treasury
-from marginal.integrations.codex.events import PostToolUseEvent, PreToolUseEvent
+from marginal.integrations.codex.events import (
+    PostToolUseEvent,
+    PreToolUseEvent,
+    UserPromptSubmitEvent,
+)
+from marginal.integrations.codex.normalization import normalize_pre_tool_use
 from marginal.integrations.codex.runtime import CodexIntegrationError, CodexSessionRuntime
 from marginal.protocol import AgentCapabilities
 from marginal.runtime import UniversalRuntime
@@ -26,7 +31,12 @@ def _repository(path: Path) -> Path:
     return path
 
 
-def _runtime(workspace: Path, *, enforcement_enabled: bool = False) -> CodexSessionRuntime:
+def _runtime(
+    workspace: Path,
+    *,
+    enforcement_enabled: bool = False,
+    plugin_root: Path | None = None,
+) -> CodexSessionRuntime:
     universal = UniversalRuntime(
         Treasury(BudgetLimits(max_tokens=100), mode="shadow"),
         engine="codex",
@@ -38,6 +48,7 @@ def _runtime(workspace: Path, *, enforcement_enabled: bool = False) -> CodexSess
         universal,
         workspace=workspace,
         enforcement_enabled=lambda: enforcement_enabled,
+        plugin_root=plugin_root,
     )
 
 
@@ -160,3 +171,52 @@ def test_shadow_mode_never_applies_no_progress_denial(tmp_path: Path) -> None:
     assert runtime.last_no_progress_signal is not None
     assert runtime.last_no_progress_signal.enforcement_eligible is True
     assert runtime.summary()["enforced_denials"] == 0
+
+
+def test_user_prompt_intent_is_ephemeral_and_bound_to_the_hook_session(tmp_path: Path) -> None:
+    runtime = _runtime(_repository(tmp_path))
+    event = UserPromptSubmitEvent(
+        session_id="session-1",
+        cwd="/workspace",
+        hook_event_name="UserPromptSubmit",
+        model="gpt-5.6-sol",
+        permission_mode="default",
+        prompt="Esegui di nuovo",
+    )
+
+    runtime.user_prompt_submit(event)
+
+    assert runtime.user_intent.repeat_requested is True
+    assert "prompt" not in runtime.summary()
+
+
+def test_trusted_control_plane_bypass_has_no_pending_workload_reservation(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _repository(workspace)
+    root = tmp_path / "installed" / "marginal"
+    script = root / "scripts" / "marginal_control.py"
+    script.parent.mkdir(parents=True)
+    (root / ".codex-plugin").mkdir()
+    (root / ".codex-plugin" / "plugin.json").write_text("{}", encoding="utf-8")
+    script.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+    runtime = _runtime(workspace, enforcement_enabled=True, plugin_root=root)
+
+    decision = runtime.pre_tool_use(_pre("control-1", command=f"python3 {script} status"))
+
+    assert decision.allowed is True
+    assert decision.reason_code == "control_plane_bypass"
+    assert runtime.pending_action_ids() == ()
+    assert runtime.summary()["enforced_denials"] == 0
+
+
+@pytest.mark.parametrize("command", ["pytest -q", "curl https://example.com"])
+def test_autopilot_does_not_classify_generic_shell_as_l3_eligible(
+    tmp_path: Path, command: str
+) -> None:
+    workspace = _repository(tmp_path)
+    runtime = _runtime(workspace)
+    event = _pre("shell", command=command)
+    action = normalize_pre_tool_use(event, state_hash="state")
+
+    assert runtime._is_autopilot_eligible(event, action) is False

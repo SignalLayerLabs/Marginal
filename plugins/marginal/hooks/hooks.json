@@ -14,6 +14,19 @@
         ]
       }
     ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$PLUGIN_ROOT/scripts/marginal_hook.py\"",
+            "commandWindows": "py -3 \"%PLUGIN_ROOT%\\scripts\\marginal_hook.py\"",
+            "timeout": 5,
+            "statusMessage": "Reading explicit MARGINAL controls"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash|apply_patch|MCP|Read|Write|Edit",
@@ -57,4 +70,3 @@
     ]
   }
 }
-

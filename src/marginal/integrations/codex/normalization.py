@@ -5,12 +5,14 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from pathlib import Path
 from typing import Any
 
 from marginal.models import Cost
 from marginal.protocol import AgentAction, DeduplicationScope
 
 from .events import PreToolUseEvent
+from .intent import is_control_plane_action as _is_control_plane_action
 
 _VERIFICATION_PATTERN = re.compile(
     r"(?:^|[\s/])(?:pytest|tox|nox|unittest|jest|vitest|mocha|rspec|"
@@ -18,6 +20,12 @@ _VERIFICATION_PATTERN = re.compile(
     r"yarn\s+test|ruff|mypy|pyright|eslint|tsc|git\s+diff\s+--check)(?:\s|$)",
     re.IGNORECASE,
 )
+
+
+def is_control_plane_action(event: PreToolUseEvent, plugin_root: Path) -> bool:
+    """Expose strict trusted-control recognition beside action normalization."""
+
+    return _is_control_plane_action(event, plugin_root)
 
 
 def _canonical_json(value: Any) -> str:

@@ -101,7 +101,13 @@ def test_directory_submission_archive_is_reproducible_and_complete(tmp_path: Pat
 def test_hooks_cover_exact_supported_lifecycle() -> None:
     hooks = json.loads((PLUGIN / "hooks" / "hooks.json").read_text(encoding="utf-8"))
 
-    assert set(hooks["hooks"]) == {"SessionStart", "PreToolUse", "PostToolUse", "SessionEnd"}
+    assert set(hooks["hooks"]) == {
+        "SessionStart",
+        "PreToolUse",
+        "PostToolUse",
+        "SessionEnd",
+        "UserPromptSubmit",
+    }
     for groups in hooks["hooks"].values():
         command = groups[0]["hooks"][0]
         assert command["type"] == "command"

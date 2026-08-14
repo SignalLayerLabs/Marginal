@@ -48,7 +48,18 @@ class PostToolUseEvent:
     transcript_path: str | None = None
 
 
-CodexHookEvent = SessionEvent | PreToolUseEvent | PostToolUseEvent
+@dataclass(frozen=True, slots=True)
+class UserPromptSubmitEvent:
+    session_id: str
+    cwd: str
+    hook_event_name: str
+    model: str
+    permission_mode: str
+    prompt: str
+    transcript_path: str | None = None
+
+
+CodexHookEvent = SessionEvent | PreToolUseEvent | PostToolUseEvent | UserPromptSubmitEvent
 
 
 def _required_text(payload: Mapping[str, Any], name: str) -> str:
@@ -113,6 +124,8 @@ def parse_hook_event(payload: Mapping[str, Any]) -> CodexHookEvent:
             **_tool_fields(payload),
             tool_response=payload["tool_response"],
         )
+    if name == "UserPromptSubmit":
+        return UserPromptSubmitEvent(**common, prompt=_required_text(payload, "prompt"))
     raise ValueError(f"unsupported Codex hook event: {name}")
 
 

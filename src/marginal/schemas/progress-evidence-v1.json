@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SignalLayerLabs/Marginal/schemas/progress-evidence-v1.json",
+  "title": "MARGINAL Progress Evidence v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "level",
+    "state_hash",
+    "evidence_hash",
+    "confidence",
+    "verifier"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "level": {
+      "enum": ["activity", "information", "progress", "verified_progress"]
+    },
+    "state_hash": {"type": "string", "minLength": 1},
+    "evidence_hash": {"type": "string", "minLength": 1},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "verifier": {"type": ["string", "null"], "minLength": 1}
+  },
+  "additionalProperties": false
+}

@@ -11,9 +11,12 @@ from typing import Any
 from marginal.controls import ActionOutcomeStatus, NoProgressDetector, NoProgressSignal
 from marginal.models import Cost, Decision
 from marginal.protocol import AgentAction, AgentDecision
+from marginal.reason_codes import ReasonCode
 from marginal.runtime import UniversalRuntime
 
-from .events import PostToolUseEvent, PreToolUseEvent
+from .autopilot import AutopilotController
+from .events import PostToolUseEvent, PreToolUseEvent, UserPromptSubmitEvent
+from .intent import UserIntent, is_control_plane_action, normalize_user_prompt
 from .normalization import normalize_pre_tool_use
 from .outcomes import classify_tool_outcome, completion_evidence_hash
 from .state import workspace_state_hash
@@ -39,6 +42,8 @@ class CodexSessionRuntime:
         workspace: str | Path,
         detector: NoProgressDetector | None = None,
         enforcement_enabled: Callable[[], bool] | None = None,
+        plugin_root: Path | None = None,
+        autopilot: AutopilotController | None = None,
     ) -> None:
         if not isinstance(runtime, UniversalRuntime):
             raise TypeError("runtime must be a UniversalRuntime")
@@ -47,6 +52,8 @@ class CodexSessionRuntime:
         workspace_state_hash(self.workspace)
         self.detector = detector or NoProgressDetector()
         self._enforcement_enabled = enforcement_enabled or (lambda: False)
+        self._plugin_root = Path(plugin_root) if plugin_root is not None else None
+        self._autopilot = autopilot
         self._pending: dict[str, _PendingAction] = {}
         self._evidence_by_semantic_key: dict[str, str] = {}
         self._last_signal: NoProgressSignal | None = None
@@ -55,6 +62,7 @@ class CodexSessionRuntime:
         self._failed = 0
         self._unknown = 0
         self._enforced_denials = 0
+        self._user_intent = UserIntent()
         self._closed = False
 
     @property
@@ -65,12 +73,39 @@ class CodexSessionRuntime:
     def last_action_evidence(self) -> dict[str, str] | None:
         return dict(self._last_action_evidence) if self._last_action_evidence else None
 
+    @property
+    def user_intent(self) -> UserIntent:
+        """Return prompt-derived state without retaining prompt material."""
+
+        return self._user_intent
+
+    def user_prompt_submit(self, event: UserPromptSubmitEvent) -> None:
+        self._ensure_open()
+        self._validate_session(event.session_id)
+        self._user_intent = normalize_user_prompt(event.prompt)
+
     def pre_tool_use(self, event: PreToolUseEvent) -> AgentDecision:
         self._ensure_open()
         self._validate_session(event.session_id)
         if event.tool_use_id in self._pending:
             raise CodexIntegrationError(f"tool identity is already pending: {event.tool_use_id}")
         state_hash = workspace_state_hash(self.workspace)
+        if self._plugin_root is not None and is_control_plane_action(event, self._plugin_root):
+            self._last_signal = None
+            self._last_action_evidence = self._safe_bypass_evidence(event, state_hash)
+            return AgentDecision.from_core(
+                event.tool_use_id,
+                Decision(
+                    allowed=True,
+                    reason="Trusted MARGINAL control-plane action bypasses workload governance",
+                    recommended=False,
+                    recommendation_reason="",
+                    reason_code=ReasonCode.CONTROL_PLANE_BYPASS.value,
+                    recommendation_reason_code=ReasonCode.CONTROL_PLANE_BYPASS.value,
+                    mode="shadow",
+                    confidence=1.0,
+                ),
+            )
         action = normalize_pre_tool_use(event, state_hash=state_hash)
         semantic_key = str(action.metadata["semantic_key"])
         evidence_hash = self._evidence_by_semantic_key.get(semantic_key, "")
@@ -86,7 +121,33 @@ class CodexSessionRuntime:
             state_hash,
             evidence_hash,
         )
-        if self._last_signal.enforcement_eligible and self._is_enforcement_enabled():
+        if self._autopilot is not None and self._autopilot.consent_granted:
+            autopilot_decision = self._autopilot.pre_action(
+                action_id=event.tool_use_id,
+                workload_key=semantic_key,
+                eligible_family=self._is_autopilot_eligible(event, action),
+                state_hash=state_hash,
+                evidence_hash=evidence_hash,
+                intent=self._user_intent,
+            )
+            if not autopilot_decision.allowed:
+                self._enforced_denials += 1
+                return AgentDecision.from_core(
+                    event.tool_use_id,
+                    Decision(
+                        allowed=False,
+                        reason=(
+                            "Repeated proven-success local action produced no new state or evidence"
+                        ),
+                        recommended=False,
+                        recommendation_reason="",
+                        reason_code=autopilot_decision.reason_code,
+                        recommendation_reason_code=autopilot_decision.reason_code,
+                        mode="enforce",
+                        confidence=1.0,
+                    ),
+                )
+        elif self._last_signal.enforcement_eligible and self._is_enforcement_enabled():
             self._enforced_denials += 1
             return AgentDecision.from_core(
                 event.tool_use_id,
@@ -142,6 +203,13 @@ class CodexSessionRuntime:
 
         self._pending.pop(event.tool_use_id)
         self.detector.observe(semantic_key, post_state_hash, evidence_hash, outcome)
+        if self._autopilot is not None and self._autopilot.consent_granted:
+            self._autopilot.settle_action(
+                event.tool_use_id,
+                outcome=outcome,
+                state_hash=post_state_hash,
+                evidence_hash=evidence_hash,
+            )
         if evidence_hash:
             self._evidence_by_semantic_key[semantic_key] = evidence_hash
         return outcome
@@ -154,7 +222,7 @@ class CodexSessionRuntime:
         return self._safe_action_evidence(pending.action) if pending is not None else None
 
     def summary(self) -> dict[str, int]:
-        return {
+        summary = {
             "successful_observations": self._successful,
             "failed_observations": self._failed,
             "unknown_observations": self._unknown,
@@ -162,6 +230,9 @@ class CodexSessionRuntime:
             "pending_actions": len(self._pending),
             "enforced_denials": self._enforced_denials,
         }
+        if self._autopilot is not None:
+            summary.update(self._autopilot.summary())
+        return summary
 
     def close(self) -> None:
         if self._closed:
@@ -172,6 +243,14 @@ class CodexSessionRuntime:
                 reason="Codex session ended before the action outcome was observable",
             )
             self._unknown += 1
+            if self._autopilot is not None and self._autopilot.consent_granted:
+                pending = self._pending[action_id]
+                self._autopilot.settle_action(
+                    action_id,
+                    outcome=ActionOutcomeStatus.UNKNOWN,
+                    state_hash=pending.action.state_hash,
+                    evidence_hash="",
+                )
             self._pending.pop(action_id)
         self._closed = True
 
@@ -186,6 +265,23 @@ class CodexSessionRuntime:
             return False
         return enabled if isinstance(enabled, bool) else False
 
+    def _is_autopilot_eligible(self, event: PreToolUseEvent, action: AgentAction) -> bool:
+        """Accept only a direct constrained local-read adapter family for L3."""
+
+        del action
+        if event.tool_name.casefold() not in {"read", "read_file"}:
+            return False
+        if set(event.tool_input) not in ({"path"}, {"file_path"}):
+            return False
+        raw_path = event.tool_input.get("path", event.tool_input.get("file_path"))
+        if not isinstance(raw_path, str) or not raw_path or not Path(raw_path).is_absolute():
+            return False
+        try:
+            Path(raw_path).resolve(strict=False).relative_to(self.workspace)
+        except ValueError:
+            return False
+        return True
+
     @staticmethod
     def _safe_action_evidence(action: AgentAction) -> dict[str, str]:
         return {
@@ -193,6 +289,15 @@ class CodexSessionRuntime:
             "semantic_key": str(action.metadata.get("semantic_key", "")),
             "state_hash": action.state_hash,
             "evidence_hash": str(action.metadata.get("evidence_hash", "")),
+        }
+
+    @staticmethod
+    def _safe_bypass_evidence(event: PreToolUseEvent, state_hash: str) -> dict[str, str]:
+        return {
+            "action_hash": hashlib.sha256(event.tool_use_id.encode("utf-8")).hexdigest(),
+            "semantic_key": "",
+            "state_hash": state_hash,
+            "evidence_hash": "",
         }
 
     def _validate_session(self, session_id: str) -> None:

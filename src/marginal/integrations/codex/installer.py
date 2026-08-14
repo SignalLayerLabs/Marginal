@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 
 
@@ -80,6 +82,7 @@ class CodexInstallation:
     selector: str = "marginal@marginal"
     error_code: str = ""
     message: str = ""
+    autopilot_consent: bool = False
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -88,6 +91,7 @@ class CodexInstallation:
             "selector": self.selector,
             "error_code": self.error_code,
             "message": self.message,
+            "autopilot_consent": self.autopilot_consent,
         }
 
 
@@ -127,7 +131,11 @@ def install(
     runner: CommandRunner | None = None,
     repository: str = "SignalLayerLabs/Marginal",
     ref: str = "main",
+    data_dir: str | Path | None = None,
+    autopilot_consent: bool = False,
 ) -> CodexInstallation:
+    if not isinstance(autopilot_consent, bool):
+        raise TypeError("autopilot_consent must be a bool")
     selected = runner or SubprocessRunner()
     report = inspect_codex(runner=selected)
     if report.capability_level != "tool_enforcement":
@@ -164,7 +172,21 @@ def install(
             error_code="PLUGIN_ADD_FAILED",
             message=plugin.stderr.strip(),
         )
-    return CodexInstallation(True, True, message="installed in Shadow Mode")
+    if autopilot_consent:
+        if data_dir is None:
+            return CodexInstallation(
+                True,
+                True,
+                error_code="AUTOPILOT_CONSENT_DATA_DIR_REQUIRED",
+                message="installed in Shadow Mode; Autopilot consent was not persisted",
+            )
+        configure_autopilot_consent(data_dir, granted=True)
+    return CodexInstallation(
+        True,
+        True,
+        message="installed in Shadow Mode",
+        autopilot_consent=autopilot_consent,
+    )
 
 
 def uninstall(*, runner: CommandRunner | None = None) -> CodexInstallation:
@@ -178,3 +200,48 @@ def uninstall(*, runner: CommandRunner | None = None) -> CodexInstallation:
             message=result.stderr.strip(),
         )
     return CodexInstallation(False, True, message="plugin removed; local evidence preserved")
+
+
+def _user_config_path(data_dir: str | Path) -> Path:
+    return Path(data_dir).resolve() / "user-config.json"
+
+
+def configure_autopilot_consent(data_dir: str | Path, *, granted: bool) -> None:
+    """Persist an explicit user-level Autopilot choice outside every repository.
+
+    Repository configuration is deliberately not read here: it can constrain
+    local behavior but cannot grant a user's authority to enforce actions.
+    """
+
+    if not isinstance(granted, bool):
+        raise TypeError("granted must be a bool")
+    path = _user_config_path(data_dir)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if os.name == "posix":
+        path.parent.chmod(0o700)
+    temporary = path.with_suffix(".tmp")
+    descriptor = os.open(temporary, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
+    try:
+        os.write(
+            descriptor,
+            (
+                json.dumps({"schema_version": 1, "autopilot_consent": granted}, sort_keys=True)
+                + "\n"
+            ).encode(),
+        )
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    os.replace(temporary, path)
+    if os.name == "posix":
+        path.chmod(0o600)
+
+
+def autopilot_consent_configured(data_dir: str | Path) -> bool:
+    """Return only a valid, explicit consent bit from the user-owned config."""
+
+    try:
+        value = json.loads(_user_config_path(data_dir).read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return False
+    return bool(isinstance(value, dict) and value.get("autopilot_consent") is True)
