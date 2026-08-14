@@ -13,7 +13,7 @@ from .promotion import PromotionIdentity
 PLUGIN_VERSION = "0.3.3"
 ADAPTER_VERSION = "1"
 POLICY_HASH = hashlib.sha256(b"marginal:no-progress:v1:max-same-evidence=2").hexdigest()
-DEFAULT_HOOK_HASH = "46b7a85a3a542957d055c615ab501f9fee284bb3193ac9ecfbe8951cce5a9942"
+DEFAULT_HOOK_HASH = "6d010b4849d8748d59e9d32e49e0ace08fc9a3dbc7a759b70336490b745a6190"
 
 
 def repository_identity_hash(workspace: str | Path) -> str:

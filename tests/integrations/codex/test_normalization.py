@@ -5,7 +5,10 @@ import json
 import pytest
 
 from marginal.integrations.codex.events import PreToolUseEvent
-from marginal.integrations.codex.normalization import normalize_pre_tool_use
+from marginal.integrations.codex.normalization import (
+    is_control_plane_action,
+    normalize_pre_tool_use,
+)
 
 
 def _event(command: str, *, tool_name: str = "Bash") -> PreToolUseEvent:
@@ -76,3 +79,14 @@ def test_non_json_tool_input_is_rejected() -> None:
 
     with pytest.raises(ValueError, match="canonical JSON"):
         normalize_pre_tool_use(event, state_hash="state")
+
+
+def test_control_plane_actions_are_not_normalized_as_governable_work(tmp_path) -> None:
+    root = tmp_path / "installed" / "marginal"
+    script = root / "scripts" / "marginal_control.py"
+    script.parent.mkdir(parents=True)
+    (root / ".codex-plugin").mkdir()
+    (root / ".codex-plugin" / "plugin.json").write_text("{}", encoding="utf-8")
+    script.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+
+    assert is_control_plane_action(_event(f"python3 {script} status"), root)

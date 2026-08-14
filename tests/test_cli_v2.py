@@ -173,3 +173,21 @@ def test_ledger_export_uses_owner_only_permissions(tmp_path: Path) -> None:
 
     if os.name != "nt":
         assert destination.stat().st_mode & 0o077 == 0
+
+
+def test_top_level_diagnostics_commands_share_json_reports(tmp_path: Path, capsys) -> None:
+    assert main(["status", "--data-dir", str(tmp_path), "--json"]) == 0
+    status = json.loads(capsys.readouterr().out)
+    assert status["authority"]["current"] == "L0"
+
+    assert main(["privacy", "inspect", "--json"]) == 0
+    privacy = json.loads(capsys.readouterr().out)
+    assert "derived_enums" in privacy["persisted_categories"]
+
+    assert main(["explain", "missing", "--data-dir", str(tmp_path), "--json"]) == 1
+    explanation = json.loads(capsys.readouterr().out)
+    assert explanation == {
+        "decision_id": "missing",
+        "found": False,
+        "reason_code": "DECISION_NOT_FOUND",
+    }

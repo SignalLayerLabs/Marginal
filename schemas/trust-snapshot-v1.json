@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SignalLayerLabs/Marginal/schemas/trust-snapshot-v1.json",
+  "title": "MARGINAL Trust Snapshot v1",
+  "type": "object",
+  "required": ["schema_version", "context", "components", "confidence_band", "eligible_authority", "current_authority", "authority", "blockers", "transition_receipt"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "context": {"type": "object", "additionalProperties": {"type": "string", "minLength": 1}},
+    "components": {"type": "object", "additionalProperties": {"type": ["number", "null"]}},
+    "confidence_band": {"enum": ["low", "medium", "high"]},
+    "eligible_authority": {"type": "integer", "minimum": 0, "maximum": 4},
+    "current_authority": {"type": "integer", "minimum": 0, "maximum": 4},
+    "authority": {"type": "integer", "minimum": 0, "maximum": 4},
+    "blockers": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "transition_receipt": {
+      "type": ["object", "null"],
+      "required": ["schema_version", "context", "previous", "current", "evidence_ledger_root", "ledger_records", "blockers", "receipt_hash"],
+      "properties": {
+        "schema_version": {"const": "1.0"},
+        "context": {"type": "object", "additionalProperties": {"type": "string", "minLength": 1}},
+        "previous": {"type": "integer", "minimum": 0, "maximum": 4},
+        "current": {"type": "integer", "minimum": 0, "maximum": 4},
+        "evidence_ledger_root": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "ledger_records": {"type": "integer", "minimum": 0},
+        "blockers": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "receipt_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

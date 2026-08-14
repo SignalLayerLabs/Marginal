@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import math
 from dataclasses import asdict, dataclass
 
 from .budget import BudgetLedger
+from .canonical import canonical_hash
 from .controls import DiminishingReturnDetector, DiminishingReturnSignal
 from .estimator import EstimatorIdentity, ValueEstimate, ValueEstimator
 from .models import Action, Decision
@@ -93,13 +92,10 @@ class MarginalPolicy:
             raise TypeError("version must be a string")
         if not version.strip():
             raise ValueError("version must not be empty")
-        config_payload = json.dumps(
-            asdict(self.config), sort_keys=True, separators=(",", ":")
-        ).encode("utf-8")
         self.identity = PolicyIdentity(
             name=name,
             version=version,
-            config_hash=hashlib.sha256(config_payload).hexdigest(),
+            config_hash=canonical_hash(asdict(self.config)),
         )
         self._executed_fingerprints: set[str] = set()
 

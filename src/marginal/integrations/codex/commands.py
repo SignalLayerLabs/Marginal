@@ -8,9 +8,10 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from .evidence import EvidenceStore, summarize_evidence
+from marginal.diagnostics import doctor_report, render_human, status_report
+
+from .evidence import EvidenceStore, summarize_verified_evidence
 from .identity import current_promotion_identity
-from .installer import inspect_codex
 from .promotion import (
     PromotionCriteria,
     activate_enforcement,
@@ -18,7 +19,6 @@ from .promotion import (
     evaluate_promotion,
     write_promotion_receipt,
 )
-from .service import read_mode
 from .transport import ConnectionInfo, request_session
 
 _MAX_SESSION_RECEIPTS = 64
@@ -121,45 +121,18 @@ def codex_command(
     evidence_store = EvidenceStore(root / "evidence" / identity.repository_hash)
     payload: dict[str, Any]
     if command == "status":
-        state = read_mode(root, repository_hash=identity.repository_hash)
-        records = evidence_store.read_all()
-        summary = summarize_evidence(records)
-        hooks_observed = any(
-            record.get("event") in {"session_start", "decision", "outcome", "session_end"}
-            for record in records
-        )
-        coverage_ratio = (
-            summary.covered_actions / summary.coverable_actions
-            if summary.coverable_actions
-            else 0.0
-        )
-        active_hook_sessions, stale_session_receipts = _active_hook_sessions(
-            root,
-            repository_hash=identity.repository_hash,
-        )
-        hooks_active = active_hook_sessions > 0
-        _emit(
-            {
-                **state,
-                "capability": "Tool Enforcement",
-                "repository_hash": identity.repository_hash,
-                "hook_state": (
-                    "active" if hooks_active else "observed" if hooks_observed else "not_observed"
-                ),
-                "hooks_observed": hooks_observed,
-                "hooks_active": hooks_active,
-                "active_hook_sessions": active_hook_sessions,
-                "stale_session_receipts": stale_session_receipts,
-                "evidence_records": len(records),
-                "covered_actions": summary.covered_actions,
-                "coverable_actions": summary.coverable_actions,
-                "coverage_ratio": coverage_ratio,
-            },
-            as_json=as_json,
-        )
+        payload = status_report(data_root=root, workspace=selected_workspace).to_dict()
+        if as_json:
+            _emit(payload, as_json=True)
+        else:
+            print(render_human(payload), end="")
         return 0
     if command == "doctor":
-        _emit(inspect_codex().to_dict(), as_json=as_json)
+        payload = doctor_report(data_root=root, workspace=selected_workspace).to_dict()
+        if as_json:
+            _emit(payload, as_json=True)
+        else:
+            print(render_human(payload), end="")
         return 0
     if command == "review":
         records = evidence_store.read_all()
@@ -240,8 +213,15 @@ def codex_command(
         _emit(payload, as_json=as_json)
         return 0
     if command == "promote":
-        summary = summarize_evidence(evidence_store.read_all())
-        receipt = evaluate_promotion(summary, PromotionCriteria(), identity=identity)
+        summary, root_report = summarize_verified_evidence(evidence_store)
+        receipt = evaluate_promotion(
+            summary,
+            PromotionCriteria(),
+            identity=identity,
+            evidence_root=root_report.root_hash if root_report.valid else "",
+            ledger_records=root_report.records,
+            ledger_path=evidence_store.governance_ledger_path,
+        )
         write_promotion_receipt(root, receipt)
         if not receipt.is_ready:
             payload = {
@@ -252,7 +232,7 @@ def codex_command(
             }
             _emit(payload, as_json=as_json)
             return 2
-        activate_enforcement(root, receipt)
+        activate_enforcement(root, receipt, ledger_path=evidence_store.governance_ledger_path)
         payload = {
             "schema_version": 1,
             "mode": "enforce",

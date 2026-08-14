@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import base64
-import hashlib
 import json
 import math
 from collections.abc import Callable, Mapping, Sequence, Set
@@ -11,6 +10,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from .canonical import canonical_hash
 from .models import Action
 
 
@@ -51,14 +51,7 @@ def _canonicalize(value: Any) -> Any:
 
 
 def _digest(payload: Mapping[str, Any]) -> str:
-    canonical = json.dumps(
-        _canonicalize(payload),
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        allow_nan=False,
-    )
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return canonical_hash(_canonicalize(payload))
 
 
 def fingerprint_action(action: Action) -> str:

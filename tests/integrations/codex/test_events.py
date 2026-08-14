@@ -6,6 +6,7 @@ from marginal.integrations.codex.events import (
     PostToolUseEvent,
     PreToolUseEvent,
     SessionEvent,
+    UserPromptSubmitEvent,
     build_post_tool_output,
     build_pre_tool_output,
     parse_hook_event,
@@ -69,9 +70,11 @@ def test_session_events_are_typed(name: str, extra: dict[str, str]) -> None:
     assert event.hook_event_name == name
 
 
-def test_unknown_hook_event_is_rejected() -> None:
-    with pytest.raises(ValueError, match="unsupported Codex hook event"):
-        parse_hook_event(_common("UserPromptSubmit"))
+def test_user_prompt_submit_is_typed_without_a_transcript_reference() -> None:
+    event = parse_hook_event({**_common("UserPromptSubmit"), "prompt": "run it again"})
+
+    assert isinstance(event, UserPromptSubmitEvent)
+    assert event.prompt == "run it again"
 
 
 def test_denial_uses_official_codex_shape() -> None:

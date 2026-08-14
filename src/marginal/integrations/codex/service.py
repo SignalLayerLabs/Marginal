@@ -17,17 +17,21 @@ from typing import Any
 
 from marginal import BudgetLimits, Treasury
 from marginal.protocol import AgentCapabilities
+from marginal.reason_codes import ReasonCode
 from marginal.runtime import UniversalRuntime
 
+from .autopilot import AutopilotController
 from .events import (
     PostToolUseEvent,
     PreToolUseEvent,
     SessionEvent,
+    UserPromptSubmitEvent,
     build_pre_tool_output,
     parse_hook_event,
 )
-from .evidence import EvidenceStore, summarize_evidence
+from .evidence import EvidenceStore, summarize_verified_evidence
 from .identity import current_promotion_identity, repository_identity_hash
+from .installer import autopilot_consent_configured
 from .promotion import PromotionIdentity, demote_enforcement, enforcement_is_active
 from .runtime import CodexSessionRuntime
 from .transport import ConnectionInfo, SessionServer, connection_filename, request_session
@@ -74,6 +78,9 @@ def _handler(
                 threading.Timer(0.05, shutdown_event.set).start()
             return runtime.summary()
         event = parse_hook_event(payload)
+        if operation == "prompt" and isinstance(event, UserPromptSubmitEvent):
+            runtime.user_prompt_submit(event)
+            return None
         if operation == "pre" and isinstance(event, PreToolUseEvent):
             started = time.perf_counter_ns()
             decision = runtime.pre_tool_use(event)
@@ -88,12 +95,15 @@ def _handler(
                     **action_evidence,
                     "reason_code": decision.reason_code,
                     "latency_ms": latency_ms,
-                    "covered": True,
-                    "coverable": True,
+                    "covered": decision.reason_code != ReasonCode.CONTROL_PLANE_BYPASS.value,
+                    "coverable": decision.reason_code != ReasonCode.CONTROL_PLANE_BYPASS.value,
                     "recommended_stop": bool(signal and signal.should_recommend_stop),
                     "reviewed": False,
                     "false_stop": False,
-                    "pending": decision.allowed,
+                    "pending": (
+                        decision.allowed
+                        and decision.reason_code != ReasonCode.CONTROL_PLANE_BYPASS.value
+                    ),
                 }
             )
             return build_pre_tool_output(
@@ -131,8 +141,27 @@ def _handler(
     return handle
 
 
+def _installed_plugin_root() -> Path | None:
+    """Derive the trusted installation root from the running immutable zipapp path."""
+
+    executable = Path(sys.argv[0])
+    if executable.name != "marginal_runtime.pyz":
+        return None
+    try:
+        root = executable.resolve(strict=True).parent.parent
+    except OSError:
+        return None
+    return root if (root / ".codex-plugin" / "plugin.json").is_file() else None
+
+
 def _session_hash(session_id: str) -> str:
     return hashlib.sha256(session_id.encode("utf-8")).hexdigest()
+
+
+def _identity_fingerprint(identity: PromotionIdentity) -> str:
+    return hashlib.sha256(
+        json.dumps(asdict(identity), sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
 
 
 def _evidence_store(data_root: Path, repository_hash: str) -> EvidenceStore:
@@ -157,7 +186,6 @@ def _bootstrap_event_payload(event: SessionEvent) -> dict[str, Any]:
         "hook_event_name": event.hook_event_name,
         "model": event.model,
         "permission_mode": event.permission_mode,
-        "source": event.source,
     }
 
 
@@ -262,7 +290,16 @@ def _serve_bootstrap(path: Path) -> int:
         enforcement_enabled=lambda: enforcement_is_active(
             data_root,
             identity=identity,
-            summary=summarize_evidence(evidence_store.read_all()),
+            summary=summarize_verified_evidence(evidence_store)[0],
+            ledger_path=evidence_store.governance_ledger_path,
+        ),
+        plugin_root=_installed_plugin_root(),
+        autopilot=AutopilotController(
+            data_root,
+            repository_hash=identity.repository_hash,
+            evidence=evidence_store,
+            identity_fingerprint=_identity_fingerprint(identity),
+            user_consent=autopilot_consent_configured(data_root),
         ),
     )
     shutdown_event = threading.Event()
@@ -322,7 +359,16 @@ def start_session_service(
         enforcement_enabled=lambda: enforcement_is_active(
             root,
             identity=identity,
-            summary=summarize_evidence(evidence_store.read_all()),
+            summary=summarize_verified_evidence(evidence_store)[0],
+            ledger_path=evidence_store.governance_ledger_path,
+        ),
+        plugin_root=_installed_plugin_root(),
+        autopilot=AutopilotController(
+            root,
+            repository_hash=identity.repository_hash,
+            evidence=evidence_store,
+            identity_fingerprint=_identity_fingerprint(identity),
+            user_consent=autopilot_consent_configured(root),
         ),
     )
     server = SessionServer(
@@ -407,6 +453,11 @@ def _fail_open_for_workspace(data_root: Path, cwd: str, reason: str) -> None:
             }
         )
         store.start_new_window(reason_code=reason)
+        AutopilotController(
+            data_root,
+            repository_hash=repository_hash,
+            evidence=store,
+        ).revoke(reason)
     except OSError:
         pass
     with suppress(OSError):
@@ -421,7 +472,7 @@ def run_hook(payload: dict[str, Any], *, data_root: str | Path) -> HookResult:
     """Execute one hook. Integration faults always fail open and demote enforcement."""
 
     root = Path(data_root).resolve()
-    event: SessionEvent | PreToolUseEvent | PostToolUseEvent | None = None
+    event: SessionEvent | PreToolUseEvent | PostToolUseEvent | UserPromptSubmitEvent | None = None
     try:
         event = parse_hook_event(payload)
         if isinstance(event, SessionEvent):
@@ -436,7 +487,13 @@ def run_hook(payload: dict[str, Any], *, data_root: str | Path) -> HookResult:
             _fail_open_for_workspace(root, event.cwd, "SERVICE_UNAVAILABLE")
             return HookResult(exit_code=0, warning_code="SERVICE_UNAVAILABLE")
         connection = ConnectionInfo.from_file(connection_path)
-        operation = "pre" if isinstance(event, PreToolUseEvent) else "post"
+        operation = (
+            "pre"
+            if isinstance(event, PreToolUseEvent)
+            else "post"
+            if isinstance(event, PostToolUseEvent)
+            else "prompt"
+        )
         response = request_session(connection, operation=operation, payload=payload)
         if response.get("ok") is not True:
             code = str(response.get("error_code", "SERVICE_ERROR"))

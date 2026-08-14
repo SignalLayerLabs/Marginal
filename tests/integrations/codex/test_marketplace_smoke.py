@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
@@ -7,6 +8,12 @@ import pytest
 from scripts.smoke_codex_plugin import smoke_plugin
 
 REPO = Path(__file__).resolve().parents[3]
+
+
+def test_plugin_bundle_registers_user_prompt_submit_hook() -> None:
+    payload = json.loads((REPO / "plugins" / "marginal" / "hooks" / "hooks.json").read_text())
+
+    assert "UserPromptSubmit" in payload["hooks"]
 
 
 @pytest.mark.skipif(shutil.which("codex") is None, reason="Codex CLI is not installed")

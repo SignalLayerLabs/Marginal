@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SignalLayerLabs/Marginal/schemas/governance-ledger-v3.json",
+  "title": "MARGINAL Governance Ledger Record v3",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "sequence",
+    "timestamp",
+    "previous_hash",
+    "payload",
+    "payload_hash",
+    "record_hash"
+  ],
+  "properties": {
+    "schema_version": {"const": "3.0"},
+    "sequence": {"type": "integer", "minimum": 1},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "previous_hash": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      ]
+    },
+    "payload": {"type": "object"},
+    "payload_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "record_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}

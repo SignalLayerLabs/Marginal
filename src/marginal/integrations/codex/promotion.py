@@ -10,6 +10,8 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
+from marginal.governance_ledger import GovernanceLedger
+
 
 @dataclass(frozen=True, slots=True)
 class PromotionIdentity:
@@ -82,6 +84,8 @@ class PromotionReceipt:
     blocking_reasons: tuple[str, ...]
     is_ready: bool
     receipt_hash: str
+    evidence_root: str = ""
+    ledger_records: int = 0
 
     def _hash_payload(self) -> dict[str, Any]:
         payload = self.to_dict()
@@ -92,7 +96,12 @@ class PromotionReceipt:
         return self.receipt_hash == _hash(self._hash_payload())
 
     def valid_for(self, identity: PromotionIdentity) -> bool:
-        return self.is_ready and self.verify_hash() and identity == self.identity
+        return (
+            self.is_ready
+            and self.verify_hash()
+            and identity == self.identity
+            and _valid_root_range(self.evidence_root, self.ledger_records)
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -105,6 +114,8 @@ class PromotionReceipt:
             "blocking_reasons": list(self.blocking_reasons),
             "is_ready": self.is_ready,
             "receipt_hash": self.receipt_hash,
+            "evidence_root": self.evidence_root,
+            "ledger_records": self.ledger_records,
         }
 
     @classmethod
@@ -121,6 +132,8 @@ class PromotionReceipt:
             blocking_reasons=tuple(payload["blocking_reasons"]),
             is_ready=bool(payload["is_ready"]),
             receipt_hash=str(payload["receipt_hash"]),
+            evidence_root=str(payload.get("evidence_root", "")),
+            ledger_records=int(payload.get("ledger_records", 0)),
         )
 
 
@@ -147,6 +160,9 @@ def evaluate_promotion(
     criteria: PromotionCriteria,
     *,
     identity: PromotionIdentity,
+    evidence_root: str | None = None,
+    ledger_records: int = 0,
+    ledger_path: str | Path | None = None,
 ) -> PromotionReceipt:
     """Create a self-verifying receipt for the conservative default evidence gate."""
 
@@ -177,6 +193,8 @@ def evaluate_promotion(
         reasons.append("OUTCOME_UNOBSERVABLE")
     if summary.unknown_enforceable_outcomes:
         reasons.append("UNKNOWN_ENFORCEABLE_OUTCOMES")
+    if not _verified_root_range(evidence_root, ledger_records, ledger_path):
+        reasons.append("EVIDENCE_ROOT_UNVERIFIED")
 
     provisional = PromotionReceipt(
         schema_version=1,
@@ -188,6 +206,8 @@ def evaluate_promotion(
         blocking_reasons=tuple(reasons),
         is_ready=not reasons,
         receipt_hash="",
+        evidence_root=evidence_root if isinstance(evidence_root, str) else "",
+        ledger_records=ledger_records if isinstance(ledger_records, int) else 0,
     )
     return replace(provisional, receipt_hash=_hash(provisional._hash_payload()))
 
@@ -243,9 +263,44 @@ def read_promotion_receipt(
     return PromotionReceipt.from_dict(payload)
 
 
-def activate_enforcement(data_root: str | Path, receipt: PromotionReceipt) -> Path:
+def _valid_evidence_anchor(receipt: PromotionReceipt, ledger_path: str | Path | None) -> bool:
+    return _verified_root_range(receipt.evidence_root, receipt.ledger_records, ledger_path)
+
+
+def _verified_root_range(
+    root: object,
+    records: object,
+    ledger_path: str | Path | None,
+) -> bool:
+    if not _valid_root_range(root, records) or ledger_path is None:
+        return False
+    assert isinstance(root, str)
+    assert isinstance(records, int) and not isinstance(records, bool)
+    report = GovernanceLedger(ledger_path).verify_prefix(records, expected_root=root)
+    return report.valid and report.root_hash == root
+
+
+def _valid_root_range(root: object, records: object) -> bool:
+    return bool(
+        isinstance(root, str)
+        and len(root) == 64
+        and all(character in "0123456789abcdef" for character in root)
+        and not isinstance(records, bool)
+        and isinstance(records, int)
+        and records >= 1
+    )
+
+
+def activate_enforcement(
+    data_root: str | Path,
+    receipt: PromotionReceipt,
+    *,
+    ledger_path: str | Path | None = None,
+) -> Path:
     if not receipt.is_ready or not receipt.verify_hash():
         raise ValueError("a ready, hash-valid receipt is required for enforcement")
+    if not _valid_evidence_anchor(receipt, ledger_path):
+        raise ValueError("a verified v3 evidence root is required for enforcement")
     stored = read_promotion_receipt(data_root, receipt.identity.repository_hash)
     if stored != receipt:
         raise ValueError("promotion receipt must be persisted before enforcement")
@@ -258,6 +313,8 @@ def activate_enforcement(data_root: str | Path, receipt: PromotionReceipt) -> Pa
             "reason": "EARNED_ENFORCEMENT_PROMOTED",
             "receipt_hash": receipt.receipt_hash,
             "identity": asdict(receipt.identity),
+            "evidence_root": receipt.evidence_root,
+            "ledger_records": receipt.ledger_records,
         },
     )
     return path
@@ -282,6 +339,7 @@ def enforcement_is_active(
     *,
     identity: PromotionIdentity,
     summary: CoverageSummary | None = None,
+    ledger_path: str | Path | None = None,
 ) -> bool:
     state_path = _state_path(data_root, identity.repository_hash)
     if not state_path.exists():
@@ -295,6 +353,14 @@ def enforcement_is_active(
             receipt is None
             or state.get("receipt_hash") != receipt.receipt_hash
             or not receipt.valid_for(identity)
+            or not _valid_evidence_anchor(
+                receipt,
+                ledger_path
+                or Path(data_root).resolve()
+                / "evidence"
+                / identity.repository_hash
+                / "governance-v3.jsonl",
+            )
         ):
             demote_enforcement(
                 data_root,
@@ -312,7 +378,6 @@ def enforcement_is_active(
                 coverage_ratio < receipt.criteria.minimum_coverage_ratio
                 or summary.false_stops > receipt.summary.false_stops
                 or summary.integration_failures > 0
-                or summary.pending_actions > 0
                 or summary.unknown_enforceable_outcomes > 0
                 or summary.reviewed_candidates < summary.intervention_candidates
                 or _p95(summary.decision_latencies_ms) > receipt.criteria.maximum_p95_latency_ms
