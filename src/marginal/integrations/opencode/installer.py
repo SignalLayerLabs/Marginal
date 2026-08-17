@@ -20,6 +20,9 @@ from .targets import OPENCODE, PLUGIN_FILENAME, PLUGIN_MARKER, OpenCodeTarget
 
 _VERSION_PATTERN = re.compile(r"(\d+\.\d+\.\d+)")
 _MINIMUM_VERSION = (1, 18, 0)
+_TARGET_PATTERN = re.compile(
+    r'(const ENGINE_TARGET = process\.env\.MARGINAL_TARGET \|\| ")[A-Za-z0-9._-]+(")'
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,6 +122,24 @@ def _version_tuple(version: str) -> tuple[int, ...]:
         return ()
 
 
+def render_plugin(source: str, target: OpenCodeTarget) -> str:
+    """Return the plugin source with its bridge target bound to one engine.
+
+    The bundled plugin defaults to OpenCode so the shipped file is valid as written.
+    Installing for a compatible fork rewrites exactly that default, so the plugin
+    reports the right engine without depending on an environment variable.
+    """
+
+    rendered, replacements = _TARGET_PATTERN.subn(
+        lambda match: f"{match.group(1)}{target.engine}{match.group(2)}",
+        source,
+        count=1,
+    )
+    if replacements != 1:
+        raise ValueError("plugin source does not declare a bridge target")
+    return rendered
+
+
 def is_marginal_plugin(path: Path) -> bool:
     """Return True only for a plugin file MARGINAL wrote."""
 
@@ -185,6 +206,14 @@ def install(
             error_code="PLUGIN_SOURCE_MISSING",
             message=str(origin),
         )
+    if not is_marginal_plugin(origin):
+        return OpenCodeInstallation(
+            installed=False,
+            changed=False,
+            target=target.name,
+            error_code="PLUGIN_SOURCE_UNRECOGNIZED",
+            message=str(origin),
+        )
     destination = target.plugin_path()
     if destination.exists() and not is_marginal_plugin(destination):
         return OpenCodeInstallation(
@@ -197,11 +226,11 @@ def install(
         )
     try:
         destination.parent.mkdir(parents=True, exist_ok=True)
-        payload = origin.read_text(encoding="utf-8")
+        payload = render_plugin(origin.read_text(encoding="utf-8"), target)
         changed = not destination.exists() or destination.read_text(encoding="utf-8") != payload
         if changed:
             destination.write_text(payload, encoding="utf-8")
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         return OpenCodeInstallation(
             installed=False,
             changed=False,

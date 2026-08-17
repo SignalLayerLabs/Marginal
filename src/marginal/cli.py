@@ -154,7 +154,9 @@ def _build_parser() -> argparse.ArgumentParser:
     public_eval.add_argument("--seed", type=int, default=42)
 
     install_parser = subparsers.add_parser("install", help="install a native integration")
-    install_parser.add_argument("target", choices=["codex", "claude-code", "opencode"])
+    install_parser.add_argument(
+        "target", choices=["codex", "claude-code", "opencode", "privacycode"]
+    )
     install_parser.add_argument("--repository", default="SignalLayerLabs/Marginal")
     install_parser.add_argument("--ref", default="main")
     install_parser.add_argument("--data-dir", type=Path)
@@ -162,7 +164,9 @@ def _build_parser() -> argparse.ArgumentParser:
     install_parser.add_argument("--json", action="store_true", dest="as_json")
 
     uninstall_parser = subparsers.add_parser("uninstall", help="remove a native integration")
-    uninstall_parser.add_argument("target", choices=["codex", "claude-code", "opencode"])
+    uninstall_parser.add_argument(
+        "target", choices=["codex", "claude-code", "opencode", "privacycode"]
+    )
     uninstall_parser.add_argument("--purge-data", action="store_true")
     uninstall_parser.add_argument("--yes", action="store_true")
     uninstall_parser.add_argument("--data-dir", type=Path)
@@ -218,7 +222,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(claude_result.message or claude_result.error_code or claude_result.selector)
             return 0 if claude_result.installed else 1
 
-        if args.target == "opencode":
+        if args.target in {"opencode", "privacycode"}:
             from .integrations.opencode.installer import install as install_opencode
             from .integrations.opencode.targets import resolve_target
 
@@ -255,7 +259,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(claude_result.message or claude_result.error_code or claude_result.selector)
             return 0 if not claude_result.installed else 1
 
-        if args.target == "opencode":
+        if args.target in {"opencode", "privacycode"}:
             from .integrations.opencode.installer import uninstall as uninstall_opencode
             from .integrations.opencode.targets import resolve_target
 

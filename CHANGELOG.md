@@ -15,7 +15,11 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
 - an OpenCode plugin labeled **Observe**, running inside the engine process and speaking
   newline-delimited JSON to one bridge child process over pipes. Tool output never reaches MARGINAL:
   the plugin forwards a digest plus an allowlist of outcome signals;
-- `marginal install claude-code`, `marginal install opencode`, and their `uninstall` counterparts.
+- PrivacyCode as an OpenCode-compatible install target, governed by the same adapter and plugin. It
+  keeps a distinct engine label, plugin path, and ledger root, so one ledger never conflates two
+  engines;
+- `marginal install claude-code`, `marginal install opencode`, `marginal install privacycode`, and
+  their `uninstall` counterparts.
 
 ### Changed
 
