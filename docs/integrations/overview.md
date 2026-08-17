@@ -80,7 +80,12 @@ recommendations in a local Decision Ledger, declares no control capability, and 
 call. Its outcome evidence is engine-declared, because Claude Code reports success and failure as
 separate hook events. See [Claude Code plugin](claude-code.md).
 
-OpenCode and GitHub Copilot remain roadmap work. Codex is labeled Tool Enforcement,
+The OpenCode plugin is labeled **Observe**. It runs inside the engine process and speaks to one bridge
+child process over pipes. Its outcome evidence is weaker than Claude Code's: the shell tool reports an
+exit code, most other tools prove nothing, and those outcomes stay `unknown`. See
+[OpenCode plugin](opencode.md).
+
+GitHub Copilot remains roadmap work. Codex is labeled Tool Enforcement,
 not Full Compute Enforcement, because specialized and hosted tool paths can fall outside local
 hook coverage.
 
