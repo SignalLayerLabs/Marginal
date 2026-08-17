@@ -1,0 +1,19 @@
+{
+  "name": "marginal",
+  "owner": {
+    "name": "SignalLayer Labs",
+    "url": "https://github.com/SignalLayerLabs/Marginal"
+  },
+  "metadata": {
+    "description": "Compute governance that has to justify its own cost.",
+    "version": "0.3.3"
+  },
+  "plugins": [
+    {
+      "name": "marginal-claude-code",
+      "source": "./plugins/marginal-claude-code",
+      "description": "Local-first compute governance evidence for Claude Code, in Shadow Mode.",
+      "category": "productivity"
+    }
+  ]
+}

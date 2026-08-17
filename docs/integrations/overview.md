@@ -75,6 +75,16 @@ It provides lifecycle correlation, privacy-safe normalization, outcome classific
 authenticated local service, Shadow Mode, Earned Enforcement receipts, and reversible native
 installation. See [Codex plugin](codex.md).
 
-OpenCode, Claude Code, and GitHub Copilot remain roadmap work. Codex is labeled Tool Enforcement,
+The Claude Code plugin is labeled **Observe**. It records normalized evidence and repeated-work
+recommendations in a local Decision Ledger, declares no control capability, and never blocks a tool
+call. Its outcome evidence is engine-declared, because Claude Code reports success and failure as
+separate hook events. See [Claude Code plugin](claude-code.md).
+
+OpenCode and GitHub Copilot remain roadmap work. Codex is labeled Tool Enforcement,
 not Full Compute Enforcement, because specialized and hosted tool paths can fall outside local
 hook coverage.
+
+Engine-independent parts of a hook integration live in `marginal.integrations.hookkit`: normalized
+events, action normalization, structured outcome classification, workspace state evidence, and
+session correlation. The Codex integration predates that module and still carries its own copies;
+migrating it is separate work so a new adapter never destabilizes the validated Codex path.
