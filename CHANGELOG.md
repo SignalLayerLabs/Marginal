@@ -4,6 +4,22 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
 
 ## [Unreleased]
 
+### Added
+
+- a Claude Code plugin labeled **Observe**: it records normalized tool-call evidence and
+  repeated-work recommendations in a local Decision Ledger, declares no control capability, and never
+  blocks a tool call or returns hook output;
+- `marginal.integrations.hookkit`, the engine-independent parts of a hook integration: normalized
+  events, privacy-safe action normalization, conservative structured outcome classification,
+  workspace state evidence that fails open, and session correlation;
+- `marginal install claude-code` and `marginal uninstall claude-code`.
+
+### Changed
+
+- the authenticated loopback session transport moved from `marginal.integrations.codex.transport` to
+  `marginal.integrations.transport` so every hook adapter shares it. The old import path re-exports
+  it unchanged.
+
 ## [0.3.3] - 2026-08-13
 
 ### Fixed
