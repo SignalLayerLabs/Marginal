@@ -85,6 +85,12 @@ child process over pipes. Its outcome evidence is weaker than Claude Code's: the
 exit code, most other tools prove nothing, and those outcomes stay `unknown`. See
 [OpenCode plugin](opencode.md).
 
+PrivacyCode is an **Observe** install target for the same OpenCode adapter because its validated plugin
+surface is currently compatible. It keeps a distinct engine label, configuration path, ledger root, and
+evidence history. Target compatibility does not transfer Earned Enforcement authority: trust remains
+engine-specific. If the plugin/event contract diverges, PrivacyCode becomes a separate adapter rather
+than accumulating target-specific governance semantics.
+
 GitHub Copilot remains roadmap work. Codex is labeled Tool Enforcement,
 not Full Compute Enforcement, because specialized and hosted tool paths can fall outside local
 hook coverage.

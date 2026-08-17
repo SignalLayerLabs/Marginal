@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>MARGINAL — Evidence-Driven Compute Governance for AI Agents</title>
   <meta name="description" content="MARGINAL is an open-source, local-first compute governance layer for AI agents that measures net value, governance overhead, diminishing returns and false stops.">
-  <meta name="keywords" content="AI agents, coding agents, compute governance, token optimization, Codex, agent observability, AI FinOps, LLM cost optimization">
+  <meta name="keywords" content="AI agents, coding agents, compute governance, Codex, Claude Code, OpenCode, PrivacyCode, agent observability, AI FinOps, LLM cost optimization">
   <meta name="author" content="SignalLayer Labs">
   <meta name="robots" content="index,follow">
   <link rel="canonical" href="https://signallayerlabs.github.io/Marginal/">
@@ -29,6 +29,7 @@
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-links">Menu</button>
       <div class="nav-links" id="nav-links">
         <a href="#benchmark">Benchmark</a>
+        <a href="#integrations">Integrations</a>
         <a href="#trace">Concrete trace</a>
         <a href="#proof">Proof standard</a>
         <a href="#irrelevance">Graceful irrelevance</a>
@@ -91,6 +92,29 @@
         <div class="trace-row"><span class="trace-num">03</span><div><b>Verify README.md</b><small>same state · no new evidence</small></div><span class="status warn">DISCOUNT</span></div>
         <div class="trace-row"><span class="trace-num">04</span><div><b>Verify README.md</b><small>diminishing return threshold reached</small></div><span class="status stop">STOP?</span></div>
         <p class="trace-note">The question mark matters: enforcement is earned by evidence, not assumed by the demo.</p>
+      </div>
+    </section>
+
+    <section class="section shell" id="integrations">
+      <div class="section-heading">
+        <p class="eyebrow">Multi-engine runtime</p>
+        <h2>One governance core. Engine-specific evidence boundaries.</h2>
+        <p>Adapters translate native lifecycle events into the same provider-neutral runtime. Capability labels stay conservative: sharing an adapter never transfers earned trust between engines.</p>
+      </div>
+      <div class="metric-grid">
+        <article class="accent-card"><span>Codex</span><h3>Tool Enforcement</h3><p>Native plugin. Shadow Mode first; narrow blocking requires repository-local Earned Enforcement evidence.</p></article>
+        <article><span>Claude Code</span><h3>Observe</h3><p>Native hooks with engine-declared success/failure events. Recommendations go to the ledger and never alter the next model action.</p></article>
+        <article><span>OpenCode</span><h3>Observe</h3><p>JavaScript plugin plus a persistent stdio bridge. Shell exit codes are provable; unsupported outcomes remain unknown.</p></article>
+        <article><span>PrivacyCode</span><h3>Observe</h3><p>OpenCode-compatible target with its own engine label, install path, ledger root and evidence history.</p></article>
+      </div>
+      <div class="evidence-banner">
+        <span class="evidence-key">Current rule</span>
+        <strong>Same adapter ≠ same trust. Enforcement evidence stays engine- and repository-specific.</strong>
+      </div>
+      <div class="benchmark-links">
+        <a href="https://github.com/SignalLayerLabs/Marginal/blob/main/docs/integrations/overview.md">Integration matrix</a>
+        <a href="https://github.com/SignalLayerLabs/Marginal/blob/main/docs/integrations/claude-code.md">Claude Code</a>
+        <a href="https://github.com/SignalLayerLabs/Marginal/blob/main/docs/integrations/opencode.md">OpenCode / PrivacyCode</a>
       </div>
     </section>
 
@@ -173,11 +197,11 @@
     </section>
 
     <section class="section roadmap-section"><div class="shell">
-      <div class="section-heading"><p class="eyebrow">Measured milestone</p><h2>Codex Reference Integration</h2><p>The auditable adapter and first matched smoke are implemented. The next evidence gate is a preregistered repeated canary large enough to estimate trajectory variance.</p></div>
+      <div class="section-heading"><p class="eyebrow">Current milestone</p><h2>Multi-Engine Developer Preview</h2><p>Codex, Claude Code, OpenCode and PrivacyCode now reach the same governance core through capability-aware integrations. The next gate is cross-engine conformance and causal intervention evidence, not broader claims.</p></div>
       <div class="roadmap-line">
-        <div class="done"><span>v0.2</span><b>Learning Loop Foundation</b><small>universal protocol · ledger · privacy · replay</small></div>
-        <div class="current"><span>Hardening</span><b>Net-value evidence layer</b><small>governance tax · false stops · diminishing returns</small></div>
-        <div class="done"><span>v0.3 foundation</span><b>Codex integration smoke</b><small>pinned runtime · telemetry · matched OFF/ON · Modal verification</small></div>
+        <div class="done"><span>v0.3</span><b>Codex reference integration</b><small>Tool Enforcement · evidence receipts · matched smoke</small></div>
+        <div class="done"><span>Multi-engine</span><b>Observe surfaces landed</b><small>Claude Code · OpenCode · PrivacyCode</small></div>
+        <div class="current"><span>Next</span><b>Counterfactual validation</b><small>paired continuations · regret · engine-specific earned trust</small></div>
       </div>
       <div class="center"><a class="button button-secondary" href="https://github.com/SignalLayerLabs/Marginal/blob/main/ROADMAP.md">Read the roadmap</a></div>
     </div></section>
@@ -186,7 +210,7 @@
       <p class="eyebrow">Build the evidence first</p>
       <h2>Observe. Measure. Let intervention earn enforcement.</h2>
       <div class="hero-actions center">
-        <a class="button" href="https://github.com/SignalLayerLabs/Marginal#install">Install for Codex</a>
+        <a class="button" href="https://github.com/SignalLayerLabs/Marginal#native-integrations">Install MARGINAL</a>
         <a class="button button-secondary" href="https://github.com/SignalLayerLabs/Marginal/issues">Challenge the project</a>
       </div>
     </div></section>

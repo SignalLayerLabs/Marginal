@@ -16,6 +16,8 @@ MARGINAL documentation is organized by user intent instead of keeping every guid
 
 - [Integration overview](integrations/overview.md)
 - [Codex plugin](integrations/codex.md)
+- [Claude Code plugin](integrations/claude-code.md)
+- [OpenCode and PrivacyCode](integrations/opencode.md)
 - [Codex benchmark readiness](integrations/codex-benchmark-readiness.md)
 
 ## Evaluation and research

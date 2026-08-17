@@ -1,6 +1,25 @@
 # Quickstart
 
-## Install
+## Native agent integrations
+
+MARGINAL starts conservatively. Codex installs in Shadow Mode before any earned tool enforcement;
+Claude Code, OpenCode, and PrivacyCode are **Observe-only** and cannot block.
+
+```bash
+# Codex native plugin
+codex plugin marketplace add SignalLayerLabs/Marginal --ref main
+codex plugin add marginal@marginal
+
+# With the MARGINAL Python CLI installed
+marginal install claude-code
+marginal install opencode
+marginal install privacycode
+```
+
+Remove an integration with its matching uninstall command. See the
+[integration overview](../integrations/overview.md) for capability and evidence limits.
+
+## Python library / development install
 
 ```bash
 python -m pip install -e ".[dev]"
