@@ -154,7 +154,7 @@ def _build_parser() -> argparse.ArgumentParser:
     public_eval.add_argument("--seed", type=int, default=42)
 
     install_parser = subparsers.add_parser("install", help="install a native integration")
-    install_parser.add_argument("target", choices=["codex", "claude-code"])
+    install_parser.add_argument("target", choices=["codex", "claude-code", "opencode"])
     install_parser.add_argument("--repository", default="SignalLayerLabs/Marginal")
     install_parser.add_argument("--ref", default="main")
     install_parser.add_argument("--data-dir", type=Path)
@@ -162,7 +162,7 @@ def _build_parser() -> argparse.ArgumentParser:
     install_parser.add_argument("--json", action="store_true", dest="as_json")
 
     uninstall_parser = subparsers.add_parser("uninstall", help="remove a native integration")
-    uninstall_parser.add_argument("target", choices=["codex", "claude-code"])
+    uninstall_parser.add_argument("target", choices=["codex", "claude-code", "opencode"])
     uninstall_parser.add_argument("--purge-data", action="store_true")
     uninstall_parser.add_argument("--yes", action="store_true")
     uninstall_parser.add_argument("--data-dir", type=Path)
@@ -218,6 +218,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(claude_result.message or claude_result.error_code or claude_result.selector)
             return 0 if claude_result.installed else 1
 
+        if args.target == "opencode":
+            from .integrations.opencode.installer import install as install_opencode
+            from .integrations.opencode.targets import resolve_target
+
+            opencode_result = install_opencode(target=resolve_target(args.target))
+            if args.as_json:
+                print(json.dumps(opencode_result.to_dict(), sort_keys=True))
+            else:
+                print(opencode_result.message or opencode_result.error_code or opencode_result.path)
+            return 0 if opencode_result.installed else 1
+
         from .integrations.codex.installer import install
 
         result = install(
@@ -243,6 +254,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             else:
                 print(claude_result.message or claude_result.error_code or claude_result.selector)
             return 0 if not claude_result.installed else 1
+
+        if args.target == "opencode":
+            from .integrations.opencode.installer import uninstall as uninstall_opencode
+            from .integrations.opencode.targets import resolve_target
+
+            opencode_result = uninstall_opencode(target=resolve_target(args.target))
+            if args.as_json:
+                print(json.dumps(opencode_result.to_dict(), sort_keys=True))
+            else:
+                print(opencode_result.message or opencode_result.error_code or opencode_result.path)
+            return 0 if not opencode_result.installed else 1
 
         from .integrations.codex.commands import default_data_dir, purge_data
         from .integrations.codex.installer import uninstall

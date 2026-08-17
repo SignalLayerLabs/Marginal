@@ -12,7 +12,10 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
 - `marginal.integrations.hookkit`, the engine-independent parts of a hook integration: normalized
   events, privacy-safe action normalization, conservative structured outcome classification,
   workspace state evidence that fails open, and session correlation;
-- `marginal install claude-code` and `marginal uninstall claude-code`.
+- an OpenCode plugin labeled **Observe**, running inside the engine process and speaking
+  newline-delimited JSON to one bridge child process over pipes. Tool output never reaches MARGINAL:
+  the plugin forwards a digest plus an allowlist of outcome signals;
+- `marginal install claude-code`, `marginal install opencode`, and their `uninstall` counterparts.
 
 ### Changed
 
