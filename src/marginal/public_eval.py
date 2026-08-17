@@ -28,6 +28,7 @@ class RunRecord:
     repeated_calls: int = 0
     governance_tokens: int = 0
     governance_usd: float = 0.0
+    usd_measured: bool = True
     governance_latency_ms: int = 0
     reviewed_stops: int = 0
     false_stops: int = 0
@@ -59,6 +60,8 @@ class RunRecord:
             if not math.isfinite(float(value)) or value < 0:
                 raise ValueError("metrics must be finite and non-negative")
             object.__setattr__(self, name, float(value))
+        if not isinstance(self.usd_measured, bool):
+            raise TypeError("usd_measured must be a boolean")
         if self.false_stops > self.reviewed_stops:
             raise ValueError("false_stops cannot exceed reviewed_stops")
 
@@ -97,6 +100,7 @@ def load_runs(path: Path) -> dict[str, RunRecord]:
                     repeated_calls=item.get("repeated_calls", 0),
                     governance_tokens=item.get("governance_tokens", 0),
                     governance_usd=item.get("governance_usd", 0.0),
+                    usd_measured=item.get("usd_measured", True),
                     governance_latency_ms=item.get("governance_latency_ms", 0),
                     reviewed_stops=item.get("reviewed_stops", 0),
                     false_stops=item.get("false_stops", 0),
@@ -119,6 +123,7 @@ def _aggregate(records: list[RunRecord]) -> dict[str, Any]:
     governance_latency_ms = sum(record.governance_latency_ms for record in records)
     tokens = sum(record.tokens for record in records)
     usd = sum(record.usd for record in records)
+    usd_measured = all(record.usd_measured for record in records)
     latency_ms = sum(record.latency_ms for record in records)
     reviewed_stops = sum(record.reviewed_stops for record in records)
     false_stops = sum(record.false_stops for record in records)
@@ -127,15 +132,15 @@ def _aggregate(records: list[RunRecord]) -> dict[str, Any]:
         "resolved": resolved,
         "resolve_rate": resolved / tasks,
         "tokens": tokens,
-        "usd": round(usd, 6),
+        "usd": round(usd, 6) if usd_measured else None,
         "latency_ms": latency_ms,
         "tool_calls": sum(record.tool_calls for record in records),
         "repeated_calls": sum(record.repeated_calls for record in records),
         "governance_tokens": governance_tokens,
-        "governance_usd": round(governance_usd, 6),
+        "governance_usd": round(governance_usd, 6) if usd_measured else None,
         "governance_latency_ms": governance_latency_ms,
         "effective_tokens": tokens + governance_tokens,
-        "effective_usd": round(usd + governance_usd, 6),
+        "effective_usd": round(usd + governance_usd, 6) if usd_measured else None,
         "effective_latency_ms": latency_ms + governance_latency_ms,
         "reviewed_stops": reviewed_stops,
         "false_stops": false_stops,
@@ -145,6 +150,12 @@ def _aggregate(records: list[RunRecord]) -> dict[str, Any]:
 
 def _saving(original: float, optimized: float) -> float:
     return round((original - optimized) / original * 100.0, 2) if original else 0.0
+
+
+def _optional_saving(original: Any, optimized: Any) -> float | None:
+    if original is None or optimized is None:
+        return None
+    return _saving(float(original), float(optimized))
 
 
 def _bootstrap_token_savings(
@@ -225,6 +236,7 @@ def compare_runs(
     marginal_rows = [marginal[item] for item in ids]
     baseline_total = _aggregate(baseline_rows)
     marginal_total = _aggregate(marginal_rows)
+    quality_evaluable = int(baseline_total["resolved"]) > 0 and int(marginal_total["resolved"]) > 0
     delta_pp = round(
         (marginal_total["resolve_rate"] - baseline_total["resolve_rate"]) * 100.0,
         2,
@@ -253,12 +265,14 @@ def compare_runs(
         usd_key = "effective_usd" if include_governance else "usd"
         return {
             "tokens_per_resolved": round(float(total[token_key]) / resolved, 6),
-            "usd_per_resolved": round(float(total[usd_key]) / resolved, 6),
+            "usd_per_resolved": (
+                round(float(total[usd_key]) / resolved, 6) if total[usd_key] is not None else None
+            ),
         }
 
     gross_savings = {
         "tokens_percent": _saving(float(baseline_total["tokens"]), float(marginal_total["tokens"])),
-        "usd_percent": _saving(float(baseline_total["usd"]), float(marginal_total["usd"])),
+        "usd_percent": _optional_saving(baseline_total["usd"], marginal_total["usd"]),
         "latency_percent": _saving(
             float(baseline_total["latency_ms"]),
             float(marginal_total["latency_ms"]),
@@ -272,16 +286,15 @@ def compare_runs(
             float(marginal_total["repeated_calls"]),
         ),
         "confidence_level": confidence_level,
-        "tokens_confidence_interval": list(gross_token_ci),
+        "tokens_confidence_interval": list(gross_token_ci) if quality_evaluable else None,
     }
     net_savings = {
         "tokens_percent": _saving(
             float(baseline_total["effective_tokens"]),
             float(marginal_total["effective_tokens"]),
         ),
-        "usd_percent": _saving(
-            float(baseline_total["effective_usd"]),
-            float(marginal_total["effective_usd"]),
+        "usd_percent": _optional_saving(
+            baseline_total["effective_usd"], marginal_total["effective_usd"]
         ),
         "latency_percent": _saving(
             float(baseline_total["effective_latency_ms"]),
@@ -290,18 +303,20 @@ def compare_runs(
         "tool_calls_percent": gross_savings["tool_calls_percent"],
         "repeated_calls_percent": gross_savings["repeated_calls_percent"],
         "confidence_level": confidence_level,
-        "tokens_confidence_interval": list(net_token_ci),
-        "tokens_95pct_ci": list(net_token_ci),
+        "tokens_confidence_interval": list(net_token_ci) if quality_evaluable else None,
+        "tokens_95pct_ci": list(net_token_ci) if quality_evaluable else None,
     }
 
     quality_margin_value = float(quality_margin_pp)
-    quality_preserved = delta_pp >= -quality_margin_value
+    quality_preserved = delta_pp >= -quality_margin_value if quality_evaluable else None
     has_verified_success = int(marginal_total["resolved"]) > 0
     false_stop_rate = marginal_total["false_stop_rate"]
     false_stops_acceptable = false_stop_rate is None or float(false_stop_rate) <= float(
         max_false_stop_rate
     )
-    if not quality_preserved:
+    if not quality_evaluable:
+        intervention_status = "pass_through"
+    elif not quality_preserved:
         intervention_status = "quality_regression"
     elif not false_stops_acceptable:
         intervention_status = "false_stop_risk"
@@ -339,7 +354,8 @@ def compare_runs(
             "resolved_delta_pp": delta_pp,
             "non_inferiority_margin_pp": quality_margin_pp,
             "preserved_within_margin": quality_preserved,
-            "preserved_within_one_pp": delta_pp >= -1.0,
+            "preserved_within_one_pp": delta_pp >= -1.0 if quality_evaluable else None,
+            "evaluable": quality_evaluable,
             "regressions": sum(
                 baseline[item].resolved and not marginal[item].resolved for item in ids
             ),
@@ -359,7 +375,7 @@ def compare_runs(
             "net_positive": float(cast(float, net_savings["tokens_percent"])) > 0.0,
             "graceful_irrelevance": intervention_status == "pass_through",
             "eligible_for_support": (
-                quality_preserved and false_stops_acceptable and has_verified_success
+                quality_preserved is True and false_stops_acceptable and has_verified_success
             ),
         },
     }
@@ -391,6 +407,10 @@ def render_public_report(result: dict[str, Any]) -> str:
     margin = float(quality["non_inferiority_margin_pp"])
     intervention = result.get("intervention", {"status": "unclassified"})
     governance = result.get("governance", {"tokens": 0, "usd": 0.0, "latency_ms": 0})
+    usd_change = "n/a" if savings["usd_percent"] is None else f"{savings['usd_percent']:.2f}% lower"
+    quality_result = (
+        quality["preserved_within_margin"] if quality.get("evaluable", True) else "not evaluable"
+    )
     return "\n".join(
         [
             "# Measured public benchmark comparison",
@@ -414,8 +434,10 @@ def render_public_report(result: dict[str, Any]) -> str:
                 f"{marginal['effective_tokens']:,} | {savings['tokens_percent']:.2f}% fewer |"
             ),
             (
-                f"| Effective USD | ${baseline['effective_usd']:.4f} | "
-                f"${marginal['effective_usd']:.4f} | {savings['usd_percent']:.2f}% lower |"
+                "| Effective USD | "
+                f"{_format_optional_usd(baseline['effective_usd'])} | "
+                f"{_format_optional_usd(marginal['effective_usd'])} | "
+                f"{usd_change} |"
             ),
             (
                 f"| Effective latency | {baseline['effective_latency_ms']:,} ms | "
@@ -446,7 +468,8 @@ def render_public_report(result: dict[str, Any]) -> str:
             "",
             (
                 f"MARGINAL overhead: **{governance['tokens']:,} tokens**, "
-                f"**${governance['usd']:.6f}**, **{governance['latency_ms']:,} ms**."
+                f"**{_format_optional_usd(governance['usd'])}**, "
+                f"**{governance['latency_ms']:,} ms**."
             ),
             (
                 f"Gross agent-token savings: **{gross['tokens_percent']:.2f}%**. "
@@ -458,10 +481,12 @@ def render_public_report(result: dict[str, Any]) -> str:
             (
                 f"Net token savings {confidence_percent:.1f}% bootstrap interval: "
                 f"**{ci[0]:.2f}% to {ci[1]:.2f}%**."
+                if quality.get("evaluable", True)
+                else "Token uncertainty: **not evaluable** without a successful task in both arms."
             ),
             (
                 f"Quality preserved within the {margin:.2f} pp non-inferiority margin: "
-                f"**{quality['preserved_within_margin']}**."
+                f"**{quality_result}**."
             ),
             f"Regressions: **{quality['regressions']}**. Recoveries: **{quality['recoveries']}**.",
             (

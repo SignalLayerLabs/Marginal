@@ -106,3 +106,22 @@ def test_public_report_includes_efficiency_and_configured_criterion() -> None:
     assert "USD per resolved task" in report
     assert "90.0% bootstrap interval" in report
     assert "0.50 pp non-inferiority margin" in report
+
+
+def test_unmeasured_usd_and_zero_success_quality_are_not_claimed() -> None:
+    from marginal.public_eval import RunRecord, compare_runs, render_public_report
+
+    baseline = {
+        "task": RunRecord(instance_id="task", resolved=False, tokens=100, usd_measured=False)
+    }
+    marginal = {
+        "task": RunRecord(instance_id="task", resolved=False, tokens=50, usd_measured=False)
+    }
+    result = compare_runs(baseline, marginal, bootstrap_samples=20)
+    report = render_public_report(result)
+
+    assert result["baseline"]["effective_usd"] is None
+    assert result["quality"]["preserved_within_margin"] is None
+    assert result["net_savings"]["tokens_confidence_interval"] is None
+    assert "not evaluable" in report
+    assert "bootstrap interval" not in report

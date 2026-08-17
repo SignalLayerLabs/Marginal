@@ -12,6 +12,7 @@ from types import MappingProxyType
 from typing import Any
 
 from .canonical import canonical_hash
+from .reason_codes import REASON_CODE_VERSION, ReasonCode
 
 RECEIPT_SCHEMA_VERSION = "1.0"
 PROGRESS_EVIDENCE_SCHEMA_VERSION = "1.0"
@@ -249,6 +250,8 @@ class DecisionReceipt:
             "enforcement_level",
         ):
             _required_text(getattr(self, name), name)
+        if self.reason_code not in {code.value for code in ReasonCode}:
+            raise ValueError(f"unsupported reason_code for registry version {REASON_CODE_VERSION}")
         if not isinstance(self.decision_hash, str):
             raise TypeError("decision_hash must be a string")
         for name in ("state_hash", "evidence_hash", "trajectory_hash"):

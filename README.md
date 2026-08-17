@@ -72,6 +72,11 @@ explicit promotion.
 Authority is contextual, not permanent. The Trust Engine evaluates sample size, coverage, harmful
 outcomes, regret, governance tax, recency, policy identity, and available adapter capabilities.
 
+The promotion gate assumes a non-adversarial, same-user trust domain. Receipt and ledger hashes
+detect corruption and make decisions reproducible; they do not prove authorship or stop the agent,
+a prompt-injected tool, or another same-user process from rewriting local state. Do not treat local
+Earned Enforcement as a security boundary against software running as the same OS user.
+
 ## User intent and controls
 
 Codex user prompts can express deliberate repeat intent in English or Italian, including `repeat`,
