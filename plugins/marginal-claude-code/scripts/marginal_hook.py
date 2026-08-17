@@ -33,7 +33,7 @@ def _candidate_paths() -> list[str]:
 
 
 def main() -> int:
-    if sys.version_info < (3, 10):
+    if sys.version_info < (3, 10):  # noqa: UP036 - plugin bootstrap must fail open on unsupported Python
         return 0
     for candidate in _candidate_paths():
         if candidate not in sys.path:
