@@ -8,6 +8,9 @@ hook. Shadow Mode is the only mode this integration supports today.
 
 Validated against OpenCode 1.18.18 on Linux.
 
+Also validated against PrivacyCode 1.18.10, an OpenCode-compatible fork. See
+[Compatible forks](#compatible-forks).
+
 ## Install
 
 ```bash
@@ -92,3 +95,27 @@ OpenCode's own logs, database, and telemetry are outside this boundary.
 ```bash
 marginal ledger-report ~/.local/share/marginal/opencode/ledger/*/*.jsonl
 ```
+
+## Compatible forks
+
+OpenCode's plugin loader is reused unchanged by compatible forks, so the same plugin and the same bridge
+protocol govern them. A target records only what differs: the executable name, the global configuration
+directory, and the ledger location.
+
+| Target | Executable | Plugin path | Ledger root |
+|---|---|---|---|
+| `opencode` | `opencode` | `~/.config/opencode/plugins/marginal.js` | `~/.local/share/marginal/opencode` |
+| `privacycode` | `privacycode` | `~/.config/privacycode/plugins/marginal.js` | `~/.local/share/marginal/privacycode` |
+
+```bash
+marginal install privacycode
+marginal uninstall privacycode
+```
+
+Each target keeps a distinct engine label, so one ledger never conflates two engines and a later
+measurement can compare them instead of pooling them. Installing binds the copied plugin to its engine,
+so both can be installed at once without interfering. `MARGINAL_PRIVACYCODE_DATA` overrides the ledger
+location for that target alone.
+
+Adding another compatible fork means one `OpenCodeTarget` entry. Nothing about the governance contract
+is per-target, so a fork that has diverged in its plugin API is not a target — it is a new adapter.

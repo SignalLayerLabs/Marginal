@@ -72,7 +72,25 @@ OPENCODE = OpenCodeTarget(
     data_directory_name="opencode",
 )
 
-TARGETS: dict[str, OpenCodeTarget] = {OPENCODE.name: OPENCODE}
+PRIVACYCODE = OpenCodeTarget(
+    name="privacycode",
+    engine="privacycode",
+    executable="privacycode",
+    config_directory_name="privacycode",
+    data_directory_name="privacycode",
+)
+"""PrivacyCode, an OpenCode-compatible fork.
+
+It reuses OpenCode's plugin loader unchanged, so the governance contract is
+identical. Only the executable name, the global configuration directory, and the
+ledger location differ. The engine label stays distinct so a ledger never conflates
+two engines, and so a future measurement can compare them rather than pool them.
+"""
+
+TARGETS: dict[str, OpenCodeTarget] = {
+    OPENCODE.name: OPENCODE,
+    PRIVACYCODE.name: PRIVACYCODE,
+}
 
 
 def resolve_target(name: str) -> OpenCodeTarget:

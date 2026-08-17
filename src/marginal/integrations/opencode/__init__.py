@@ -29,14 +29,16 @@ from .installer import (
     inspect_opencode,
     install,
     is_marginal_plugin,
+    render_plugin,
     uninstall,
 )
 from .normalization import ENGINE, classify_outcome, tool_call_end, tool_call_start
-from .targets import OPENCODE, TARGETS, OpenCodeTarget, resolve_target
+from .targets import OPENCODE, PRIVACYCODE, TARGETS, OpenCodeTarget, resolve_target
 
 __all__ = [
     "ENGINE",
     "OPENCODE",
+    "PRIVACYCODE",
     "TARGETS",
     "BridgeService",
     "OpenCodeDoctorReport",
@@ -52,6 +54,7 @@ __all__ = [
     "is_marginal_plugin",
     "main",
     "parse_request",
+    "render_plugin",
     "resolve_target",
     "serve",
     "tool_call_end",
