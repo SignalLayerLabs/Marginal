@@ -8,7 +8,7 @@ MARGINAL overhead is counted in net efficiency and net savings.
 | Resolved | 0/3 | 0/3 | +0.00 pp |
 | Agent tokens | 1,098,747 | 824,839 | 24.93% fewer |
 | Effective tokens (incl. governance) | 1,098,747 | 824,839 | 24.93% fewer |
-| Effective USD | $0.0000 | $0.0000 | 0.00% lower |
+| Effective USD | n/a | n/a | n/a |
 | Effective latency | 593,106 ms | 565,768 ms | 4.61% lower |
 | Tool calls | 33 | 32 | 3.03% fewer |
 | Repeated calls | 0 | 0 | 0.00% fewer |
@@ -17,13 +17,13 @@ MARGINAL overhead is counted in net efficiency and net savings.
 
 ## Governance tax
 
-MARGINAL overhead: **0 tokens**, **$0.000000**, **7,058 ms**.
+MARGINAL overhead: **0 tokens**, **n/a**, **7,058 ms**.
 Gross agent-token savings: **24.93%**. Net token savings after governance: **24.93%**.
 
 ## Quality and intervention decision
 
-Net token savings 95.0% bootstrap interval: **21.52% to 28.07%**.
-Quality preserved within the 1.00 pp non-inferiority margin: **True**.
+Token uncertainty: **not evaluable** without a successful task in both arms.
+Quality preserved within the 1.00 pp non-inferiority margin: **not evaluable**.
 Regressions: **0**. Recoveries: **0**.
 Reviewed deny recommendations: **0**. False stops: **0** (n/a).
 Intervention status: **pass_through**.

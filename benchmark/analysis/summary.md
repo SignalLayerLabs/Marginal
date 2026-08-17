@@ -2,7 +2,9 @@
 
 ## Executive Summary
 
-No Codex OFF/ON trajectory was executed. The integration-only preflight passes for the
+This directory records an earlier blocked preflight; no Codex OFF/ON trajectory was executed in
+that attempt. A later exploratory smoke did run, and its complete evidence is published under
+`benchmarks/swebench_lite/evidence/smoke-2026-08-11-dbce533/`. The integration-only preflight passes for the
 frozen three-task set, Codex 0.147.0, `gpt-5.6-sol`, and `high` reasoning effort. The
 mandatory full preflight stops before inference because successful shell executions are
 not observable through the pinned hook contract and no official per-instance SWE-bench

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 
+from marginal.reason_codes import ReasonCode
 from marginal.receipts import (
     DecisionReceipt,
     GovernanceCost,
@@ -62,6 +63,16 @@ def test_receipt_hash_binds_the_canonical_payload_and_detects_tampering() -> Non
 
     assert verify_decision_receipt(receipt)
     assert not verify_decision_receipt(replace(receipt, decision="allow"))
+
+
+@pytest.mark.parametrize("reason_code", [code.value for code in ReasonCode])
+def test_decision_receipt_accepts_only_versioned_reason_codes(reason_code: str) -> None:
+    assert replace(_receipt(), reason_code=reason_code).reason_code == reason_code
+
+
+def test_decision_receipt_rejects_unknown_reason_code() -> None:
+    with pytest.raises(ValueError, match="unsupported reason_code"):
+        replace(_receipt(), reason_code="this_is_not_a_real_reason_code")
 
 
 def test_receipt_payload_keeps_unavailable_measurements_explicit_and_mappings_immutable() -> None:
