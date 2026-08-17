@@ -41,7 +41,7 @@ This roadmap is milestone-driven rather than date-driven. GitHub Issues and pull
 | **v0.2 — Learning Loop Foundation** | Complete | Universal protocol, non-blocking observation, versioned evidence, privacy and replay |
 | **Community hardening** | In progress | Governance tax, false-stop accounting, diminishing-return control and clearer evidence UX |
 | **v0.3 — Codex Reference Integration** | Validation | Native plugin, one-command install, Earned Enforcement, and measured smoke |
-| **v0.4 — Multi-Engine Developer Preview** | Planned | Shared core across materially different coding agents |
+| **v0.4 — Multi-Engine Developer Preview** | In progress | Codex, Claude Code and OpenCode-family surfaces sharing one governance core |
 | **v0.5 — One-Command Universal Installation** | Planned | Detection, installation, diagnostics and rollback across engines |
 | **v0.6 — Adaptive and Causal Allocation** | Planned | Calibrated learning, exploration and stronger identification strategies |
 | **v0.7 — Ecosystem and Operational Scale** | Planned | Persistence, observability, team controls and more engines |
@@ -196,11 +196,22 @@ See [Codex benchmark readiness](docs/integrations/codex-benchmark-readiness.md).
 
 ## v0.4 — Multi-Engine Developer Preview
 
-**Status:** Planned
+**Status:** In progress
 
-Build OpenCode, Claude Code and GitHub Copilot integrations where official control surfaces permit them. Reuse the same protocol, policy, governance accounting, privacy boundaries and reports. Publish a capability matrix and label each engine as Observe, Tool Enforcement or Full Compute Enforcement.
+The multi-engine layer is now real rather than roadmap-only:
 
-**Exit criteria:** at least four environments pass protocol conformance; economic logic remains centralized; at least two integrations support real enforcement; each engine documents limitations and fail-open behavior.
+- [x] Claude Code native plugin, labeled **Observe**, mapped through the engine-neutral hook core.
+- [x] OpenCode plugin, labeled **Observe**, using one persistent stdio bridge for interleaved sessions.
+- [x] PrivacyCode supported as an OpenCode-compatible target with separate engine identity and ledger state.
+- [x] Keep economic policy in `UniversalRuntime`; adapters normalize native events and declare only capabilities they can prove.
+- [x] Preserve fail-open behavior and record unavailable/unknown evidence instead of inventing measurements.
+- [ ] Migrate older duplicated hook logic onto the shared integration core only after conformance coverage is sufficient.
+- [ ] Add another materially different engine surface where its official API supports a defensible adapter.
+- [ ] Publish cross-engine conformance and paired evidence before expanding enforcement claims.
+
+**Exit criteria:** at least four environments pass protocol conformance; economic logic remains centralized;
+at least two integrations support real enforcement backed by engine-specific Earned Enforcement evidence;
+each engine documents outcome limits, privacy boundaries and fail-open behavior.
 
 ---
 

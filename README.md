@@ -32,7 +32,22 @@ Open source · Local first · Provider neutral · Zero mandatory runtime depende
 
 MARGINAL does not assume that more calls are wasteful. Missing or ambiguous evidence fails open.
 
-## Install for Codex
+## Current integrations
+
+| Engine | Capability | Integration |
+|---|---|---|
+| **Codex** | **Tool Enforcement** | Native plugin. Shadow Mode by default; enforcement requires local Earned Enforcement evidence. |
+| **Claude Code** | **Observe** | Native plugin using Claude Code hooks. Records engine-declared success/failure without changing the next model action. |
+| **OpenCode** | **Observe** | In-process JavaScript plugin with a persistent stdio bridge to the provider-neutral runtime. |
+| **PrivacyCode** | **Observe** | OpenCode-compatible install target with a distinct engine identity, ledger root, and trust evidence. |
+
+`Observe` integrations record evidence and recommendations but cannot block. A compatible install target
+may share an adapter, but it never shares earned trust: **same adapter does not mean same enforcement
+evidence**.
+
+## Native integrations
+
+### Codex
 
 Install the native plugin from the repository:
 
@@ -60,6 +75,43 @@ marginal install codex --autopilot-consent
 
 Installation alone never enables enforcement. Earned Enforcement requires verified evidence and
 explicit promotion.
+
+### Claude Code
+
+With the Python CLI installed:
+
+```bash
+marginal install claude-code
+marginal uninstall claude-code
+```
+
+Claude Code is **Observe-only** today. Its hooks expose separate success and failure events, so those
+outcomes are engine-declared rather than inferred from tool output.
+
+### OpenCode
+
+```bash
+marginal install opencode
+marginal uninstall opencode
+```
+
+OpenCode is **Observe-only**. The JavaScript plugin runs in the engine process and communicates with one
+long-running local MARGINAL bridge over stdio. Shell exit codes can prove shell success/failure; outcomes
+without a reliable engine signal remain `unknown`.
+
+### PrivacyCode
+
+```bash
+marginal install privacycode
+marginal uninstall privacycode
+```
+
+PrivacyCode reuses the OpenCode plugin contract but keeps a distinct engine label, installation path,
+ledger root, and evidence history. Compatibility is validated, not assumed permanently; a protocol
+divergence requires a separate adapter.
+
+See the [integration overview](docs/integrations/overview.md), [Claude Code guide](docs/integrations/claude-code.md),
+and [OpenCode / PrivacyCode guide](docs/integrations/opencode.md).
 
 ## How Autopilot works
 
@@ -200,6 +252,8 @@ evidence semantics. See the [architecture guide](docs/product/architecture.md).
 | Getting started | [Quickstart](docs/getting-started/quickstart.md) |
 | Product | [Concepts](docs/product/concepts.md) · [Architecture](docs/product/architecture.md) |
 | Codex | [Plugin guide](docs/integrations/codex.md) · [Benchmark readiness](docs/integrations/codex-benchmark-readiness.md) |
+| Claude Code | [Observe plugin](docs/integrations/claude-code.md) |
+| OpenCode / PrivacyCode | [Observe plugin and compatible targets](docs/integrations/opencode.md) |
 | Evaluation | [Benchmarking](docs/evaluation/benchmarking.md) · [Public benchmarks](docs/evaluation/public-benchmarks.md) |
 | Operations | [Privacy](docs/operations/privacy.md) · [Governance](docs/project/governance.md) |
 | Reference | [API](docs/reference/api.md) · [Roadmap](ROADMAP.md) |
