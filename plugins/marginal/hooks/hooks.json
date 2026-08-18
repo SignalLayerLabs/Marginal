@@ -62,7 +62,7 @@
             "type": "command",
             "command": "python3 \"$PLUGIN_ROOT/scripts/marginal_hook.py\"",
             "commandWindows": "py -3 \"%PLUGIN_ROOT%\\scripts\\marginal_hook.py\"",
-            "timeout": 5,
+            "timeout": 3,
             "statusMessage": "Closing MARGINAL session"
           }
         ]
