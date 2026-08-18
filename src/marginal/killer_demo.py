@@ -509,6 +509,7 @@ def render_killer_demo_markdown(result: dict[str, Any]) -> str:
     )
     return "\n".join(lines)
 
+
 def render_killer_demo_svg(result: dict[str, Any]) -> str:
     baseline_tokens = int(result["baseline"]["tokens"])
     marginal_tokens = int(result["marginal"]["tokens"])
@@ -532,10 +533,11 @@ def render_killer_demo_svg(result: dict[str, Any]) -> str:
             f'<text x="{350 + marginal_width}" y="337" fill="#91ff63" font-family="Arial,sans-serif" font-size="18">{marginal_tokens:,}</text>',
             f'<text x="70" y="430" fill="#91ff63" font-family="Arial,sans-serif" font-size="30" font-weight="700">{savings:.2f}% fewer declared tokens</text>',
             '<text x="70" y="470" fill="#9aa7b5" font-family="Arial,sans-serif" font-size="16">PASS → PASS · deterministic mechanism demonstration</text>',
-            '</svg>',
-            '',
+            "</svg>",
+            "",
         ]
     )
+
 
 def _candidate_lookup(result: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {
@@ -633,9 +635,9 @@ def render_killer_demo_html(result: dict[str, Any]) -> str:
             [
                 '<article class="decision-card">',
                 f'<span class="decision-stage">{html.escape(stage["stage"])}</span>',
-                f'<strong>{html.escape(stage["selected"])}</strong>',
-                f'<small>{len(stage["candidates"]) - 1} higher-cost alternatives rejected</small>',
-                '</article>',
+                f"<strong>{html.escape(stage['selected'])}</strong>",
+                f"<small>{len(stage['candidates']) - 1} higher-cost alternatives rejected</small>",
+                "</article>",
             ]
         )
         for stage in result["stages"]
@@ -707,6 +709,7 @@ def render_killer_demo_html(result: dict[str, Any]) -> str:
     for placeholder, value in replacements.items():
         page = page.replace(placeholder, value)
     return page
+
 
 def _write_artifacts(
     output_dir: Path,
