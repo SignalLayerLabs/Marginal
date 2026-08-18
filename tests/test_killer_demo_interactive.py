@@ -32,6 +32,8 @@ def test_playback_replays_same_nine_candidates_with_three_funded_actions() -> No
     assert all(tick["baseline"]["decision"] == "EXECUTE" for tick in ticks)
     assert sum(tick["baseline"]["calls"] for tick in ticks) == 9
     assert sum(tick["marginal"]["calls"] for tick in ticks) == 3
+    assert sum(tick["marginal"]["decision"] == "REJECT BEFORE SPEND" for tick in ticks) == 6
+    assert sum(tick["marginal"]["decision"] == "FUND + EXECUTE" for tick in ticks) == 3
 
     assert playback["final"]["baseline"]["verified_success"] is True
     assert playback["final"]["marginal"]["verified_success"] is True
@@ -77,7 +79,7 @@ def test_interactive_assets_expose_playback_controls() -> None:
     assert "function resetRace" in js
     assert "function playRace" in js
     assert "ArrowRight" in js
-    assert "REJECT BEFORE SPEND" in js
+    assert "tick.marginal.decision" in js
     assert "fetch(" not in js
 
 
