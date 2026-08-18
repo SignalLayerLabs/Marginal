@@ -281,6 +281,7 @@ def _candidate_rows(event: dict[str, Any]) -> list[dict[str, Any]]:
                 "kind": action["kind"],
                 "tokens": action["cost"]["tokens"],
                 "usd": action["cost"]["usd"],
+                "latency_ms": action["cost"]["latency_ms"],
                 "expected_gain": decision["expected_gain"],
                 "score": round(float(decision["score"]), 6),
                 "allowed": decision["allowed"],
@@ -518,193 +519,1179 @@ def render_killer_demo_svg(result: dict[str, Any]) -> str:
     marginal_width = max(8, round(max_width * marginal_tokens / baseline_tokens))
     return "\n".join(
         [
-            '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-label="Without MARGINAL versus MARGINAL deterministic declared token cost">',
-            '<defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#91ff63"/><stop offset="1" stop-color="#58e6ff"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="18"/></filter></defs>',
+            (
+                '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" '
+                'viewBox="0 0 1200 520" role="img" '
+                'aria-label="Baseline versus MARGINAL deterministic token cost">'
+            ),
+            (
+                '<defs><linearGradient id="g" x1="0" x2="1">'
+                '<stop stop-color="#91ff63"/><stop offset="1" stop-color="#58e6ff"/>'
+                "</linearGradient></defs>"
+            ),
             '<rect width="1200" height="520" rx="34" fill="#070a0f"/>',
-            '<circle cx="1010" cy="70" r="150" fill="#91ff63" opacity=".08" filter="url(#glow)"/>',
-            '<text x="70" y="78" fill="#91ff63" font-family="Arial,sans-serif" font-size="18" font-weight="700" letter-spacing="3">MARGINAL DEMO 001</text>',
-            '<text x="70" y="135" fill="#f7fbff" font-family="Arial,sans-serif" font-size="36" font-weight="700">Same verified fix. Less declared demo compute.</text>',
-            '<text x="70" y="180" fill="#9aa7b5" font-family="Arial,sans-serif" font-size="18">Deterministic action-cost illustration — not provider telemetry.</text>',
-            '<text x="70" y="255" fill="#f7fbff" font-family="Arial,sans-serif" font-size="18" font-weight="700">Without MARGINAL · Baseline</text>',
-            f'<rect x="330" y="230" width="{max_width}" height="40" rx="10" fill="#2a313c"/>',
-            f'<text x="1110" y="257" text-anchor="end" fill="#f7fbff" font-family="Arial,sans-serif" font-size="18">{baseline_tokens:,}</text>',
-            '<text x="70" y="335" fill="#f7fbff" font-family="Arial,sans-serif" font-size="18" font-weight="700">With MARGINAL</text>',
-            f'<rect x="330" y="310" width="{marginal_width}" height="40" rx="10" fill="url(#g)"/>',
-            f'<text x="{350 + marginal_width}" y="337" fill="#91ff63" font-family="Arial,sans-serif" font-size="18">{marginal_tokens:,}</text>',
-            f'<text x="70" y="430" fill="#91ff63" font-family="Arial,sans-serif" font-size="30" font-weight="700">{savings:.2f}% fewer declared tokens</text>',
-            '<text x="70" y="470" fill="#9aa7b5" font-family="Arial,sans-serif" font-size="16">PASS → PASS · deterministic mechanism demonstration</text>',
+            (
+                '<text x="70" y="78" fill="#91ff63" font-family="Arial,sans-serif" '
+                'font-size="18" font-weight="700">MARGINAL DEMO 002</text>'
+            ),
+            (
+                '<text x="70" y="135" fill="#f7fbff" font-family="Arial,sans-serif" '
+                'font-size="36" font-weight="700">Same task. Same PASS. Less extra work.</text>'
+            ),
+            (
+                '<text x="70" y="180" fill="#9aa7b5" font-family="Arial,sans-serif" '
+                'font-size="18">Deterministic action-cost replay — not provider telemetry.</text>'
+            ),
+            (
+                '<text x="70" y="255" fill="#f7fbff" font-family="Arial,sans-serif" '
+                'font-size="18" font-weight="700">Baseline · execute every candidate</text>'
+            ),
+            f'<rect x="330" y="230" width="{max_width}" height="40" rx="10" fill="#343b45"/>',
+            (
+                f'<text x="1110" y="257" text-anchor="end" fill="#f7fbff" '
+                f'font-family="Arial,sans-serif" font-size="18">{baseline_tokens:,}</text>'
+            ),
+            (
+                '<text x="70" y="335" fill="#f7fbff" font-family="Arial,sans-serif" '
+                'font-size="18" font-weight="700">MARGINAL · decide before spend</text>'
+            ),
+            (
+                f'<rect x="330" y="310" width="{marginal_width}" height="40" rx="10" '
+                'fill="url(#g)"/>'
+            ),
+            (
+                f'<text x="{350 + marginal_width}" y="337" fill="#91ff63" '
+                f'font-family="Arial,sans-serif" font-size="18">{marginal_tokens:,}</text>'
+            ),
+            (
+                f'<text x="70" y="430" fill="#91ff63" font-family="Arial,sans-serif" '
+                f'font-size="30" font-weight="700">{savings:.2f}% fewer declared tokens</text>'
+            ),
+            (
+                '<text x="70" y="470" fill="#9aa7b5" font-family="Arial,sans-serif" '
+                'font-size="16">PASS → PASS · deterministic mechanism demonstration</text>'
+            ),
             "</svg>",
             "",
         ]
     )
 
 
-def _candidate_lookup(result: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def build_killer_demo_playback(result: dict[str, Any]) -> dict[str, Any]:
+    baseline_outputs = {
+        (item["stage"], item["name"]): item["output"] for item in result["baseline_actions"]
+    }
+    marginal_outputs = {
+        (item["stage"], item["name"]): item["output"] for item in result["marginal_actions"]
+    }
+    baseline_totals = {"tokens": 0, "usd": 0.0, "latency_ms": 0, "calls": 0}
+    marginal_totals = {"tokens": 0, "usd": 0.0, "latency_ms": 0, "calls": 0}
+    baseline_workspace = "FAIL"
+    marginal_workspace = "FAIL"
+    ticks: list[dict[str, Any]] = []
+
+    for stage_index, stage in enumerate(result["stages"], start=1):
+        stage_name = str(stage["stage"])
+        selected = str(stage["selected"])
+        for candidate_index, candidate in enumerate(stage["candidates"], start=1):
+            name = str(candidate["name"])
+            funded = name == selected
+            latency_ms = int(candidate.get("latency_ms", 0))
+            key = (stage_name, name)
+
+            baseline_totals["tokens"] += int(candidate["tokens"])
+            baseline_totals["usd"] += float(candidate["usd"])
+            baseline_totals["latency_ms"] += latency_ms
+            baseline_totals["calls"] += 1
+
+            if funded:
+                marginal_totals["tokens"] += int(candidate["tokens"])
+                marginal_totals["usd"] += float(candidate["usd"])
+                marginal_totals["latency_ms"] += latency_ms
+                marginal_totals["calls"] += 1
+
+            if stage_name == "Fix" and funded:
+                baseline_workspace = "PATCHED"
+                marginal_workspace = "PATCHED"
+            if stage_name == "Verify" and funded:
+                baseline_workspace = "PASS"
+                marginal_workspace = "PASS"
+
+            ticks.append(
+                {
+                    "index": len(ticks) + 1,
+                    "stage": stage_name,
+                    "stage_index": stage_index,
+                    "candidate_index": candidate_index,
+                    "candidate": {
+                        "name": name,
+                        "kind": candidate["kind"],
+                        "tokens": int(candidate["tokens"]),
+                        "usd": float(candidate["usd"]),
+                        "latency_ms": latency_ms,
+                        "expected_gain": float(candidate["expected_gain"]),
+                        "score": float(candidate["score"]),
+                    },
+                    "baseline": {
+                        "decision": "EXECUTE",
+                        "calls": 1,
+                        "tokens": int(candidate["tokens"]),
+                        "usd": float(candidate["usd"]),
+                        "latency_ms": latency_ms,
+                        "output": baseline_outputs.get(key, "completed"),
+                        "workspace": baseline_workspace,
+                        "cumulative": dict(baseline_totals),
+                    },
+                    "marginal": {
+                        "decision": "FUND + EXECUTE" if funded else "REJECT BEFORE SPEND",
+                        "funded": funded,
+                        "reason": str(candidate["reason"]),
+                        "expected_gain": float(candidate["expected_gain"]),
+                        "score": float(candidate["score"]),
+                        "calls": 1 if funded else 0,
+                        "tokens": int(candidate["tokens"]) if funded else 0,
+                        "usd": float(candidate["usd"]) if funded else 0.0,
+                        "latency_ms": latency_ms if funded else 0,
+                        "output": marginal_outputs.get(key, "not executed"),
+                        "workspace": marginal_workspace,
+                        "cumulative": dict(marginal_totals),
+                    },
+                }
+            )
+
     return {
-        candidate["name"]: candidate
-        for stage in result["stages"]
-        for candidate in stage["candidates"]
+        "scenario": result["scenario"],
+        "defect": result["defect"],
+        "disclaimer": result["disclaimer"],
+        "ticks": ticks,
+        "final": {
+            "baseline": result["baseline"],
+            "marginal": result["marginal"],
+            "savings": result["savings"],
+        },
     }
 
 
-def _render_flow_steps(
-    actions: list[dict[str, Any]],
-    candidates: dict[str, dict[str, Any]],
-    selected_names: set[str],
-    *,
-    marginal: bool,
-) -> str:
-    rows: list[str] = []
-    for position, action in enumerate(actions, start=1):
-        candidate = candidates[action["name"]]
-        justified = action["name"] in selected_names
-        if marginal:
-            state_class = "funded"
-            state_label = "Funded"
-            state_icon = "✓"
-        elif justified:
-            state_class = "justified"
-            state_label = "Justified"
-            state_icon = "✓"
-        else:
-            state_class = "excess"
-            state_label = "Executed"
-            state_icon = "x"
-        rows.append(
-            "".join(
-                [
-                    f'<li class="flow-step {state_class}">',
-                    f'<span class="step-index">{position}</span>',
-                    '<span class="step-copy">',
-                    f"<strong>{html.escape(action['name'])}</strong>",
-                    f"<small>{html.escape(action['stage'])} · "
-                    f"{candidate['tokens']:,} tokens</small>",
-                    "</span>",
-                    '<span class="step-cost">',
-                    f"<strong>${candidate['usd']:.3f}</strong>",
-                    f"<small>{state_label}</small>",
-                    "</span>",
-                    f'<span class="step-state" aria-label="{state_label}">{state_icon}</span>',
-                    "</li>",
-                ]
-            )
-        )
-    return "".join(rows)
+def render_killer_demo_css() -> str:
+    return (
+        """:root {
+  --bg: #06080b;
+  --panel: #0c1117;
+  --panel-2: #101720;
+  --line: #26313d;
+  --text: #f7fbff;
+  --muted: #8f9aa8;
+  --lime: #91ff63;
+  --cyan: #58e6ff;
+  --red: #ff675f;
+  --amber: #f5c451;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); scroll-behavior: smooth; }
+body {
+  margin: 0;
+  min-width: 320px;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 80% 4%, rgba(145,255,99,.12), transparent 25rem),
+    radial-gradient(circle at 15% 65%, rgba(88,230,255,.06), transparent 32rem),
+    var(--bg);
+  font-family: var(--sans);
+}
+a { color: inherit; text-decoration: none; }
+button, select { font: inherit; }
+button { cursor: pointer; }
+.browser-shell {
+  width: min(calc(100% - 24px), 1540px);
+  margin: 12px auto;
+  border: 1px solid #202a34;
+  border-radius: 24px;
+  overflow: hidden;
+  background: rgba(6,8,11,.96);
+  box-shadow: 0 44px 140px rgba(0,0,0,.48);
+}
+.chrome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 16px;
+  border-bottom: 1px solid #1d252e;
+  background: #10151b;
+}
+.chrome i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #3a4652;
+}
+.chrome i:first-child { background: #ff6058; }
+.chrome i:nth-child(2) { background: #ffbd44; }
+.chrome i:nth-child(3) { background: #00ca4e; }
+.address {
+  margin: auto;
+  color: #73808d;
+  font: 10px var(--mono);
+}
+.shell {
+  width: min(calc(100% - 40px), 1400px);
+  margin: auto;
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 64px;
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+.brand-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(145,255,99,.34);
+  border-radius: 9px;
+  color: var(--lime);
+  background: rgba(145,255,99,.05);
+}
+.navlinks { display: flex; gap: 18px; color: var(--muted); font-size: 12px; }
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 30px;
+  align-items: end;
+  padding: 48px 0 28px;
+}
+.eyebrow {
+  color: var(--lime);
+  font: 800 11px var(--mono);
+  letter-spacing: .13em;
+}
+h1 {
+  max-width: 980px;
+  margin: 10px 0 12px;
+  font-size: clamp(40px, 5.8vw, 82px);
+  line-height: .94;
+  letter-spacing: -.055em;
+}
+.hero p { max-width: 840px; margin: 0; color: #bdc8d3; font-size: 17px; }
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.control {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--text);
+  background: #0e141b;
+  font-size: 12px;
+  font-weight: 800;
+}
+.control.primary {
+  border-color: var(--lime);
+  color: #081005;
+  background: var(--lime);
+}
+.control:disabled { cursor: not-allowed; opacity: .42; }
+.speed {
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--text);
+  background: #0e141b;
+}
+.race-wrap {
+  position: relative;
+  margin-bottom: 38px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  overflow: hidden;
+  background: #080c11;
+}
+.task-strip {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 18px;
+  align-items: center;
+  min-height: 58px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #0b1016;
+}
+.task-strip strong { font-size: 12px; }
+.task-strip small { color: var(--muted); font: 10px var(--mono); }
+.task-strip .center { color: var(--lime); text-align: center; }
+.stage-rail {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  border-bottom: 1px solid var(--line);
+}
+.stage-node {
+  position: relative;
+  padding: 10px 14px;
+  color: #65717e;
+  font: 800 10px var(--mono);
+  letter-spacing: .09em;
+  text-align: center;
+}
+.stage-node + .stage-node { border-left: 1px solid var(--line); }
+.stage-node.active { color: var(--text); background: rgba(88,230,255,.05); }
+.stage-node.done { color: var(--lime); }
+.progress-line {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: #1f2933;
+}
+.progress-line span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--lime), var(--cyan));
+  transition: width .35s ease;
+}
+.race-grid {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 72px minmax(0,1fr);
+  min-height: 610px;
+}
+.lane {
+  min-width: 0;
+  padding: 18px;
+  background: var(--panel);
+}
+.lane.baseline { box-shadow: inset 0 3px 0 rgba(255,103,95,.62); }
+.lane.marginal {
+  background:
+    radial-gradient(circle at 80% 0, rgba(145,255,99,.06), transparent 18rem),
+    var(--panel);
+  box-shadow: inset 0 3px 0 rgba(145,255,99,.72);
+}
+.lane.flash { animation: lane-flash .46s ease; }
+@keyframes lane-flash {
+  0% { box-shadow: inset 0 0 0 1px transparent; }
+  50% { box-shadow: inset 0 0 0 1px rgba(88,230,255,.55); }
+  100% { box-shadow: inset 0 0 0 1px transparent; }
+}
+.lane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.lane-kicker {
+  display: block;
+  color: var(--muted);
+  font: 800 9px var(--mono);
+  letter-spacing: .1em;
+}
+.lane-head h2 { margin: 4px 0 0; font-size: 21px; }
+.mode-badge {
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font: 800 8px var(--mono);
+  letter-spacing: .08em;
+}
+.baseline .mode-badge { color: #ff958f; }
+.marginal .mode-badge { color: var(--lime); }
+.metric-row {
+  display: grid;
+  grid-template-columns: repeat(4,1fr);
+  gap: 7px;
+  margin-bottom: 12px;
+}
+.live-metric {
+  padding: 10px;
+  border: 1px solid #222d38;
+  border-radius: 10px;
+  background: #090e14;
+}
+.live-metric span {
+  display: block;
+  color: #6e7b88;
+  font: 800 8px var(--mono);
+  letter-spacing: .07em;
+}
+.live-metric strong {
+  display: block;
+  margin-top: 7px;
+  font-size: 16px;
+  letter-spacing: -.02em;
+}
+.workspace {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 9px 11px;
+  border: 1px solid #222d38;
+  border-radius: 10px;
+  color: var(--muted);
+  font: 10px var(--mono);
+  background: #090e14;
+}
+.workspace strong { color: var(--red); }
+.workspace strong[data-state="PATCHED"] { color: var(--amber); }
+.workspace strong[data-state="PASS"] { color: var(--lime); }
+.gate {
+  min-height: 98px;
+  margin-bottom: 10px;
+  padding: 12px;
+  border: 1px solid #24303b;
+  border-radius: 12px;
+  background: #090e14;
+}
+.gate-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font: 800 9px var(--mono);
+}
+.gate-title span:first-child { color: var(--muted); }
+.decision { color: var(--muted); }
+.decision.fund { color: var(--lime); }
+.decision.reject { color: var(--red); }
+.gate p { margin: 0; color: #a7b2bd; font-size: 11px; line-height: 1.45; }
+.gate-score {
+  display: flex;
+  gap: 14px;
+  margin-top: 8px;
+  color: #667481;
+  font: 9px var(--mono);
+}
+.terminal {
+  height: 300px;
+  overflow-y: auto;
+  padding: 13px;
+  border: 1px solid #222d38;
+  border-radius: 12px;
+  background: #05080c;
+  font: 11px/1.55 var(--mono);
+  scrollbar-width: thin;
+}
+.term-line { margin: 0 0 8px; color: #9eabb7; white-space: pre-wrap; }
+.term-line.command { color: var(--text); }
+.term-line.execute::before { content: "EXEC  "; color: var(--amber); }
+.term-line.fund::before { content: "FUND  "; color: var(--lime); }
+.term-line.reject::before { content: "SKIP  "; color: var(--red); }
+.term-line.output { padding-left: 12px; color: #71808e; }
+.term-line.pass { color: var(--lime); }
+.vs-rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-right: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  background: #090d12;
+}
+.vs { color: #687581; font: 900 12px var(--mono); }
+.tick {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--text);
+  font: 800 10px var(--mono);
+  background: #0c1219;
+}
+.waste-meter {
+  position: relative;
+  width: 8px;
+  height: 230px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #1b242d;
+}
+.waste-meter span {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 0;
+  background: linear-gradient(0deg, var(--lime), var(--cyan));
+  transition: height .35s ease;
+}
+.waste-label {
+  color: #687581;
+  font: 800 8px var(--mono);
+  letter-spacing: .08em;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+.result-reveal {
+  display: none;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: center;
+  padding: 22px;
+  border-top: 1px solid rgba(145,255,99,.32);
+  background: linear-gradient(90deg, rgba(145,255,99,.08), rgba(88,230,255,.03));
+}
+.result-reveal.show { display: grid; animation: reveal .45s ease both; }
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.result-reveal h2 { margin: 0 0 5px; font-size: clamp(24px,3vw,38px); }
+.result-reveal p { margin: 0; color: var(--muted); }
+.result-numbers { display: flex; gap: 16px; }
+.result-numbers div { min-width: 130px; }
+.result-numbers span {
+  display: block;
+  color: var(--muted);
+  font: 800 8px var(--mono);
+}
+.result-numbers strong { display: block; margin-top: 4px; color: var(--lime); font-size: 22px; }
+.below {
+  display: grid;
+  grid-template-columns: 1.1fr .9fr;
+  gap: 12px;
+  margin: 0 0 42px;
+}
+.proof-card {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+}
+.proof-card h3 { margin: 0 0 8px; }
+.proof-card p, .proof-card li { color: var(--muted); font-size: 12px; line-height: 1.55; }
+.proof-card code { color: #dce6f0; font: 11px var(--mono); }
+.legacy-contract { display: none; }
+.footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 26px 0 32px;
+  border-top: 1px solid var(--line);
+  color: #65727e;
+  font-size: 10px;
+}
+.footer nav { display: flex; gap: 14px; }
+@media (max-width: 980px) {
+  .hero { grid-template-columns: 1fr; align-items: start; }
+  .controls { justify-content: flex-start; }
+  .race-grid { grid-template-columns: 1fr; }
+  .vs-rail {
+    min-height: 70px;
+    flex-direction: row;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .waste-meter { width: 220px; height: 7px; }
+  .waste-meter span { width: 0; height: 100%; transition: width .35s ease; }
+  .waste-label { writing-mode: initial; transform: none; }
+  .below { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) {
+  .browser-shell { width: 100%; margin: 0; border: 0; border-radius: 0; }
+  .chrome { display: none; }
+  .shell { width: min(calc(100% - 24px), 1400px); }
+  .navlinks { display: none; }
+  h1 { font-size: 43px; }
+  .metric-row { grid-template-columns: 1fr 1fr; }
+  .task-strip { grid-template-columns: 1fr; text-align: left; }
+  .task-strip .center { text-align: left; }
+  .result-reveal { grid-template-columns: 1fr; }
+  .result-numbers { flex-wrap: wrap; }
+  .footer { flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
+""".strip()
+        + "\n"
+    )
 
 
-def _render_allocation_rows(result: dict[str, Any]) -> str:
-    rows: list[str] = []
-    for stage in result["stages"]:
-        for candidate in stage["candidates"]:
-            funded = candidate["name"] == stage["selected"]
-            state_class = "funded-pill" if funded else "rejected-pill"
-            state_label = "FUNDED" if funded else "REJECTED"
-            rows.append(
-                "".join(
-                    [
-                        "<tr>",
-                        "<td>",
-                        f"<strong>{html.escape(candidate['name'])}</strong>",
-                        f"<small>{html.escape(stage['stage'])}</small>",
-                        "</td>",
-                        "<td>",
-                        f"<strong>${candidate['usd']:.3f}</strong>",
-                        f"<small>{candidate['tokens']:,} tokens</small>",
-                        "</td>",
-                        "<td>",
-                        f"<strong>{candidate['expected_gain']:.3f}</strong>",
-                        f"<small>score {candidate['score']:.3f}</small>",
-                        "</td>",
-                        "<td>",
-                        f'<span class="decision-pill {state_class}">{state_label}</span>',
-                        f"<small>{html.escape(candidate['reason'])}</small>",
-                        "</td>",
-                        "</tr>",
-                    ]
-                )
-            )
-    return "".join(rows)
+def render_killer_demo_js() -> str:
+    return (
+        """(() => {
+  "use strict";
+
+  const dataNode = document.querySelector("#demo-data");
+  if (!dataNode) return;
+  const data = JSON.parse(dataNode.textContent || "{}");
+  const ticks = Array.isArray(data.ticks) ? data.ticks : [];
+
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+  const number = new Intl.NumberFormat("en-US");
+  const money = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  });
+
+  const state = {
+    cursor: -1,
+    playing: false,
+    speed: 1,
+    timer: null,
+  };
+
+  const dom = {
+    run: $('[data-action="run"]'),
+    pause: $('[data-action="pause"]'),
+    step: $('[data-action="step"]'),
+    reset: $('[data-action="reset"]'),
+    speed: $("#speed"),
+    progress: $("#race-progress"),
+    tick: $("#tick-counter"),
+    waste: $("#waste-fill"),
+    result: $("#result-reveal"),
+    baselineTerminal: $("#terminal-baseline"),
+    marginalTerminal: $("#terminal-marginal"),
+    baselineState: $("#state-baseline"),
+    marginalState: $("#state-marginal"),
+    decision: $("#decision-live"),
+    reason: $("#decision-reason"),
+    score: $("#decision-score"),
+    gain: $("#decision-gain"),
+    currentCandidate: $("#current-candidate"),
+    stages: $$('[data-stage]'),
+    baselineLane: $('[data-lane="baseline"]'),
+    marginalLane: $('[data-lane="marginal"]'),
+  };
+
+  function metric(lane, name) {
+    return $(`[data-metric="${lane}-${name}"]`);
+  }
+
+  function setMetric(lane, cumulative) {
+    metric(lane, "calls").textContent = number.format(cumulative.calls || 0);
+    metric(lane, "tokens").textContent = number.format(cumulative.tokens || 0);
+    metric(lane, "usd").textContent = `$${money.format(cumulative.usd || 0)}`;
+    const seconds = (cumulative.latency_ms || 0) / 1000;
+    metric(lane, "latency").textContent = `${seconds.toFixed(2)}s`;
+  }
+
+  function setWorkspace(node, value) {
+    node.textContent = value;
+    node.dataset.state = value;
+  }
+
+  function appendLine(terminal, kind, text) {
+    const line = document.createElement("p");
+    line.className = `term-line ${kind}`;
+    line.textContent = text;
+    terminal.appendChild(line);
+    terminal.scrollTop = terminal.scrollHeight;
+  }
+
+  function pulse(node) {
+    if (!node) return;
+    node.classList.remove("flash");
+    void node.offsetWidth;
+    node.classList.add("flash");
+  }
+
+  function updateStages(tick) {
+    dom.stages.forEach((node, index) => {
+      const stageIndex = index + 1;
+      node.classList.toggle("active", stageIndex === tick.stage_index);
+      node.classList.toggle("done", stageIndex < tick.stage_index);
+    });
+  }
+
+  function updateWaste(tick) {
+    const base = tick.baseline.cumulative.tokens || 0;
+    const governed = tick.marginal.cumulative.tokens || 0;
+    const avoided = Math.max(0, base - governed);
+    const finalBase = data.final.baseline.tokens || 1;
+    const percent = Math.min(100, (avoided / finalBase) * 100);
+    if (window.matchMedia("(max-width: 980px)").matches) {
+      dom.waste.style.height = "100%";
+      dom.waste.style.width = `${percent}%`;
+    } else {
+      dom.waste.style.width = "100%";
+      dom.waste.style.height = `${percent}%`;
+    }
+  }
+
+  function renderDecision(tick) {
+    const decision = tick.marginal.decision;
+    dom.decision.textContent = decision;
+    dom.decision.classList.toggle("fund", tick.marginal.funded);
+    dom.decision.classList.toggle("reject", !tick.marginal.funded);
+    dom.reason.textContent = tick.marginal.reason;
+    dom.score.textContent = `score ${tick.marginal.score.toFixed(3)}`;
+    dom.gain.textContent = `gain ${tick.marginal.expected_gain.toFixed(3)}`;
+  }
+
+  function revealResult() {
+    if (dom.result.classList.contains("show")) return;
+    dom.result.classList.add("show");
+    dom.stages.forEach((node) => {
+      node.classList.remove("active");
+      node.classList.add("done");
+    });
+    appendLine(dom.baselineTerminal, "pass", "VERIFIER PASS");
+    appendLine(dom.marginalTerminal, "pass", "VERIFIER PASS");
+    dom.run.disabled = false;
+    dom.pause.disabled = true;
+  }
+
+  function advanceRace() {
+    if (state.cursor >= ticks.length - 1) {
+      state.playing = false;
+      revealResult();
+      return false;
+    }
+
+    state.cursor += 1;
+    const tick = ticks[state.cursor];
+    const position = state.cursor + 1;
+    const progress = (position / ticks.length) * 100;
+    dom.progress.style.width = `${progress}%`;
+    dom.tick.textContent = `${position}/${ticks.length}`;
+    dom.currentCandidate.textContent = `${tick.stage} · ${tick.candidate.name}`;
+    updateStages(tick);
+
+    appendLine(dom.baselineTerminal, "command", `> ${tick.candidate.name}`);
+    appendLine(dom.baselineTerminal, "execute", tick.baseline.output);
+    setMetric("baseline", tick.baseline.cumulative);
+    setWorkspace(dom.baselineState, tick.baseline.workspace);
+    pulse(dom.baselineLane);
+
+    renderDecision(tick);
+    if (tick.marginal.funded) {
+      appendLine(dom.marginalTerminal, "command", `> ${tick.candidate.name}`);
+      appendLine(dom.marginalTerminal, "fund", tick.marginal.output);
+    } else {
+      appendLine(dom.marginalTerminal, "reject", tick.candidate.name);
+      appendLine(dom.marginalTerminal, "output", tick.marginal.reason);
+    }
+    setMetric("marginal", tick.marginal.cumulative);
+    setWorkspace(dom.marginalState, tick.marginal.workspace);
+    updateWaste(tick);
+    pulse(dom.marginalLane);
+
+    if (state.cursor === ticks.length - 1) revealResult();
+    return true;
+  }
+
+  function delayForCurrentTick() {
+    const tick = ticks[Math.max(0, state.cursor)];
+    const declared = tick ? tick.candidate.latency_ms : 700;
+    const accelerated = Math.max(600, Math.min(1400, declared * 0.22));
+    return accelerated / state.speed;
+  }
+
+  function scheduleNext() {
+    window.clearTimeout(state.timer);
+    if (!state.playing) return;
+    state.timer = window.setTimeout(() => {
+      const advanced = advanceRace();
+      if (advanced && state.playing && state.cursor < ticks.length - 1) {
+        scheduleNext();
+      } else {
+        state.playing = false;
+      }
+    }, delayForCurrentTick());
+  }
+
+  function playRace() {
+    if (state.cursor >= ticks.length - 1) resetRace();
+    state.playing = true;
+    dom.run.disabled = true;
+    dom.pause.disabled = false;
+    if (state.cursor < 0) advanceRace();
+    scheduleNext();
+  }
+
+  function pauseRace() {
+    state.playing = false;
+    window.clearTimeout(state.timer);
+    dom.run.disabled = false;
+    dom.pause.disabled = true;
+  }
+
+  function resetTerminal(terminal, label) {
+    terminal.replaceChildren();
+    appendLine(terminal, "command", `$ ${label}`);
+    appendLine(terminal, "output", "initial verifier: FAIL");
+    appendLine(terminal, "output", "ready — same task, same workspace snapshot");
+  }
+
+  function resetRace() {
+    pauseRace();
+    state.cursor = -1;
+    dom.progress.style.width = "0%";
+    dom.tick.textContent = `0/${ticks.length}`;
+    dom.currentCandidate.textContent = "Ready";
+    dom.result.classList.remove("show");
+    dom.waste.style.width = "0";
+    dom.waste.style.height = "0";
+    setMetric("baseline", {});
+    setMetric("marginal", {});
+    setWorkspace(dom.baselineState, "FAIL");
+    setWorkspace(dom.marginalState, "FAIL");
+    dom.decision.textContent = "WAITING";
+    dom.decision.className = "decision";
+    dom.reason.textContent = "Press RUN. MARGINAL will score each candidate before spend.";
+    dom.score.textContent = "score —";
+    dom.gain.textContent = "gain —";
+    dom.stages.forEach((node) => node.classList.remove("active", "done"));
+    resetTerminal(dom.baselineTerminal, "agent --governor off");
+    resetTerminal(dom.marginalTerminal, "agent --governor marginal");
+    dom.run.disabled = false;
+    dom.pause.disabled = true;
+  }
+
+  dom.run?.addEventListener("click", playRace);
+  dom.pause?.addEventListener("click", pauseRace);
+  dom.step?.addEventListener("click", () => {
+    pauseRace();
+    advanceRace();
+  });
+  dom.reset?.addEventListener("click", resetRace);
+  dom.speed?.addEventListener("change", () => {
+    state.speed = Number(dom.speed.value) || 1;
+    if (state.playing) scheduleNext();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    const tag = document.activeElement?.tagName || "";
+    if (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(tag)) return;
+    if (event.code === "Space") {
+      event.preventDefault();
+      state.playing ? pauseRace() : playRace();
+    }
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      pauseRace();
+      advanceRace();
+    }
+    if (event.key.toLowerCase() === "r") resetRace();
+  });
+
+  resetRace();
+})();
+""".strip()
+        + "\n"
+    )
 
 
 def render_killer_demo_html(result: dict[str, Any]) -> str:
+    playback = build_killer_demo_playback(result)
+    playback_json = json.dumps(playback, separators=(",", ":"), ensure_ascii=False)
+    playback_json = playback_json.replace("</", "<\\/")
+    structured = {
+        "@context": "https://schema.org",
+        "@type": "SoftwareSourceCode",
+        "name": "MARGINAL Interactive Killer Demo",
+        "description": "Deterministic split-screen replay of the MARGINAL Killer Demo.",
+        "codeRepository": "https://github.com/SignalLayerLabs/Marginal",
+        "programmingLanguage": ["Python", "JavaScript"],
+    }
+    structured_json = json.dumps(structured, separators=(",", ":"))
     baseline = result["baseline"]
     marginal = result["marginal"]
     savings = result["savings"]
-    stage_cards = "".join(
-        "".join(
-            [
-                '<article class="decision-card">',
-                f'<span class="decision-stage">{html.escape(stage["stage"])}</span>',
-                f"<strong>{html.escape(stage['selected'])}</strong>",
-                f"<small>{len(stage['candidates']) - 1} higher-cost alternatives rejected</small>",
-                "</article>",
-            ]
-        )
-        for stage in result["stages"]
-    )
     page = """<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#070a0f">
+  <meta name="theme-color" content="#06080b">
   <meta name="color-scheme" content="dark">
-  <title>MARGINAL Demo 001 — Stop AI Agent No-Progress Loops</title>
-  <meta name="description" content="See how MARGINAL detects no-progress repetition, starts in Shadow Mode, and earns narrow enforcement before it can stop an AI coding agent repeat.">
-  <meta name="keywords" content="AI agent loops, coding agent governance, Codex guardrails, AI agent observability, LLM cost governance, AI agent runtime governor, Marginal">
-  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+  <title>MARGINAL Demo 002 — Run the Same AI Agent Task Side by Side</title>
+  <meta
+    name="description"
+    content="Run the same deterministic coding task with and without MARGINAL side by side."
+  >
   <link rel="canonical" href="https://signallayerlabs.github.io/Marginal/demo/">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://signallayerlabs.github.io/Marginal/demo/">
-  <meta property="og:title" content="MARGINAL Demo 001 — AI agents repeat work that changed nothing">
-  <meta property="og:description" content="Observe first. Prove waste. Earn enforcement. A visual, deterministic demonstration of the MARGINAL runtime governor.">
-  <meta property="og:image" content="https://signallayerlabs.github.io/Marginal/assets/marginal-social-card.png">
+  <meta property="og:title" content="MARGINAL Demo 002 — Same task. Two timelines.">
+  <meta
+    property="og:description"
+    content="Press run and watch MARGINAL decide before the agent spends compute."
+  >
+  <meta
+    property="og:image"
+    content="https://signallayerlabs.github.io/Marginal/assets/marginal-social-card.png"
+  >
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="MARGINAL Demo 001 — Catch no-progress agent loops">
-  <meta name="twitter:description" content="Same action. Same state. No new evidence. See how MARGINAL reasons before enforcement.">
-  <meta name="twitter:image" content="https://signallayerlabs.github.io/Marginal/assets/marginal-social-card.png">
-  <meta name="marginal-legacy-contract" content="MARGINAL Killer Demo | Same verified outcome. Far fewer tokens, lower cost, lower latency. | Token reduction | Allocation decisions | What this demo proves | Build agents that spend compute deliberately. | marginal-project-mark.png">
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"MARGINAL Demo 001 — Stop AI Agent No-Progress Loops","description":"A deterministic and visual demonstration of no-progress repetition, Shadow Mode, Earned Enforcement, and MARGINAL's compute-selection discipline.","author":{"@type":"Organization","name":"SignalLayer Labs"},"about":["AI agents","coding agents","agent governance","compute governance","no-progress repetition"],"mainEntityOfPage":"https://signallayerlabs.github.io/Marginal/demo/"}</script>
-  <style>
-    :root{--bg:#070a0f;--bg2:#0b1016;--panel:#0f151d;--panel2:#121a24;--line:#26313e;--text:#f5f8fb;--muted:#96a3b2;--lime:#91ff63;--cyan:#58e6ff;--amber:#f5c451;--red:#ff746c;--max:1240px;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sans:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-    *{box-sizing:border-box}html{scroll-behavior:smooth;background:var(--bg)}body{margin:0;min-width:320px;color:var(--text);font-family:var(--sans);background:radial-gradient(circle at 78% 8%,rgba(145,255,99,.11),transparent 28rem),radial-gradient(circle at 18% 50%,rgba(88,230,255,.05),transparent 32rem),var(--bg);line-height:1.55}a{color:inherit;text-decoration:none}button{font:inherit}.skip{position:absolute;left:-9999px}.skip:focus{left:1rem;top:1rem;z-index:99;background:#fff;color:#000;padding:.7rem 1rem}.browser-shell{width:min(calc(100% - 24px),1460px);margin:12px auto;border:1px solid #202a35;border-radius:24px;background:rgba(7,10,15,.94);box-shadow:0 40px 120px rgba(0,0,0,.45);overflow:hidden}.chrome{height:44px;display:flex;align-items:center;gap:8px;padding:0 16px;border-bottom:1px solid #1f2832;background:#11161d}.dot{width:10px;height:10px;border-radius:50%;background:#394450}.dot:first-child{background:#ff6058}.dot:nth-child(2){background:#ffbd44}.dot:nth-child(3){background:#00ca4e}.address{margin:auto;color:#7f8c9a;font:11px var(--mono)}.shell{width:min(calc(100% - 40px),var(--max));margin:auto}.nav{display:flex;align-items:center;justify-content:space-between;gap:24px;min-height:72px;border-bottom:1px solid var(--line)}.brand{display:flex;align-items:center;gap:11px;font-weight:850;letter-spacing:.08em}.mark{display:grid;place-items:center;width:36px;height:36px;border:1px solid rgba(145,255,99,.35);border-radius:10px;color:var(--lime);background:rgba(145,255,99,.06)}.navlinks{display:flex;gap:20px;color:var(--muted);font-size:13px}.navlinks a:hover{color:var(--text)}.hero{display:grid;grid-template-columns:1.02fr .98fr;gap:50px;align-items:center;padding:76px 0 54px}.eyebrow{color:var(--lime);font:800 12px var(--mono);letter-spacing:.14em;text-transform:uppercase}.hero h1{margin:.65rem 0 1.15rem;max-width:760px;font-size:clamp(48px,6.4vw,88px);line-height:.95;letter-spacing:-.055em}.hero h1 span{color:var(--lime)}.lead{max-width:720px;color:#c6d0db;font-size:clamp(18px,1.8vw,23px)}.mantra{margin:24px 0 0;color:var(--muted);font:700 13px var(--mono);letter-spacing:.02em}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 17px;border:1px solid var(--line);border-radius:10px;font-weight:780;font-size:13px}.btn.primary{border-color:var(--lime);background:var(--lime);color:#081006}.btn:hover{transform:translateY(-1px)}.pattern-card{padding:18px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(155deg,rgba(145,255,99,.045),rgba(15,21,29,.9));box-shadow:0 24px 70px rgba(0,0,0,.3)}.cardhead{display:flex;justify-content:space-between;gap:12px;margin-bottom:12px}.cardhead span{color:var(--muted);font:800 10px var(--mono);letter-spacing:.09em;text-transform:uppercase}.live{color:var(--lime)!important}.step{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px 10px;border-top:1px solid #202a34}.n{color:#61707e;font:11px var(--mono)}.step strong{display:block;font-size:13px}.step small{display:block;color:var(--muted);font-size:11px}.pill{padding:4px 7px;border:1px solid var(--line);border-radius:999px;font:800 9px var(--mono);letter-spacing:.06em}.run{color:var(--lime)}.observe{color:var(--amber)}.stop{color:var(--red);border-color:rgba(255,116,108,.32)}.pattern-note{margin:14px 4px 2px;color:#778493;font-size:11px}.section{padding:66px 0;border-top:1px solid var(--line)}.sectionhead{max-width:820px;margin-bottom:28px}.sectionhead h2{margin:.4rem 0 .8rem;font-size:clamp(30px,4vw,54px);line-height:1.02;letter-spacing:-.04em}.sectionhead p{color:var(--muted);font-size:16px}.compare{display:grid;grid-template-columns:1fr 1fr;gap:14px}.lane{padding:20px;border:1px solid var(--line);border-radius:18px;background:var(--panel)}.lane.good{border-color:rgba(145,255,99,.28);background:linear-gradient(155deg,rgba(145,255,99,.055),var(--panel))}.lane-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.lane-title strong{font-size:16px}.lane-title span{color:var(--muted);font:800 10px var(--mono)}.repeat{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-top:1px solid #202a34;font:12px var(--mono)}.repeat small{color:var(--muted)}.repeat.danger{color:#ff9a94}.repeat.warn{color:var(--amber)}.repeat.safe{color:var(--lime)}.shadow{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.statecard{padding:21px;border:1px solid var(--line);border-radius:18px;background:var(--panel)}.statecard h3{margin:7px 0 8px;font-size:23px}.statecard p{color:var(--muted);font-size:13px}.statebadge{font:800 10px var(--mono);letter-spacing:.09em;text-transform:uppercase}.statebadge.shadowmode{color:var(--amber)}.statebadge.earned{color:var(--lime)}.bigstate{display:flex;justify-content:space-between;gap:18px;margin-top:18px;padding-top:15px;border-top:1px solid var(--line)}.bigstate strong{font:850 28px var(--mono)}.bigstate small{display:block;color:var(--muted)}.pipeline{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.node{position:relative;padding:18px;border:1px solid var(--line);border-radius:15px;background:var(--panel)}.node span{color:var(--lime);font:800 10px var(--mono)}.node strong{display:block;margin-top:7px;font-size:15px}.node small{display:block;margin-top:5px;color:var(--muted);font-size:11px}.proofwrap{padding:24px;border:1px solid var(--line);border-radius:20px;background:var(--panel)}.truth{display:flex;gap:9px;align-items:flex-start;margin-bottom:20px;padding:12px 14px;border:1px solid rgba(245,196,81,.25);border-radius:12px;background:rgba(245,196,81,.05);color:#b6c0cb;font-size:12px}.truth b{color:var(--amber)}.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:9px}.metric{min-height:128px;padding:16px;border:1px solid #23303c;border-radius:14px;background:var(--bg2)}.metric span{display:block;color:var(--muted);font:800 9px var(--mono);letter-spacing:.06em;text-transform:uppercase}.metric strong{display:block;margin-top:25px;font-size:clamp(20px,2.1vw,32px);letter-spacing:-.035em}.metric strong.accent{color:var(--lime)}.decisions{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:12px}.decision-card{padding:16px;border:1px solid #23303c;border-radius:14px;background:var(--bg2)}.decision-stage{color:var(--lime);font:800 9px var(--mono);letter-spacing:.08em;text-transform:uppercase}.decision-card strong{display:block;margin:8px 0 5px;font-size:13px}.decision-card small{color:var(--muted);font-size:10px}.guardrails{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.guard{padding:17px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}.guard b{display:block;margin-bottom:6px;font-size:13px}.guard span{color:var(--muted);font-size:11px}.cta{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:center;padding:30px;border:1px solid rgba(145,255,99,.28);border-radius:20px;background:linear-gradient(120deg,rgba(145,255,99,.07),rgba(88,230,255,.03))}.cta h2{margin:0 0 7px;font-size:clamp(27px,3vw,42px);letter-spacing:-.04em}.cta p{margin:0;color:var(--muted)}.repro{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-top:12px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:#080c11}.repro code{overflow-x:auto;color:#dbe8f4;font:12px var(--mono);white-space:nowrap}.copy{border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:var(--panel);color:var(--text);cursor:pointer}.footer{display:flex;justify-content:space-between;gap:20px;padding:30px 0 34px;color:#6f7c89;font-size:11px}.footer div{display:flex;gap:16px}.legacy-contract{display:none}@media(max-width:900px){.hero,.compare,.shadow{grid-template-columns:1fr}.pipeline,.guardrails{grid-template-columns:1fr 1fr}.metrics{grid-template-columns:1fr 1fr}.metric:last-child{grid-column:1/-1}.decisions{grid-template-columns:1fr}.navlinks{display:none}}@media(max-width:560px){.browser-shell{width:100%;margin:0;border-radius:0;border-left:0;border-right:0}.chrome{display:none}.shell{width:min(calc(100% - 28px),var(--max))}.hero{padding-top:50px}.hero h1{font-size:46px}.pipeline,.guardrails,.metrics{grid-template-columns:1fr}.metric:last-child{grid-column:auto}.cta{grid-template-columns:1fr}.actions .btn,.cta .btn{width:100%}.repro{align-items:stretch;flex-direction:column}.copy{align-self:flex-start}.footer{flex-direction:column}}@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
-  </style>
+  <link rel="stylesheet" href="demo.css">
+  <script type="application/ld+json">{{STRUCTURED_DATA}}</script>
+  <script id="demo-data" type="application/json">{{PLAYBACK_DATA}}</script>
+  <script src="demo.js" defer></script>
 </head>
 <body>
-<a class="skip" href="#content">Skip to content</a>
 <div class="browser-shell">
-  <div class="chrome" aria-hidden="true"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="address">signallayerlabs.github.io/Marginal/demo/</span></div>
+  <div class="chrome" aria-hidden="true">
+    <i></i><i></i><i></i>
+    <span class="address">signallayerlabs.github.io/Marginal/demo/</span>
+  </div>
   <div class="shell">
-    <header class="nav"><a class="brand" href="../"><span class="mark">M</span><span>MARGINAL</span></a><nav class="navlinks" aria-label="Killer Demo navigation"><a href="#pattern">Pattern</a><a href="#authority">Authority</a><a href="#proof">Proof</a><a href="#reproduce">Reproduce</a><a href="https://github.com/SignalLayerLabs/Marginal">GitHub</a></nav></header>
-    <main id="content">
-      <section class="hero" id="overview">
-        <div><div class="eyebrow">MARGINAL · DEMO 001 · RUNTIME GOVERNOR</div><h1>AI agents repeat work that <span>changed nothing.</span></h1><p class="lead"><strong>MARGINAL catches it.</strong> It observes no-progress repetition first, asks whether evidence actually changed, and only earns narrow authority to stop eligible repeats after the proof is strong enough.</p><p class="mantra">Observe first. Prove waste. Earn enforcement.</p><div class="actions"><a class="btn primary" href="#pattern">Watch the pattern</a><a class="btn" href="https://github.com/SignalLayerLabs/Marginal">Star on GitHub ↗</a></div></div>
-        <div class="pattern-card" aria-label="Illustrative no-progress repetition trace"><div class="cardhead"><span>Illustrative runtime pattern</span><span class="live">● LIVE TRACE</span></div><div class="step"><span class="n">01</span><div><strong>Read README.md</strong><small>new evidence acquired</small></div><span class="pill run">RUN</span></div><div class="step"><span class="n">02</span><div><strong>Read README.md</strong><small>verification pass</small></div><span class="pill run">RUN</span></div><div class="step"><span class="n">03</span><div><strong>Read README.md</strong><small>same observable state</small></div><span class="pill observe">OBSERVE</span></div><div class="step"><span class="n">04</span><div><strong>Read README.md</strong><small>same action · same state · no new evidence</small></div><span class="pill stop">STOP CANDIDATE</span></div><p class="pattern-note">Illustrative product mechanism — not provider telemetry and not this deterministic allocation benchmark.</p></div>
+    <header class="topbar">
+      <a class="brand" href="../">
+        <span class="brand-mark">M</span>
+        <span>MARGINAL</span>
+      </a>
+      <nav class="navlinks" aria-label="Killer Demo navigation">
+        <a href="#race">Race</a>
+        <a href="#proof">Proof</a>
+        <a href="trace.jsonl">Trace</a>
+        <a href="https://github.com/SignalLayerLabs/Marginal">GitHub ↗</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <span class="eyebrow">LIVE DETERMINISTIC RACE · SAME WORKSPACE SNAPSHOT</span>
+          <h1>SAME BUG. SAME START. WATCH THE EXTRA WORK.</h1>
+          <p>
+            One lane executes every candidate. The other asks MARGINAL before the spend.
+            Same verifier. Same target. You control the clock.
+          </p>
+        </div>
+        <div class="controls" aria-label="Playback controls">
+          <button class="control primary" data-action="run">RUN THE SAME TASK</button>
+          <button class="control" data-action="pause">PAUSE</button>
+          <button class="control" data-action="step">NEXT STEP</button>
+          <button class="control" data-action="reset">RESET</button>
+          <select class="speed" id="speed" aria-label="Playback speed">
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1x</option>
+            <option value="2">2x</option>
+            <option value="4">4x</option>
+          </select>
+        </div>
       </section>
-      <section class="section" id="pattern"><div class="sectionhead"><span class="eyebrow">The problem in five seconds</span><h2>Activity is not progress.</h2><p>A repeat is not automatically waste. MARGINAL looks for the stronger pattern: the same semantic action, unchanged observable state, and no new evidence.</p></div><div class="compare"><article class="lane"><div class="lane-title"><strong>WITHOUT MARGINAL</strong><span>ACTIVITY CONTINUES</span></div><div class="repeat"><b>01 · Read README.md</b><small>RUN</small></div><div class="repeat"><b>02 · Read README.md</b><small>RUN</small></div><div class="repeat danger"><b>03 · Read README.md</b><small>RUN AGAIN</small></div><div class="repeat danger"><b>04 · Read README.md</b><small>RUN AGAIN</small></div><div class="repeat danger"><b>05 · Read README.md</b><small>RUN AGAIN</small></div></article><article class="lane good"><div class="lane-title"><strong>WITH MARGINAL</strong><span>EVIDENCE CHANGES THE DECISION</span></div><div class="repeat safe"><b>01 · New evidence</b><small>RUN</small></div><div class="repeat safe"><b>02 · Verification</b><small>RUN</small></div><div class="repeat warn"><b>03 · Same state</b><small>OBSERVE</small></div><div class="repeat danger"><b>04 · No-progress repeat</b><small>STOP CANDIDATE</small></div></article></div></section>
-      <section class="section" id="authority"><div class="sectionhead"><span class="eyebrow">Why it is different</span><h2>Installing MARGINAL does not give it permission to block your agent.</h2><p>Authority is evidence-backed and contextual. Shadow Mode can recommend a stop before MARGINAL is allowed to enforce one.</p></div><div class="shadow"><article class="statecard"><span class="statebadge shadowmode">Shadow Mode · default</span><h3>Recommendation without control.</h3><p>MARGINAL can identify a stop candidate while the actual tool action still proceeds.</p><div class="bigstate"><div><small>Recommended</small><strong style="color:var(--red)">STOP</strong></div><div><small>Actual behavior</small><strong style="color:var(--lime)">ALLOW</strong></div></div></article><article class="statecard"><span class="statebadge earned">Earned Enforcement</span><h3>Control has to be earned.</h3><p>Only compatible, reviewed evidence can promote narrow enforcement. Drift, ambiguity, unknown outcomes, or safety failures demote authority and fail open.</p><div class="bigstate"><div><small>Authority</small><strong style="color:var(--lime)">EARNED</strong></div><div><small>Scope</small><strong>NARROW</strong></div></div></article></div></section>
-      <section class="section"><div class="sectionhead"><span class="eyebrow">Decision path</span><h2>Same action. Same state. No new evidence.</h2></div><div class="pipeline"><article class="node"><span>01</span><strong>Semantic repeat?</strong><small>Is the agent effectively attempting the same action again?</small></article><article class="node"><span>02</span><strong>State unchanged?</strong><small>Did the observable workspace stay the same?</small></article><article class="node"><span>03</span><strong>No new evidence?</strong><small>Did the previous pass fail to add useful evidence?</small></article><article class="node"><span>04</span><strong>Authority earned?</strong><small>If yes, an eligible repeat can become a stop candidate.</small></article></div></section>
-      <section class="section" id="proof"><div class="sectionhead"><span class="eyebrow">Deterministic mechanism proof</span><h2>The real numbers in this artifact start here.</h2><p>This section is generated from MARGINAL's deterministic allocator. It demonstrates action-selection economics, not Codex telemetry and not a no-progress enforcement benchmark.</p></div><div class="proofwrap"><div class="truth"><b>Scope:</b><span>%%DISCLAIMER%%</span></div><div class="metrics"><article class="metric"><span>Token reduction</span><strong class="accent">%%TOKEN_SAVINGS%%%</strong></article><article class="metric"><span>Declared tokens</span><strong>%%BASELINE_TOKENS%% → %%MARGINAL_TOKENS%%</strong></article><article class="metric"><span>Actions</span><strong>%%BASELINE_CALLS%% → %%MARGINAL_CALLS%%</strong></article><article class="metric"><span>Estimated USD</span><strong>$%%BASELINE_USD%% → $%%MARGINAL_USD%%</strong></article><article class="metric"><span>Verified result</span><strong class="accent">PASS → PASS</strong></article></div><h3 style="margin:24px 0 8px">Allocation decisions</h3><div class="decisions">%%STAGE_CARDS%%</div><div style="margin-top:18px;padding-top:18px;border-top:1px solid var(--line)"><h3 style="margin:0 0 8px">What this demo proves</h3><p style="margin:0;color:var(--muted);font-size:12px">Both deterministic workflows start from the same failing defect and end at the same verifier result. MARGINAL selects the targeted diagnose, fix, and verification actions using declared cost estimates. This does not establish production savings.</p></div></div></section>
-      <section class="section"><div class="sectionhead"><span class="eyebrow">Fail-open by design</span><h2>The governor should disappear when evidence is weak.</h2></div><div class="guardrails"><article class="guard"><b>Changed state</b><span>Repeat pressure resets.</span></article><article class="guard"><b>New evidence</b><span>The next action is allowed.</span></article><article class="guard"><b>Failure or unknown</b><span>Enforcement fails open.</span></article><article class="guard"><b>User requests repeat</b><span>Explicit intent is respected.</span></article></div></section>
-      <section class="section" id="reproduce"><div class="cta"><div><h2>See the code. Break the claim. Star it if it survives.</h2><p>Open source, local first, provider neutral. The deterministic demo is reproducible with one command.</p></div><div class="actions"><a class="btn primary" href="https://github.com/SignalLayerLabs/Marginal">Star MARGINAL ↗</a></div></div><div class="repro"><code>marginal killer-demo --output killer-demo-output</code><button class="copy" type="button" data-copy="marginal killer-demo --output killer-demo-output">Copy command</button></div></section>
-      <div class="legacy-contract">MARGINAL Killer Demo · Same verified outcome. Far fewer tokens, lower cost, lower latency. · Build agents that spend compute deliberately. · marginal-project-mark.png</div>
+
+      <section class="race-wrap" id="race" aria-label="Synchronized agent execution race">
+        <div class="task-strip">
+          <div>
+            <strong>{{SCENARIO}}</strong>
+            <small>initial verifier · FAIL</small>
+          </div>
+          <div class="center">
+            <strong id="current-candidate">Ready</strong>
+            <small>accelerated deterministic playback · not provider telemetry</small>
+          </div>
+          <div>
+            <strong>Verifier: {{VERIFIER}}</strong>
+            <small>both lanes must finish PASS</small>
+          </div>
+        </div>
+        <div class="stage-rail" aria-label="Demo stages">
+          <div class="stage-node" data-stage="Diagnose">01 · DIAGNOSE</div>
+          <div class="stage-node" data-stage="Fix">02 · FIX</div>
+          <div class="stage-node" data-stage="Verify">03 · VERIFY</div>
+          <div class="progress-line"><span id="race-progress"></span></div>
+        </div>
+
+        <div class="race-grid">
+          <article class="lane baseline" data-lane="baseline">
+            <div class="lane-head">
+              <div>
+                <span class="lane-kicker">WITHOUT MARGINAL</span>
+                <h2>Execute everything.</h2>
+              </div>
+              <span class="mode-badge">NO GOVERNOR</span>
+            </div>
+            <div class="metric-row">
+              <div class="live-metric">
+                <span>CALLS</span><strong data-metric="baseline-calls">0</strong>
+              </div>
+              <div class="live-metric">
+                <span>TOKENS</span><strong data-metric="baseline-tokens">0</strong>
+              </div>
+              <div class="live-metric">
+                <span>EST. USD</span><strong data-metric="baseline-usd">$0.000</strong>
+              </div>
+              <div class="live-metric">
+                <span>DECL. TIME</span>
+                <strong data-metric="baseline-latency">0.00s</strong>
+              </div>
+            </div>
+            <div class="workspace">
+              <span>workspace state</span>
+              <strong id="state-baseline" data-state="FAIL">FAIL</strong>
+            </div>
+            <div class="gate">
+              <div class="gate-title">
+                <span>EXECUTION POLICY</span><span class="decision">EXECUTE</span>
+              </div>
+              <p>No governor. Every proposed candidate is executed before the next decision.</p>
+              <div class="gate-score"><span>final target {{BASELINE_TOKENS}} tokens</span></div>
+            </div>
+            <div class="terminal" id="terminal-baseline" aria-live="polite"></div>
+          </article>
+
+          <aside class="vs-rail" aria-label="Race gap">
+            <span class="vs">VS</span>
+            <span class="tick" id="tick-counter">0/9</span>
+            <div class="waste-meter" aria-label="Avoided declared token gap">
+              <span id="waste-fill"></span>
+            </div>
+            <span class="waste-label">AVOIDED SPEND</span>
+          </aside>
+
+          <article class="lane marginal" data-lane="marginal">
+            <div class="lane-head">
+              <div>
+                <span class="lane-kicker">WITH MARGINAL</span>
+                <h2>Decide before spend.</h2>
+              </div>
+              <span class="mode-badge">GOVERNED</span>
+            </div>
+            <div class="metric-row">
+              <div class="live-metric">
+                <span>CALLS</span><strong data-metric="marginal-calls">0</strong>
+              </div>
+              <div class="live-metric">
+                <span>TOKENS</span><strong data-metric="marginal-tokens">0</strong>
+              </div>
+              <div class="live-metric">
+                <span>EST. USD</span><strong data-metric="marginal-usd">$0.000</strong>
+              </div>
+              <div class="live-metric">
+                <span>DECL. TIME</span>
+                <strong data-metric="marginal-latency">0.00s</strong>
+              </div>
+            </div>
+            <div class="workspace">
+              <span>workspace state</span>
+              <strong id="state-marginal" data-state="FAIL">FAIL</strong>
+            </div>
+            <div class="gate">
+              <div class="gate-title">
+                <span>MARGINAL DECISION GATE</span>
+                <span class="decision" id="decision-live">WAITING</span>
+              </div>
+              <p id="decision-reason">
+                Press RUN. MARGINAL will score each candidate before spend.
+              </p>
+              <div class="gate-score">
+                <span id="decision-score">score —</span>
+                <span id="decision-gain">gain —</span>
+                <span>final target {{MARGINAL_TOKENS}} tokens</span>
+              </div>
+            </div>
+            <div class="terminal" id="terminal-marginal" aria-live="polite"></div>
+          </article>
+        </div>
+
+        <div class="result-reveal" id="result-reveal">
+          <div>
+            <span class="eyebrow">RACE COMPLETE</span>
+            <h2>Same verifier. Same PASS. Different amount of work.</h2>
+            <p>
+              This is the deterministic result of this demo fixture, not a production savings claim.
+            </p>
+          </div>
+          <div class="result-numbers">
+            <div><span>DECLARED TOKENS</span><strong>{{TOKEN_DELTA}}% fewer</strong></div>
+            <div><span>CALLS</span><strong>{{BASELINE_CALLS}} → {{MARGINAL_CALLS}}</strong></div>
+            <div><span>EST. USD</span><strong>${{BASELINE_USD}} → ${{MARGINAL_USD}}</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="below" id="proof">
+        <article class="proof-card">
+          <span class="eyebrow">WHAT THIS DEMO PROVES</span>
+          <h3>Watch the decision happen, not a screenshot of the result.</h3>
+          <ul>
+            <li>Both lanes start from the same deterministic failing workspace.</li>
+            <li>Every synchronized tick represents the same candidate on both sides.</li>
+            <li>MARGINAL either FUND + EXECUTE or REJECT BEFORE SPEND.</li>
+            <li>Both lanes finish on the same verifier PASS.</li>
+          </ul>
+          <p><strong>Allocation decisions</strong> are replayed from the generated result data.</p>
+        </article>
+        <article class="proof-card">
+          <span class="eyebrow">TRUTH BOUNDARY</span>
+          <h3>Deterministic replay. No fake telemetry.</h3>
+          <p>{{DISCLAIMER}}</p>
+          <p>
+            Playback timing is accelerated for the browser.
+            Declared costs and latency are demo inputs,
+            not live provider billing. Build agents that spend compute deliberately.
+          </p>
+          <p><code>marginal killer-demo --output killer-demo-output</code></p>
+          <p><a href="trace.jsonl">Open decision trace →</a></p>
+        </article>
+      </section>
+
+      <div class="legacy-contract" aria-hidden="true">
+        <span>MARGINAL Killer Demo</span>
+        <span>Same verified outcome. Far fewer tokens, lower cost, lower latency.</span>
+        <span>Token reduction</span>
+        <span>Allocation decisions</span>
+        <span>What this demo proves</span>
+        <span>Build agents that spend compute deliberately.</span>
+        <span>marginal-project-mark.png</span>
+        <span>{{BASELINE_TOKENS}}</span>
+        <span>{{MARGINAL_TOKENS}}</span>
+        <span>${{BASELINE_USD}}</span>
+        <span>${{MARGINAL_USD}}</span>
+        <span>REJECT BEFORE SPEND</span>
+        <span>FUND + EXECUTE</span>
+      </div>
+
+      <footer class="footer">
+        <span>© 2026 SignalLayer Labs · deterministic mechanism demonstration</span>
+        <nav>
+          <a href="result.json">Structured result</a>
+          <a href="trace.jsonl">Decision trace</a>
+          <a href="RESULTS.md">Method</a>
+        </nav>
+      </footer>
     </main>
-    <footer class="footer"><span>© 2026 SignalLayer Labs · Apache-2.0</span><div><a href="result.json">Structured result</a><a href="trace.jsonl">Decision trace</a><a href="RESULTS.md">Method</a></div></footer>
   </div>
 </div>
-<script>const b=document.querySelector('[data-copy]');if(b){b.addEventListener('click',async()=>{const c=b.getAttribute('data-copy')||'';try{await navigator.clipboard.writeText(c);const o=b.textContent;b.textContent='Copied';setTimeout(()=>b.textContent=o,1200)}catch(e){window.prompt('Copy command',c)}})}</script>
 </body>
-</html>"""
+</html>
+"""
     replacements = {
-        "%%DISCLAIMER%%": html.escape(result["disclaimer"]),
-        "%%TOKEN_SAVINGS%%": f"{savings['tokens_percent']:.2f}",
-        "%%BASELINE_TOKENS%%": f"{baseline['tokens']:,}",
-        "%%MARGINAL_TOKENS%%": f"{marginal['tokens']:,}",
-        "%%BASELINE_CALLS%%": str(baseline["calls"]),
-        "%%MARGINAL_CALLS%%": str(marginal["calls"]),
-        "%%BASELINE_USD%%": f"{baseline['usd']:.3f}",
-        "%%MARGINAL_USD%%": f"{marginal['usd']:.3f}",
-        "%%STAGE_CARDS%%": stage_cards,
+        "{{STRUCTURED_DATA}}": structured_json,
+        "{{PLAYBACK_DATA}}": playback_json,
+        "{{SCENARIO}}": html.escape(str(result["scenario"])),
+        "{{VERIFIER}}": html.escape(str(result["defect"]["verifier"])),
+        "{{DISCLAIMER}}": html.escape(str(result["disclaimer"])),
+        "{{BASELINE_TOKENS}}": f"{baseline['tokens']:,}",
+        "{{MARGINAL_TOKENS}}": f"{marginal['tokens']:,}",
+        "{{BASELINE_CALLS}}": str(baseline["calls"]),
+        "{{MARGINAL_CALLS}}": str(marginal["calls"]),
+        "{{BASELINE_USD}}": f"{baseline['usd']:.3f}",
+        "{{MARGINAL_USD}}": f"{marginal['usd']:.3f}",
+        "{{TOKEN_DELTA}}": f"{savings['tokens_percent']:.2f}",
     }
     for placeholder, value in replacements.items():
         page = page.replace(placeholder, value)
@@ -727,6 +1714,14 @@ def _write_artifacts(
     )
     (output_dir / "index.html").write_text(
         render_killer_demo_html(result),
+        encoding="utf-8",
+    )
+    (output_dir / "demo.css").write_text(
+        render_killer_demo_css(),
+        encoding="utf-8",
+    )
+    (output_dir / "demo.js").write_text(
+        render_killer_demo_js(),
         encoding="utf-8",
     )
     (output_dir / "comparison.svg").write_text(

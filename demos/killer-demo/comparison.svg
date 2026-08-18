@@ -1,14 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-label="Without MARGINAL versus MARGINAL deterministic declared token cost">
-<defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#91ff63"/><stop offset="1" stop-color="#58e6ff"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="18"/></filter></defs>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-label="Baseline versus MARGINAL deterministic token cost">
+<defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#91ff63"/><stop offset="1" stop-color="#58e6ff"/></linearGradient></defs>
 <rect width="1200" height="520" rx="34" fill="#070a0f"/>
-<circle cx="1010" cy="70" r="150" fill="#91ff63" opacity=".08" filter="url(#glow)"/>
-<text x="70" y="78" fill="#91ff63" font-family="Arial,sans-serif" font-size="18" font-weight="700" letter-spacing="3">MARGINAL DEMO 001</text>
-<text x="70" y="135" fill="#f7fbff" font-family="Arial,sans-serif" font-size="36" font-weight="700">Same verified fix. Less declared demo compute.</text>
-<text x="70" y="180" fill="#9aa7b5" font-family="Arial,sans-serif" font-size="18">Deterministic action-cost illustration — not provider telemetry.</text>
-<text x="70" y="255" fill="#f7fbff" font-family="Arial,sans-serif" font-size="18" font-weight="700">Without MARGINAL · Baseline</text>
-<rect x="330" y="230" width="760" height="40" rx="10" fill="#2a313c"/>
+<text x="70" y="78" fill="#91ff63" font-family="Arial,sans-serif" font-size="18" font-weight="700">MARGINAL DEMO 002</text>
+<text x="70" y="135" fill="#f7fbff" font-family="Arial,sans-serif" font-size="36" font-weight="700">Same task. Same PASS. Less extra work.</text>
+<text x="70" y="180" fill="#9aa7b5" font-family="Arial,sans-serif" font-size="18">Deterministic action-cost replay — not provider telemetry.</text>
+<text x="70" y="255" fill="#f7fbff" font-family="Arial,sans-serif" font-size="18" font-weight="700">Baseline · execute every candidate</text>
+<rect x="330" y="230" width="760" height="40" rx="10" fill="#343b45"/>
 <text x="1110" y="257" text-anchor="end" fill="#f7fbff" font-family="Arial,sans-serif" font-size="18">72,800</text>
-<text x="70" y="335" fill="#f7fbff" font-family="Arial,sans-serif" font-size="18" font-weight="700">With MARGINAL</text>
+<text x="70" y="335" fill="#f7fbff" font-family="Arial,sans-serif" font-size="18" font-weight="700">MARGINAL · decide before spend</text>
 <rect x="330" y="310" width="45" height="40" rx="10" fill="url(#g)"/>
 <text x="395" y="337" fill="#91ff63" font-family="Arial,sans-serif" font-size="18">4,300</text>
 <text x="70" y="430" fill="#91ff63" font-family="Arial,sans-serif" font-size="30" font-weight="700">94.09% fewer declared tokens</text>

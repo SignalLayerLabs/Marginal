@@ -49,6 +49,8 @@ jobs:
           test -f _site/sitemap.xml
           test -f _site/assets/marginal-readme-hero.png
           test -f _site/demo/RESULTS.md
+          test -f _site/demo/demo.css
+          test -f _site/demo/demo.js
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
