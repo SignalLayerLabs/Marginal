@@ -1,1 +1,1 @@
-{"builder":"scripts/build_codex_plugin.py","python_requires":">=3.10","schema_version":1,"sha256":"d0a1d30db26ee34e723b84f4daa5644b9b749623d959dfc5d031f3b76d586283","source_hash":"41e1a773eeb8df465c8a560812bc83cd20c8bfd3760ccb8062c9f8780348c538"}
+{"builder":"scripts/build_codex_plugin.py","python_requires":">=3.10","schema_version":1,"sha256":"a8b9b82006b335a0800a5a9f59ad278a171f33edc962400b06283a056662d8eb","source_hash":"064f7cc94b6a614ded12aa3585c793ce88895d36278806c7374f81fe3140dca3"}
