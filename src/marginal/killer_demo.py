@@ -1485,10 +1485,10 @@ def render_killer_demo_html(result: dict[str, Any]) -> str:
           <button class="control" data-action="step">NEXT STEP</button>
           <button class="control" data-action="reset">RESET</button>
           <select class="speed" id="speed" aria-label="Playback speed">
-            <option value="0.5">0.5×</option>
-            <option value="1" selected>1×</option>
-            <option value="2">2×</option>
-            <option value="4">4×</option>
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1x</option>
+            <option value="2">2x</option>
+            <option value="4">4x</option>
           </select>
         </div>
       </section>
