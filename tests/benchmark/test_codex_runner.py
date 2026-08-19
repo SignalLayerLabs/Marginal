@@ -212,19 +212,19 @@ def test_run_rejects_runtime_directory_inside_checkout(tmp_path: Path) -> None:
 
 
 def test_auth_material_is_never_written_to_model_patch(tmp_path: Path) -> None:
-    secret = "benchmark-secret-value-123456"
+    sentinel = "benchmark-secret-value-123456"
     config = _config(
         tmp_path,
         condition="baseline",
         extra_env={"FAKE_CODEX_LOG": str(tmp_path / "leak-log.json"), "FAKE_LEAK_AUTH": "1"},
-        auth_content=json.dumps({"tokens": {"access_token": secret}}),
+        auth_content=json.dumps({"tokens": {"access_token": sentinel}}),
     )
 
     record = run_task(config)
 
     assert record["run_status"] == "security_failed"
     assert record["error_code"] == "AUTH_MATERIAL_EXFILTRATED"
-    assert secret not in (config.run_dir / "model.patch").read_text(encoding="utf-8")
+    assert sentinel not in (config.run_dir / "model.patch").read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize(

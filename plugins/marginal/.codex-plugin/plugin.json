@@ -22,7 +22,9 @@
     "longDescription": "MARGINAL measures repeated Codex tool work locally, starts in Shadow Mode, and permits repository Tool Enforcement only after a versioned evidence gate proves coverage, reviewed false stops, and governance overhead.",
     "developerName": "SignalLayer Labs",
     "category": "Productivity",
-    "capabilities": [],
+    "capabilities": [
+      "tool_enforcement"
+    ],
     "websiteURL": "https://signallayerlabs.github.io/Marginal/",
     "privacyPolicyURL": "https://signallayerlabs.github.io/Marginal/privacy.html",
     "termsOfServiceURL": "https://signallayerlabs.github.io/Marginal/terms.html",
