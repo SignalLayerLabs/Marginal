@@ -62,6 +62,8 @@ An adapter must:
 
 An adapter must not advertise Full Compute Enforcement unless the underlying engine exposes official controls for the relevant model turns, tool calls, retry loops, and stopping behavior.
 
+The [capability glossary](docs/reference/capability-glossary.md) defines Observe, Tool Enforcement, and Full Compute Enforcement, and gives the questions a reviewer uses to pick between them.
+
 ## Estimator contributions
 
 An estimator must expose a stable name, semantic version, configuration hash, training-data fingerprint when applicable, and provenance. It must report uncertainty or explicitly state that uncertainty is unavailable. Claims of causal marginal value require an identification strategy, not only historical correlation.

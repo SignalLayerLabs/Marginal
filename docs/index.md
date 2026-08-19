@@ -30,6 +30,7 @@ MARGINAL documentation is organized by user intent instead of keeping every guid
 ## Reference
 
 - [API reference](reference/api.md)
+- [Capability glossary](reference/capability-glossary.md)
 
 ## Operations
 
