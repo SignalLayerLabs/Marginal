@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MARGINAL Research & Engineering — AI Agent Governance</title>
+<meta name="description" content="Technical notes from MARGINAL on AI coding-agent no-progress detection, runtime governance, Shadow Mode, evidence, privacy and agent integrations.">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+<link rel="canonical" href="https://signallayerlabs.github.io/Marginal/blog/">
+<link rel="alternate" type="application/atom+xml" title="MARGINAL Research & Engineering" href="https://signallayerlabs.github.io/Marginal/blog/feed.xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MARGINAL">
+<meta property="og:title" content="MARGINAL Research & Engineering">
+<meta property="og:description" content="Evidence-first engineering notes on no-progress detection and runtime governance for AI coding agents.">
+<meta property="og:url" content="https://signallayerlabs.github.io/Marginal/blog/">
+<meta property="og:image" content="https://signallayerlabs.github.io/Marginal/assets/blog/no-progress-16x9.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="MARGINAL Research & Engineering: detecting no-progress in AI coding agents">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="MARGINAL Research & Engineering">
+<meta name="twitter:description" content="Evidence-first engineering notes on no-progress detection and runtime governance for AI coding agents.">
+<meta name="twitter:image" content="https://signallayerlabs.github.io/Marginal/assets/blog/no-progress-16x9.png">
+<meta name="theme-color" content="#06080b">
+<link rel="stylesheet" href="../styles.css"><link rel="stylesheet" href="../reach.css"><link rel="stylesheet" href="../blog.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Blog","name":"MARGINAL Research & Engineering","url":"https://signallayerlabs.github.io/Marginal/blog/","description":"Technical notes on AI coding-agent no-progress detection, runtime governance, evidence, privacy and agent integrations.","publisher":{"@type":"Organization","name":"SignalLayer Labs","url":"https://github.com/SignalLayerLabs"},"blogPost":[{"@type":"BlogPosting","headline":"Detecting No-Progress in AI Agents Without Reading Prompts","url":"https://signallayerlabs.github.io/Marginal/blog/detecting-no-progress-without-reading-prompts/","datePublished":"2026-08-19T13:14:00+02:00"},{"@type":"BlogPosting","headline":"Why an AI Agent Governor Should Start Powerless","url":"https://signallayerlabs.github.io/Marginal/blog/why-ai-agent-governor-should-start-powerless/","datePublished":"2026-08-19T13:14:00+02:00"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"MARGINAL","item":"https://signallayerlabs.github.io/Marginal/"},{"@type":"ListItem","position":2,"name":"Research & Engineering","item":"https://signallayerlabs.github.io/Marginal/blog/"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header"><nav class="nav shell" aria-label="Main navigation"><a class="brand" href="../"><span class="brand-mark">M</span><span>MARGINAL</span></a><div class="nav-links" style="display:flex"><a href="../demo/">Demo</a><a href="../guides/">Guides</a><a href="./" aria-current="page">Blog</a><a class="button small" href="https://github.com/SignalLayerLabs/Marginal">Star on GitHub ↗</a></div></nav></header>
+<main id="main">
+<div class="shell breadcrumbs"><a href="../">MARGINAL</a> / Research &amp; Engineering</div>
+<section class="shell blog-hero"><p class="eyebrow">Research &amp; Engineering</p><h1>Engineering notes for<span>AI agent governance.</span></h1><p class="blog-intro">Long-form technical writing from the open-source MARGINAL project. We focus on the mechanics that can be inspected: no-progress detection, runtime evidence, privacy boundaries, false stops and the conditions under which a governor should—or should not—interfere with an agent.</p><ul class="trust-row"><li>Evidence first</li><li>Open source</li><li>Falsifiable claims</li><li>No marketing math</li></ul></section>
+<section class="section"><div class="shell"><div class="section-head"><p class="eyebrow">Latest</p><h2>Start with the failure mode, then inspect the mechanism.</h2><p>Each article separates what the runtime can observe from what it can infer, and links product claims back to public code, documentation or evidence.</p></div><div class="blog-grid">
+<article class="blog-card"><img src="../assets/blog/no-progress-16x9.png" width="1200" height="675" alt="Diagram-style cover for detecting AI agent no-progress without reading prompts"><div class="blog-card-body"><div class="blog-card-meta"><span>AI agent observability</span><time datetime="2026-08-19">Aug 19, 2026</time></div><h2><a href="detecting-no-progress-without-reading-prompts/">Detecting No-Progress in AI Agents Without Reading Prompts</a></h2><p>Why repeated tool calls are not automatically waste—and how action identity, outcomes, state and evidence can expose a stronger no-progress signal without making raw prompts required telemetry.</p><a class="text-link" href="detecting-no-progress-without-reading-prompts/">Read the technical article →</a></div></article>
+<article class="blog-card"><img src="../assets/blog/powerless-governor-16x9.png" width="1200" height="675" alt="Diagram-style cover for evidence-bound authority in AI agent governance"><div class="blog-card-body"><div class="blog-card-meta"><span>Runtime governance</span><time datetime="2026-08-19">Aug 19, 2026</time></div><h2><a href="why-ai-agent-governor-should-start-powerless/">Why an AI Agent Governor Should Start Powerless</a></h2><p>Installation is not evidence. A governor that can block useful work should observe first, earn narrow authority from local evidence, and lose that authority when its assumptions drift.</p><a class="text-link" href="why-ai-agent-governor-should-start-powerless/">Read the architecture argument →</a></div></article>
+</div><div class="editorial-note"><strong>Editorial scope.</strong> This publication describes engineering work behind MARGINAL. Product behavior is checked against the public implementation and documentation at publication time. Negative, ambiguous and unsupported outcomes are kept explicit rather than rewritten into performance claims.</div></div></section>
+<section class="section"><div class="shell"><div class="section-head"><p class="eyebrow">Explore the system</p><h2>From search intent to inspectable evidence.</h2></div><div class="related-grid"><a href="../ai-agent-no-progress/"><strong>No-progress loops</strong><span>Definition, mechanism and conservative detection boundary.</span></a><a href="../repeated-tool-calls/"><strong>Repeated tool calls</strong><span>How to separate useful verification from same-state repetition.</span></a><a href="../demo/"><strong>Interactive demo</strong><span>Watch the deterministic no-progress mechanism before installing anything.</span></a></div></div></section>
+</main>
+<footer class="footer"><div class="shell footer-grid"><span>MARGINAL · SignalLayer Labs</span><div class="footer-links"><a href="../">Home</a><a href="../guides/">Guides</a><a href="feed.xml">Atom feed</a><a href="https://github.com/SignalLayerLabs/Marginal">GitHub</a></div></div></footer>
+</body></html>
