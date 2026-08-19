@@ -19,6 +19,7 @@ Open source · Local first · Provider neutral · Zero mandatory runtime depende
 [![Release](https://img.shields.io/github/v/release/SignalLayerLabs/Marginal?style=flat-square)](https://github.com/SignalLayerLabs/Marginal/releases)
 [![Python 3.10–3.13](https://img.shields.io/badge/python-3.10--3.13-blue.svg?style=flat-square)](https://www.python.org/)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green.svg?style=flat-square)](LICENSE)
+[![Awesome AI Agent Governance](https://img.shields.io/badge/awesome-AI%20Agent%20Governance-FC60A8?style=flat-square)](https://github.com/systempromptio/awesome-ai-agent-governance)
 
 </div>
 
