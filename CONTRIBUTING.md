@@ -2,6 +2,9 @@
 
 Thank you for helping build open infrastructure for economically disciplined AI agents.
 
+New here? [First contribution in 5 minutes](docs/project/first-contribution.md) shows where a small,
+low-risk change can start and the shortest loop that validates it. The standards below still apply.
+
 ## Principles
 
 Contributions must preserve these properties:
