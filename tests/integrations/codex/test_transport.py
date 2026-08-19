@@ -30,17 +30,18 @@ def _server(
 
 
 def test_wrong_token_is_rejected_without_echoing_it(tmp_path: Path) -> None:
+    bad_credential = "wrong-secret"
     with _server(tmp_path) as server:
         response = request_session(
             server.connection,
             operation="status",
             payload={},
-            token="wrong-secret",
+            token=bad_credential,
         )
 
     assert response["ok"] is False
     assert response["error_code"] == "AUTH_FAILED"
-    assert "wrong-secret" not in str(response)
+    assert bad_credential not in str(response)
 
 
 def test_authenticated_bounded_request_round_trips(tmp_path: Path) -> None:
