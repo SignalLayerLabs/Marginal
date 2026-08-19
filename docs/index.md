@@ -42,6 +42,7 @@ MARGINAL documentation is organized by user intent instead of keeping every guid
 
 ## Project
 
+- [First contribution in 5 minutes](project/first-contribution.md)
 - [Governance](project/governance.md)
 - [Community feedback](project/community-feedback.md)
 - [Roadmap](../ROADMAP.md)
