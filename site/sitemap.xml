@@ -1,8 +1,8 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://signallayerlabs.github.io/Marginal/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
   <url><loc>https://signallayerlabs.github.io/Marginal/demo/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://signallayerlabs.github.io/Marginal/privacy.html</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
   <url><loc>https://signallayerlabs.github.io/Marginal/support.html</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
   <url><loc>https://signallayerlabs.github.io/Marginal/terms.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
-</urlset>
+<url><loc>https://signallayerlabs.github.io/Marginal/guides/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url><url><loc>https://signallayerlabs.github.io/Marginal/ai-agent-no-progress/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url><url><loc>https://signallayerlabs.github.io/Marginal/repeated-tool-calls/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url><url><loc>https://signallayerlabs.github.io/Marginal/codex/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url><url><loc>https://signallayerlabs.github.io/Marginal/claude-code/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url></urlset>

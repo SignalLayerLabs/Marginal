@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Agent No-Progress Loops — Detection & Governance</title>
+<meta name="description" content="Learn how to detect AI coding-agent no-progress loops using repeated actions, workspace state and evidence without treating every retry as waste.">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+<link rel="canonical" href="https://signallayerlabs.github.io/Marginal/ai-agent-no-progress/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MARGINAL">
+<meta property="og:title" content="AI Agent No-Progress Loops — Detection & Governance">
+<meta property="og:description" content="Learn how to detect AI coding-agent no-progress loops using repeated actions, workspace state and evidence without treating every retry as waste.">
+<meta property="og:url" content="https://signallayerlabs.github.io/Marginal/ai-agent-no-progress/">
+<meta property="og:image" content="https://signallayerlabs.github.io/Marginal/assets/marginal-social-card.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AI Agent No-Progress Loops — Detection & Governance">
+<meta name="twitter:description" content="Learn how to detect AI coding-agent no-progress loops using repeated actions, workspace state and evidence without treating every retry as waste.">
+<meta name="twitter:image" content="https://signallayerlabs.github.io/Marginal/assets/marginal-social-card.png">
+<meta name="theme-color" content="#06080b">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="../reach.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"AI Agent No-Progress Loops \u2014 Detection & Governance","description":"Learn how to detect AI coding-agent no-progress loops using repeated actions, workspace state and evidence without treating every retry as waste.","url":"https://signallayerlabs.github.io/Marginal/ai-agent-no-progress/","author":{"@type":"Organization","name":"SignalLayer Labs"},"publisher":{"@type":"Organization","name":"SignalLayer Labs"},"about":["AI coding agents","runtime governance","no-progress detection"]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"MARGINAL","item":"https://signallayerlabs.github.io/Marginal/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://signallayerlabs.github.io/Marginal/guides/"},{"@type":"ListItem","position":3,"name":"No-progress loops","item":"https://signallayerlabs.github.io/Marginal/ai-agent-no-progress/"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is a no-progress loop in an AI agent?","acceptedAnswer":{"@type":"Answer","text":"Repeated work where the semantic action succeeds but observable workspace state and useful evidence do not change."}},{"@type":"Question","name":"Does MARGINAL stop every repeated action?","acceptedAnswer":{"@type":"Answer","text":"No. Verification, failures, changed state, new evidence and ambiguous outcomes are treated conservatively. Unsupported or ambiguous cases fail open."}},{"@type":"Question","name":"Is MARGINAL just a token limiter?","acceptedAnswer":{"@type":"Answer","text":"No. Token budgets are one cost signal; MARGINAL focuses on whether another action is expected to create enough verified value to justify its cost, latency and risk."}}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header"><nav class="nav shell" aria-label="Main navigation">
+<a class="brand" href="../"><span class="brand-mark">M</span><span>MARGINAL</span></a>
+<div class="nav-links" style="display:flex">
+<a href="../demo/">Demo</a><a href="../guides/">Guides</a>
+<a class="button small" href="https://github.com/SignalLayerLabs/Marginal">Star on GitHub ↗</a>
+</div></nav></header>
+<main id="main">
+<div class="shell breadcrumbs"><a href="../">MARGINAL</a> / <a href="../guides/">Guides</a> / No-progress loops</div>
+<section class="shell reach-hero">
+<p class="eyebrow">No-progress loops</p>
+<h1>AI agents repeat work.<span>Progress is what matters.</span></h1>
+<p class="hero-lead">A practical model for detecting successful agent activity that repeats without changing observable state or producing new evidence.</p>
+<div class="hero-actions"><a class="button" href="../demo/">Watch the demo ↗</a><a class="button secondary" href="https://github.com/SignalLayerLabs/Marginal">View on GitHub ↗</a></div>
+<ul class="trust-row"><li>Open source</li><li>Local first</li><li>Shadow first</li><li>Fails open on ambiguity</li></ul>
+</section>
+
+<section class="section"><div class="shell reach-prose"><p class="eyebrow">The signal</p><h2>Activity is not progress.</h2>
+<p>A coding agent can execute a tool successfully and still learn nothing new. The useful question is not “did the call succeed?” but <strong>did observable state or useful evidence change?</strong></p>
+<div class="reach-code"><code>same semantic action
++ successful outcome
++ unchanged observable workspace state
++ no new evidence
+→ no-progress repetition candidate</code></div>
+<p>MARGINAL treats that pattern as evidence of diminishing marginal value. It does not label every retry as waste: failures, changed state, new evidence and unsupported outcomes remove or reset repetition pressure.</p>
+<h3>Why fixed token caps are not enough</h3><p>A budget cap can stop a run after a threshold, but it cannot tell whether the next verification call is useful. No-progress governance is state-aware: the decision depends on what changed, what was learned and what the runtime can actually prove.</p>
+</div></section>
+<section class="section"><div class="shell"><div class="section-head"><p class="eyebrow">Mechanism</p><h2>Observe → prove → earn.</h2></div><div class="reach-compare">
+<article><b>Observe</b><p>Collect action identity, outcomes, state and derived evidence locally. Raw prompts and source are not required as evidence fields.</p></article>
+<article><b>Prove</b><p>Look for repeated successful work with unchanged state and no new evidence. Ambiguity fails open.</p></article>
+<article><b>Earn</b><p>Only an adapter with real blocking capability and sufficient local evidence can move beyond advisory behavior.</p></article>
+</div></div></section>
+<section class="section"><div class="shell reach-callout"><h3>No universal savings claim</h3><p>MARGINAL measures governance overhead and workload outcomes. A historical exploratory smoke observed a token difference but did not establish causal savings; the project keeps that distinction explicit.</p></div></section>
+
+<section class="section"><div class="shell"><div class="section-head"><p class="eyebrow">FAQ</p><h2>Fast answers.</h2></div><div class="faq"><details><summary>What is a no-progress loop in an AI agent?</summary><p>Repeated work where the semantic action succeeds but observable workspace state and useful evidence do not change.</p></details><details><summary>Does MARGINAL stop every repeated action?</summary><p>No. Verification, failures, changed state, new evidence and ambiguous outcomes are treated conservatively. Unsupported or ambiguous cases fail open.</p></details><details><summary>Is MARGINAL just a token limiter?</summary><p>No. Token budgets are one cost signal; MARGINAL focuses on whether another action is expected to create enough verified value to justify its cost, latency and risk.</p></details></div></div></section>
+<section class="section cta"><div class="shell"><p class="eyebrow">Try it</p><h2>Observe first. Prove waste. Earn enforcement.</h2>
+<p>Install MARGINAL in Shadow Mode, inspect what your agent actually repeats, and contribute traces that make the governor harder to fool.</p>
+<div class="hero-actions" style="justify-content:center"><a class="button" href="https://github.com/SignalLayerLabs/Marginal">★ Star MARGINAL on GitHub</a><a class="button secondary" href="../guides/">Explore more guides</a></div>
+</div></section>
+</main>
+<footer class="footer"><div class="shell footer-grid"><span>MARGINAL · SignalLayer Labs</span><div class="footer-links"><a href="../">Home</a><a href="../guides/">Guides</a><a href="../privacy.html">Privacy</a><a href="https://github.com/SignalLayerLabs/Marginal">GitHub</a></div></div></footer>
+</body></html>
