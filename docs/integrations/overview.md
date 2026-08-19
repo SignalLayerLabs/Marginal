@@ -68,6 +68,9 @@ Documentation must distinguish:
 
 A prompt instruction, skill, or advisory middleware is not equivalent to enforced interception.
 
+See the [capability glossary](../reference/capability-glossary.md) for the contributor-facing
+version of these definitions, including how to choose a label for a new adapter.
+
 ## Current status
 
 The v0.3 candidate implements and validates the native Codex plugin against Codex CLI 0.147.0.
