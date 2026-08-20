@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
 import stat
 from pathlib import Path
@@ -17,6 +18,33 @@ from marginal.integrations.codex.installer import (
     autopilot_consent_configured,
     configure_autopilot_consent,
 )
+
+
+def _paused_commons_update(
+    data_root: str,
+    replace_reached: multiprocessing.synchronize.Event,
+    allow_replace: multiprocessing.synchronize.Event,
+) -> None:
+    original_rename = commons_config._rename_config_at
+
+    def paused_rename(directory_descriptor: int, temporary_name: str) -> None:
+        replace_reached.set()
+        if not allow_replace.wait(timeout=10):
+            raise TimeoutError("test did not release Commons replace")
+        original_rename(directory_descriptor, temporary_name)
+
+    commons_config._rename_config_at = paused_rename
+    configure_commons_mode(data_root, mode=CommonsMode.CONTRIBUTOR)
+
+
+def _revoke_autopilot(
+    data_root: str,
+    revoke_started: multiprocessing.synchronize.Event,
+    revoke_completed: multiprocessing.synchronize.Event,
+) -> None:
+    revoke_started.set()
+    configure_autopilot_consent(data_root, granted=False)
+    revoke_completed.set()
 
 
 def test_missing_config_defaults_to_local_only_without_creating_a_file(tmp_path: Path) -> None:
@@ -91,11 +119,11 @@ def test_failed_atomic_replace_preserves_existing_choices(
     path = tmp_path / "user-config.json"
     before = path.read_bytes()
 
-    def fail_replace(source: object, destination: object, **directory_descriptors: object) -> None:
-        del source, destination, directory_descriptors
+    def fail_replace(directory_descriptor: int, temporary_name: str) -> None:
+        del directory_descriptor, temporary_name
         raise OSError("synthetic replace failure")
 
-    monkeypatch.setattr(os, "replace", fail_replace)
+    monkeypatch.setattr(commons_config, "_rename_config_at", fail_replace)
     with pytest.raises(OSError, match="synthetic"):
         configure_commons_mode(tmp_path, mode=CommonsMode.READ_ONLY)
 
@@ -191,6 +219,88 @@ def test_atomic_update_preserves_the_old_file_when_a_partial_write_errors(
 
     assert path.read_bytes() == before
     assert not list(tmp_path.glob(".user-config-*.tmp"))
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX advisory locks are required")
+def test_commons_update_and_autopilot_revoke_are_one_serialized_transaction(
+    tmp_path: Path,
+) -> None:
+    try:
+        context = multiprocessing.get_context("fork")
+    except ValueError:
+        pytest.skip("fork multiprocessing context is unavailable")
+    configure_autopilot_consent(tmp_path, granted=True)
+    replace_reached = context.Event()
+    allow_replace = context.Event()
+    revoke_started = context.Event()
+    revoke_completed = context.Event()
+    commons_process = context.Process(
+        target=_paused_commons_update,
+        args=(str(tmp_path), replace_reached, allow_replace),
+    )
+    revoke_process = context.Process(
+        target=_revoke_autopilot,
+        args=(str(tmp_path), revoke_started, revoke_completed),
+    )
+
+    commons_process.start()
+    assert replace_reached.wait(timeout=10)
+    revoke_process.start()
+    assert revoke_started.wait(timeout=10)
+    assert not revoke_completed.wait(timeout=0.25)
+    allow_replace.set()
+    commons_process.join(timeout=10)
+    revoke_process.join(timeout=10)
+
+    assert commons_process.exitcode == 0
+    assert revoke_process.exitcode == 0
+    payload = json.loads((tmp_path / "user-config.json").read_text(encoding="utf-8"))
+    assert payload["commons_mode"] == "contributor"
+    assert payload["autopilot_consent"] is False
+    if os.name == "posix":
+        assert stat.S_IMODE((tmp_path / ".user-config.lock").stat().st_mode) == 0o600
+
+
+def test_missing_descriptor_cleanup_capability_fails_before_temp_creation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    configure_commons_mode(tmp_path, mode=CommonsMode.CONTRIBUTOR)
+    path = tmp_path / "user-config.json"
+    before = path.read_bytes()
+    partial_support = set(os.supports_dir_fd)
+    partial_support.discard(os.rename)
+    monkeypatch.setattr(commons_config.os, "supports_dir_fd", partial_support)
+
+    with pytest.raises(OSError, match="descriptor-relative replace and cleanup"):
+        configure_commons_mode(tmp_path, mode=CommonsMode.READ_ONLY)
+
+    assert path.read_bytes() == before
+    assert not list(tmp_path.glob(".user-config-*.tmp"))
+
+
+def test_cleanup_failure_does_not_replace_the_original_write_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    configure_commons_mode(tmp_path, mode=CommonsMode.CONTRIBUTOR)
+    original_write = os.write
+    writes = 0
+
+    def interrupted_write(descriptor: int, data: bytes) -> int:
+        nonlocal writes
+        writes += 1
+        if writes == 1:
+            return original_write(descriptor, data[:4])
+        raise OSError("original write failure")
+
+    def failed_cleanup(directory_descriptor: int, temporary_name: str) -> None:
+        del directory_descriptor, temporary_name
+        raise OSError("secondary cleanup failure")
+
+    monkeypatch.setattr(commons_config.os, "write", interrupted_write)
+    monkeypatch.setattr(commons_config, "_unlink_config_at", failed_cleanup)
+
+    with pytest.raises(OSError, match="original write failure"):
+        configure_commons_mode(tmp_path, mode=CommonsMode.READ_ONLY)
 
 
 def test_config_rejects_boolean_schema_versions_instead_of_treating_them_as_one(

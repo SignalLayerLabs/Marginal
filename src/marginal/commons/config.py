@@ -13,9 +13,15 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from marginal.governance_ledger import _open_parent_directory, _write_all
+from marginal.governance_ledger import (
+    _lock_exclusive,
+    _open_parent_directory,
+    _unlock,
+    _write_all,
+)
 
 _CONFIG_NAME = "user-config.json"
+_LOCK_NAME = ".user-config.lock"
 _MAX_CONFIG_BYTES = 65_536
 
 
@@ -152,7 +158,50 @@ def _open_temporary(directory_descriptor: int) -> tuple[int, str]:
     raise FileExistsError("unable to allocate a private user configuration temporary file")
 
 
+def _require_config_write_safety() -> None:
+    if os.rename not in os.supports_dir_fd or os.unlink not in os.supports_dir_fd:
+        raise OSError("descriptor-relative replace and cleanup operations are unavailable")
+
+
+def _open_config_lock(directory_descriptor: int) -> int:
+    try:
+        descriptor = os.open(
+            _LOCK_NAME,
+            os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW,
+            0o600,
+            dir_fd=directory_descriptor,
+        )
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise ValueError("user configuration lock must not be a symbolic link") from exc
+        raise
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise ValueError("user configuration lock must be a regular file")
+        if os.name == "posix" and stat.S_IMODE(metadata.st_mode) & 0o077:
+            raise ValueError("user configuration lock must have owner-only permissions")
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _rename_config_at(directory_descriptor: int, temporary_name: str) -> None:
+    os.rename(
+        temporary_name,
+        _CONFIG_NAME,
+        src_dir_fd=directory_descriptor,
+        dst_dir_fd=directory_descriptor,
+    )
+
+
+def _unlink_config_at(directory_descriptor: int, temporary_name: str) -> None:
+    os.unlink(temporary_name, dir_fd=directory_descriptor)
+
+
 def _write_user_config_at(directory_descriptor: int, payload: dict[str, Any]) -> None:
+    _require_config_write_safety()
     encoded = (
         json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
     ).encode("utf-8")
@@ -164,29 +213,32 @@ def _write_user_config_at(directory_descriptor: int, payload: dict[str, Any]) ->
         os.fsync(descriptor)
         os.close(descriptor)
         descriptor = -1
-        os.replace(
-            temporary_name,
-            _CONFIG_NAME,
-            src_dir_fd=directory_descriptor,
-            dst_dir_fd=directory_descriptor,
-        )
+        _rename_config_at(directory_descriptor, temporary_name)
         renamed = True
         os.fsync(directory_descriptor)
-    finally:
+    except BaseException:
         if descriptor >= 0:
-            os.close(descriptor)
+            with suppress(OSError):
+                os.close(descriptor)
         if not renamed:
-            with suppress(FileNotFoundError):
-                os.unlink(temporary_name, dir_fd=directory_descriptor)
+            with suppress(OSError):
+                _unlink_config_at(directory_descriptor, temporary_name)
+        raise
 
 
 def _update_user_config(data_dir: str | Path, **changes: object) -> dict[str, Any]:
     """Atomically merge reviewed choices into the one user configuration file."""
 
+    _require_config_write_safety()
     directory_descriptor = _open_config_directory(data_dir, create=True)
+    lock_descriptor = -1
+    locked = False
     try:
         if os.name == "posix":
             os.fchmod(directory_descriptor, 0o700)
+        lock_descriptor = _open_config_lock(directory_descriptor)
+        _lock_exclusive(lock_descriptor)
+        locked = True
         payload = _read_user_config_at(directory_descriptor)
         if payload is None:
             payload = {"schema_version": 1}
@@ -194,6 +246,10 @@ def _update_user_config(data_dir: str | Path, **changes: object) -> dict[str, An
         _write_user_config_at(directory_descriptor, payload)
         return payload
     finally:
+        if locked:
+            _unlock(lock_descriptor)
+        if lock_descriptor >= 0:
+            os.close(lock_descriptor)
         os.close(directory_descriptor)
 
 
