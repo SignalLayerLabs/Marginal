@@ -15,12 +15,12 @@ Every identifier below is synthetic. Repository hashes are truncated to
 
 | What you see | What it means | Next safe action |
 | --- | --- | --- |
-| `hook_state: not_observed`, `evidence_records: 0` | The plugin is installed but has never seen a session. | Run a Codex session in this repository. Nothing is wrong yet. |
+| `hook_state: not_observed`, `evidence_records: 0` | No hook event has ever arrived here. Expected on a fresh install — but identical to the plugin not being installed at all. | Run a Codex session in this repository, then look again. If it does not move, run `doctor`. |
 | `mode: shadow`, `authority.effective: L0` | Shadow Mode. MARGINAL is recording and recommending only. | Nothing. This is the correct state until enforcement is earned. |
-| `coverage_ratio` below `1.0`, `COVERAGE` in `next_promotion_blockers` | Some actions were not coverable by a hook. | Keep running sessions. Check `doctor` for `hooks_enabled: false`. |
+| `coverage_ratio` below `1.0`, `COVERAGE` in `next_promotion_blockers` | Of the decisions MARGINAL recorded, some were not covered. Says nothing about actions that never reached a hook. | Keep running sessions. Check `doctor` for `hooks_enabled: false`. |
 | `authority.eligible: L0` with a non-empty `next_promotion_blockers` | Enforcement is not earned. | Clear the named blockers. Do not configure Enforce Mode to force it. |
-| `stale_session_receipts` above `0`, or `ledger.valid: false` | Session receipts were left behind, or the governance ledger did not verify. | Read `ledger.error_codes` and `ledger.first_invalid_sequence`. |
-| `doctor` → `blocking_reasons: ["CODEX_NOT_FOUND"]` | Codex CLI was not found. | Install Codex, then re-run `doctor`. `status` numbers are meaningless until this clears. |
+| `stale_session_receipts` above `0`, or `ledger.valid: false` | Receipt files exist whose session did not answer, or the governance ledger did not verify. | Remove receipts you know are dead. For the ledger, read `ledger.error_codes` and `ledger.first_invalid_sequence`. |
+| `doctor` → `blocking_reasons: ["CODEX_NOT_FOUND"]` | Codex CLI was not found *now*. No new activity can be observed until it is. | Install Codex, then re-run `doctor`. Evidence already on disk stays valid and `status` still reports it. |
 
 ## Plugin installed, no observed evidence
 
@@ -47,6 +47,17 @@ coverage_ratio: 0.0
 A fresh install sits at `not_observed`. That is not a fault. Run a Codex
 session; if it stays `not_observed` afterwards, the hooks are not firing and
 `doctor` is where to look.
+
+What this state does **not** tell you is whether the plugin is installed.
+`not_observed` with `evidence_records: 0` is the absence of evidence, and a
+machine where the plugin was never installed prints exactly the same thing.
+`doctor` is what distinguishes them — it probes the integration rather than
+reading what the integration has already recorded.
+
+`coverage_ratio: 0.0` here is the same kind of artefact. The ratio is
+`covered_actions / coverable_actions`, and with a zero denominator it is
+reported as `0.0` rather than left undefined. It means "nothing recorded", not
+"nothing covered".
 
 Note that `capability: Tool Enforcement` appears even here. It describes what
 the Codex integration is *capable* of, not what is currently in force — that
@@ -80,8 +91,22 @@ coverage_ratio: 0.8292682926829268
 next_promotion_blockers: ["COVERAGE", "MINIMUM_REVIEWS"]
 ```
 
-`coverage_ratio` is `covered_actions / coverable_actions`. Below `1.0`, some
-actions Codex took were not seen by a hook.
+`coverage_ratio` is `covered_actions / coverable_actions`. Read what those two
+numbers are counted over: both are sums across the decision records already in
+the evidence store. Below `1.0` means *of the decisions MARGINAL recorded*,
+some were marked coverable and not covered.
+
+It is worth being exact about the limit, because the intuitive reading is
+wrong. An action that never reached a hook produces no decision record, so it
+lands in neither the numerator nor the denominator — it is invisible to this
+ratio rather than counted against it. `coverage_ratio` therefore summarizes the
+decision evidence MARGINAL observed. It is not a measure of total Codex runtime
+coverage, and it cannot tell you what it never saw. A ratio of `1.0` is
+consistent with complete coverage and equally consistent with a hook that
+stopped firing.
+
+Use it as a within-evidence quality signal, and use `doctor` for the separate
+question of whether the integration can observe activity at all.
 
 This is the concrete reason Codex is labelled Tool Enforcement rather than
 Full Compute Enforcement: specialized and hosted tool paths can fall outside
@@ -122,9 +147,23 @@ permissions: {"evidence": "not_created", "governance_ledger": "not_created"}
 
 Two different problems share this shape.
 
-`stale_session_receipts` counts sessions that started and never cleanly
-finished — usually a crashed or killed Codex process. They age out; a
-persistent non-zero count means sessions are not terminating cleanly.
+`stale_session_receipts` counts receipt files under `sessions/` whose session
+did not answer when `status` asked it. Reachability is the whole test: the
+receipt is read, and the session behind it is probed over loopback with a short
+timeout. A receipt counts as stale if the file cannot be read, if it fails its
+safety checks (a symlink, oversized, a non-loopback host, a token under 16
+bytes), or if the probe does not come back `ok`.
+
+There is **no time-based TTL**, so these do not age out on their own. A receipt
+left by a crashed or killed Codex process stays counted until the file is
+removed. A non-zero count means "these receipts point at nothing reachable
+right now" — treat it as a prompt to clear dead receipts, not as something that
+resolves by waiting.
+
+Two consequences worth knowing: a session that is merely slow to answer within
+the probe timeout is counted stale for that run, and the stale count is not
+filtered by repository — unreachable receipts from any repository on this
+machine are included, while `active_hook_sessions` counts only this one.
 
 `ledger.valid: false` is more serious. Read the two fields next to it:
 `first_invalid_sequence` names the record where verification failed, and a
@@ -157,6 +196,18 @@ degrades to what can be proven, not what is intended.
 `effective_policy.effective: false` is the field that says enforcement is not
 in force. When it is `false`, the runtime fails open: actions proceed. Nothing
 in `status` should be read as blocking while that is the case.
+
+`doctor` and `status` are answering different questions here, and this is the
+state where the difference shows. `doctor` probes the integration now: can
+MARGINAL observe new Codex activity? `CODEX_NOT_FOUND` answers no. `status`
+reads evidence already persisted on disk for this repository, which is
+unaffected — the counts, the ledger and the promotion blockers keep reporting
+what was recorded before, and they remain valid.
+
+So do not read `CODEX_NOT_FOUND` as invalidating `status`. Read it as: the
+existing record still stands, and nothing will be added to it until Codex is
+reachable again. The stale reading to guard against is treating an unchanging
+`status` as evidence of a quiet period rather than of a broken integration.
 
 ## Related
 
