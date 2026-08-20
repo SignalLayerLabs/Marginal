@@ -54,6 +54,7 @@
             "test",
             "tool",
             "verification",
+            "unknown",
             "other"
           ]
         },

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import re
 from pathlib import Path
 
 import pytest
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, ValidationError
+
+from marginal.privacy import aggregate_ledger_records
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,13 +48,29 @@ def _valid_envelope() -> dict[str, object]:
     }
 
 
-def _assert_invalid(schema_name: str, payload: object) -> None:
-    with pytest.raises(Exception):
-        Draft202012Validator(_schema(schema_name)).validate(payload)
+def _validator(schema_name: str) -> Draft202012Validator:
+    return Draft202012Validator(_schema(schema_name))
+
+
+def _assert_invalid(validator: Draft202012Validator, payload: object) -> None:
+    with pytest.raises(ValidationError):
+        validator.validate(payload)
 
 
 def test_envelope_accepts_only_closed_aggregate_atoms() -> None:
-    Draft202012Validator(_schema("commons-evidence-envelope-v1.json")).validate(_valid_envelope())
+    _validator("commons-evidence-envelope-v1.json").validate(_valid_envelope())
+
+
+def test_envelope_accepts_unknown_action_kind_from_real_aggregate_outcome() -> None:
+    rows = aggregate_ledger_records(
+        [{"event": "outcome", "outcome": {"resolved": True, "reward": 1.0}}],
+        minimum_group_size=1,
+    )
+    atom = {key: value for key, value in rows[0].items() if key not in {"schema_version", "privacy_profile"}}
+    assert atom["action_kind"] == "unknown"
+    _validator("commons-evidence-envelope-v1.json").validate(
+        {"schema_version": "1.0", "model_namespace": NAMESPACES[0], "atoms": [atom]}
+    )
 
 
 @pytest.mark.parametrize(
@@ -78,7 +97,7 @@ def test_envelope_accepts_only_closed_aggregate_atoms() -> None:
 def test_envelope_rejects_unsafe_or_out_of_contract_values(mutate: object) -> None:
     payload = _valid_envelope()
     mutate(payload)  # type: ignore[operator]
-    _assert_invalid("commons-evidence-envelope-v1.json", payload)
+    _assert_invalid(_validator("commons-evidence-envelope-v1.json"), payload)
 
 
 @pytest.mark.parametrize("key", ["a" * 31, "a" * 65, "a" * 32 + "+", "a" * 31 + "="])
@@ -86,9 +105,14 @@ def test_idempotency_key_header_is_base64url_and_bounded(key: str) -> None:
     assert IDEMPOTENCY_KEY_PATTERN.fullmatch(key) is None
 
 
+@pytest.mark.parametrize("key", ["a" * 32, "_" * 64])
+def test_idempotency_key_header_accepts_base64url_boundary_lengths(key: str) -> None:
+    assert IDEMPOTENCY_KEY_PATTERN.fullmatch(key) is not None
+
+
 def test_idempotency_key_is_not_an_envelope_property() -> None:
     _assert_invalid(
-        "commons-evidence-envelope-v1.json",
+        _validator("commons-evidence-envelope-v1.json"),
         {**_valid_envelope(), "Idempotency-Key": "a" * 32},
     )
 
@@ -115,6 +139,17 @@ def test_registry_contains_only_the_reviewed_exact_model_mapping() -> None:
     }
 
 
+def test_contract_digest_fixtures_detect_schema_and_registry_drift() -> None:
+    envelope_digest = (ROOT / "schemas" / "commons-evidence-envelope-v1.sha256").read_text().strip()
+    assert hashlib.sha256(
+        (ROOT / "schemas" / "commons-evidence-envelope-v1.json").read_bytes()
+    ).hexdigest() == envelope_digest
+    manifest = json.loads((ROOT / "schemas" / "commons-contract-v1.manifest.json").read_text())
+    for name, expected in manifest["sha256"].items():
+        base = ROOT / ("models" if name.startswith("canonical-model") else "schemas")
+        assert hashlib.sha256((base / name).read_bytes()).hexdigest() == expected
+
+
 def test_pack_rejects_noncanonical_or_open_content() -> None:
     pack = {
         "schema_version": "1.0",
@@ -127,7 +162,8 @@ def test_pack_rejects_noncanonical_or_open_content() -> None:
         },
         "integrity": {"sha256": "b" * 64},
     }
-    Draft202012Validator(_schema("commons-pack-v1.json")).validate(pack)
+    validator = _validator("commons-pack-v1.json")
+    validator.validate(pack)
     for mutation in (
         lambda value: value.update({"metadata": "customer-acme"}),
         lambda value: value.update({"source_commit": "A" * 40}),
@@ -137,4 +173,4 @@ def test_pack_rejects_noncanonical_or_open_content() -> None:
     ):
         candidate = copy.deepcopy(pack)
         mutation(candidate)
-        _assert_invalid("commons-pack-v1.json", candidate)
+        _assert_invalid(validator, candidate)
