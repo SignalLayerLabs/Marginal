@@ -35,6 +35,7 @@ MARGINAL documentation is organized by user intent instead of keeping every guid
 ## Operations
 
 - [Privacy](operations/privacy.md)
+- [Troubleshooting status and doctor](operations/troubleshooting.md)
 - [Website operations](operations/website.md)
 - [Codex plugin submission](operations/codex-plugin-submission.md)
 - [Privacy notice](../PRIVACY.md)
