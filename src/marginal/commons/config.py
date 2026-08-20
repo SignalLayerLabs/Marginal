@@ -5,12 +5,15 @@ from __future__ import annotations
 import errno
 import json
 import os
+import secrets
 import stat
-import tempfile
+from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any
+
+from marginal.governance_ledger import _open_parent_directory, _write_all
 
 _CONFIG_NAME = "user-config.json"
 _MAX_CONFIG_BYTES = 65_536
@@ -47,38 +50,47 @@ class CommonsConfig:
 
 def _absolute_path(path: str | Path) -> Path:
     supplied = Path(path)
-    return Path(os.path.abspath(os.fspath(supplied)))
-
-
-def _reject_symlink_components(path: Path) -> None:
-    current = Path(path.anchor)
-    for part in path.parts[1:]:
-        current /= part
-        try:
-            metadata = current.lstat()
-        except FileNotFoundError:
-            continue
-        if stat.S_ISLNK(metadata.st_mode):
-            raise ValueError("user configuration path must not contain a symbolic link")
+    if ".." in supplied.parts:
+        raise ValueError("user configuration path must not contain traversal components")
+    return supplied if supplied.is_absolute() else Path.cwd() / supplied
 
 
 def _config_path(data_dir: str | Path) -> Path:
     root = _absolute_path(data_dir)
-    _reject_symlink_components(root)
     return root / _CONFIG_NAME
 
 
-def _read_user_config(data_dir: str | Path) -> dict[str, Any] | None:
-    path = _config_path(data_dir)
-    if path.is_symlink():
-        raise ValueError("user configuration path must not be a symbolic link")
-    flags = os.O_RDONLY
+def _open_config_directory(data_dir: str | Path, *, create: bool) -> int:
+    try:
+        return _open_parent_directory(_config_path(data_dir), create_parents=create)
+    except ValueError as exc:
+        if "symbolic" in str(exc):
+            raise ValueError("user configuration path must not contain a symbolic link") from exc
+        raise
+    except OSError as exc:
+        if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
+            raise ValueError("user configuration path must not contain a symbolic link") from exc
+        raise
+
+
+def _read_bounded(descriptor: int) -> bytes:
+    chunks: list[bytes] = []
+    remaining = _MAX_CONFIG_BYTES + 1
+    while remaining > 0:
+        chunk = os.read(descriptor, min(64 * 1024, remaining))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
+def _read_user_config_at(directory_descriptor: int) -> dict[str, Any] | None:
+    flags = os.O_RDONLY | os.O_NOFOLLOW
     if hasattr(os, "O_BINARY"):
         flags |= os.O_BINARY
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
     try:
-        descriptor = os.open(path, flags)
+        descriptor = os.open(_CONFIG_NAME, flags, dir_fd=directory_descriptor)
     except FileNotFoundError:
         return None
     except OSError as exc:
@@ -91,7 +103,7 @@ def _read_user_config(data_dir: str | Path) -> dict[str, Any] | None:
             raise ValueError("user configuration must be a regular file")
         if os.name == "posix" and stat.S_IMODE(metadata.st_mode) & 0o077:
             raise ValueError("user configuration must have owner-only permissions")
-        raw = os.read(descriptor, _MAX_CONFIG_BYTES + 1)
+        raw = _read_bounded(descriptor)
     finally:
         os.close(descriptor)
     if len(raw) > _MAX_CONFIG_BYTES:
@@ -109,50 +121,80 @@ def _read_user_config(data_dir: str | Path) -> dict[str, Any] | None:
     return payload
 
 
-def _write_user_config(data_dir: str | Path, payload: dict[str, Any]) -> None:
-    path = _config_path(data_dir)
-    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    _reject_symlink_components(path.parent)
-    if os.name == "posix":
-        path.parent.chmod(0o700)
+def _read_user_config(data_dir: str | Path) -> dict[str, Any] | None:
+    try:
+        directory_descriptor = _open_config_directory(data_dir, create=False)
+    except FileNotFoundError:
+        return None
+    try:
+        return _read_user_config_at(directory_descriptor)
+    finally:
+        os.close(directory_descriptor)
+
+
+def _temporary_name() -> str:
+    return f".user-config-{secrets.token_hex(12)}.tmp"
+
+
+def _open_temporary(directory_descriptor: int) -> tuple[int, str]:
+    for _ in range(16):
+        name = _temporary_name()
+        try:
+            descriptor = os.open(
+                name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                0o600,
+                dir_fd=directory_descriptor,
+            )
+        except FileExistsError:
+            continue
+        return descriptor, name
+    raise FileExistsError("unable to allocate a private user configuration temporary file")
+
+
+def _write_user_config_at(directory_descriptor: int, payload: dict[str, Any]) -> None:
     encoded = (
         json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
     ).encode("utf-8")
-    descriptor, temporary_name = tempfile.mkstemp(
-        prefix=".user-config-", suffix=".tmp", dir=path.parent
-    )
-    temporary = Path(temporary_name)
+    descriptor, temporary_name = _open_temporary(directory_descriptor)
+    renamed = False
     try:
         os.fchmod(descriptor, 0o600)
-        os.write(descriptor, encoded)
+        _write_all(descriptor, encoded)
         os.fsync(descriptor)
         os.close(descriptor)
         descriptor = -1
-        if path.is_symlink():
-            raise ValueError("user configuration path must not be a symbolic link")
-        os.replace(temporary, path)
-        if os.name == "posix":
-            path.chmod(0o600)
-        directory = os.open(path.parent, os.O_RDONLY)
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
+        os.replace(
+            temporary_name,
+            _CONFIG_NAME,
+            src_dir_fd=directory_descriptor,
+            dst_dir_fd=directory_descriptor,
+        )
+        renamed = True
+        os.fsync(directory_descriptor)
     finally:
         if descriptor >= 0:
             os.close(descriptor)
-        temporary.unlink(missing_ok=True)
+        if not renamed:
+            with suppress(FileNotFoundError):
+                os.unlink(temporary_name, dir_fd=directory_descriptor)
 
 
 def _update_user_config(data_dir: str | Path, **changes: object) -> dict[str, Any]:
     """Atomically merge reviewed choices into the one user configuration file."""
 
-    payload = _read_user_config(data_dir)
-    if payload is None:
-        payload = {"schema_version": 1}
-    payload.update(changes)
-    _write_user_config(data_dir, payload)
-    return payload
+    directory_descriptor = _open_config_directory(data_dir, create=True)
+    try:
+        if os.name == "posix":
+            os.fchmod(directory_descriptor, 0o700)
+        payload = _read_user_config_at(directory_descriptor)
+        if payload is None:
+            payload = {"schema_version": 1}
+        payload.update(changes)
+        _write_user_config_at(directory_descriptor, payload)
+        return payload
+    finally:
+        os.close(directory_descriptor)
 
 
 def load_commons_config(data_dir: str | Path) -> CommonsConfig:

@@ -150,7 +150,8 @@ def test_contract_digest_fixtures_detect_schema_and_registry_drift() -> None:
         ).hexdigest()
         == envelope_digest
     )
-    manifest = json.loads((ROOT / "schemas" / "commons-contract-v1.manifest.json").read_text())
+    assert not (ROOT / "schemas" / "commons-contract-v1.manifest.json").exists()
+    manifest = json.loads((ROOT / "contracts" / "commons-contract-v1.manifest.json").read_text())
     for name, expected in manifest["sha256"].items():
         base = ROOT / ("models" if name.startswith("canonical-model") else "schemas")
         assert hashlib.sha256((base / name).read_bytes()).hexdigest() == expected

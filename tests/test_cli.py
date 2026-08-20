@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 
 from marginal.cli import main
-from marginal.integrations.codex.installer import CodexInstallation
+from marginal.commons.config import CommonsMode, configure_commons_mode
+from marginal.integrations.codex.installer import CodexInstallation, CommandResult
 
 
 def write_trace(path) -> None:
@@ -100,4 +101,24 @@ def test_install_cli_persists_only_an_explicit_closed_commons_choice(
         == 0
     )
     assert captured["commons_mode"] == "contributor"
+    assert json.loads(capsys.readouterr().out)["commons_mode"] == "contributor"
+
+
+def test_reinstall_cli_json_reports_the_effective_persisted_contributor_mode(
+    tmp_path, capsys, monkeypatch
+) -> None:
+    configure_commons_mode(tmp_path, mode=CommonsMode.CONTRIBUTOR)
+
+    class AvailableCodex:
+        def run(self, args):
+            if args == ["codex", "--version"]:
+                return CommandResult(0, "codex-cli 0.147.0\n", "")
+            if args == ["codex", "features", "list"]:
+                return CommandResult(0, "hooks stable true\nplugins stable true\n", "")
+            return CommandResult(0, "{}", "")
+
+    monkeypatch.setattr("marginal.integrations.codex.installer.SubprocessRunner", AvailableCodex)
+
+    assert main(["install", "codex", "--data-dir", str(tmp_path), "--json"]) == 0
+
     assert json.loads(capsys.readouterr().out)["commons_mode"] == "contributor"

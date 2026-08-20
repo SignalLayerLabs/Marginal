@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from marginal.commons.config import CommonsMode, load_commons_config
+from marginal.commons.config import CommonsMode, configure_commons_mode, load_commons_config
 from marginal.integrations.codex.installer import (
     CommandResult,
     autopilot_consent_configured,
@@ -124,3 +124,13 @@ def test_install_defaults_to_local_only_without_persisting_or_enabling_network(t
     assert result.commons_mode == "local_only"
     assert load_commons_config(tmp_path).mode is CommonsMode.LOCAL_ONLY
     assert not (tmp_path / "user-config.json").exists()
+
+
+def test_reinstall_without_a_mode_reports_and_preserves_persisted_contributor(tmp_path) -> None:
+    configure_commons_mode(tmp_path, mode=CommonsMode.CONTRIBUTOR)
+    before = (tmp_path / "user-config.json").read_bytes()
+
+    result = install(runner=RecordingRunner(), data_dir=tmp_path)
+
+    assert result.commons_mode == "contributor"
+    assert (tmp_path / "user-config.json").read_bytes() == before

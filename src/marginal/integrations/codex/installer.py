@@ -10,7 +10,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from marginal.commons.config import CommonsMode, _update_user_config, configure_commons_mode
+from marginal.commons.config import (
+    CommonsMode,
+    _update_user_config,
+    configure_commons_mode,
+    load_commons_config,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,9 +145,12 @@ def install(
 ) -> CodexInstallation:
     if not isinstance(autopilot_consent, bool):
         raise TypeError("autopilot_consent must be a bool")
-    selected_commons_mode = (
-        CommonsMode.LOCAL_ONLY if commons_mode is None else CommonsMode.parse(commons_mode)
-    )
+    if commons_mode is None:
+        selected_commons_mode = (
+            CommonsMode.LOCAL_ONLY if data_dir is None else load_commons_config(data_dir).mode
+        )
+    else:
+        selected_commons_mode = CommonsMode.parse(commons_mode)
     selected = runner or SubprocessRunner()
     report = inspect_codex(runner=selected)
     if report.capability_level != "tool_enforcement":
@@ -151,6 +159,7 @@ def install(
             False,
             error_code="CODEX_CAPABILITIES_UNAVAILABLE",
             message=", ".join(report.blocking_reasons),
+            commons_mode=selected_commons_mode.value,
         )
     marketplace = selected.run(
         [
@@ -170,6 +179,7 @@ def install(
             False,
             error_code="MARKETPLACE_ADD_FAILED",
             message=marketplace.stderr.strip(),
+            commons_mode=selected_commons_mode.value,
         )
     plugin = selected.run(["codex", "plugin", "add", "marginal@marginal", "--json"])
     if plugin.returncode != 0 and "already" not in plugin.stderr.casefold():
@@ -178,6 +188,7 @@ def install(
             False,
             error_code="PLUGIN_ADD_FAILED",
             message=plugin.stderr.strip(),
+            commons_mode=selected_commons_mode.value,
         )
     if autopilot_consent:
         if data_dir is None:
@@ -186,6 +197,7 @@ def install(
                 True,
                 error_code="AUTOPILOT_CONSENT_DATA_DIR_REQUIRED",
                 message="installed in Shadow Mode; Autopilot consent was not persisted",
+                commons_mode=selected_commons_mode.value,
             )
         configure_autopilot_consent(data_dir, granted=True)
     if commons_mode is not None:

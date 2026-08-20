@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import marginal.commons.config as commons_config
 from marginal.commons.config import (
     CommonsMode,
     configure_commons_mode,
@@ -90,12 +91,102 @@ def test_failed_atomic_replace_preserves_existing_choices(
     path = tmp_path / "user-config.json"
     before = path.read_bytes()
 
-    def fail_replace(source: Path, destination: Path) -> None:
-        del source, destination
+    def fail_replace(source: object, destination: object, **directory_descriptors: object) -> None:
+        del source, destination, directory_descriptors
         raise OSError("synthetic replace failure")
 
     monkeypatch.setattr(os, "replace", fail_replace)
     with pytest.raises(OSError, match="synthetic"):
+        configure_commons_mode(tmp_path, mode=CommonsMode.READ_ONLY)
+
+    assert path.read_bytes() == before
+    assert not list(tmp_path.glob(".user-config-*.tmp"))
+
+
+def test_atomic_update_holds_the_open_parent_across_a_path_swap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data_root = tmp_path / "data"
+    configure_commons_mode(data_root, mode=CommonsMode.CONTRIBUTOR)
+    displaced = tmp_path / "displaced-data"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    outside_config = outside / "user-config.json"
+    outside_config.write_text(
+        '{"commons_mode":"local_only","schema_version":1}\n', encoding="utf-8"
+    )
+    outside_config.chmod(0o600)
+    original_open = os.open
+    swapped = False
+
+    def swapping_open(
+        name: object,
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal swapped
+        if dir_fd is None:
+            descriptor = original_open(name, flags, mode)
+        else:
+            descriptor = original_open(name, flags, mode, dir_fd=dir_fd)
+        if not swapped and name == data_root.name and dir_fd is not None and flags & os.O_DIRECTORY:
+            data_root.rename(displaced)
+            data_root.symlink_to(outside, target_is_directory=True)
+            swapped = True
+        return descriptor
+
+    monkeypatch.setattr(commons_config.os, "open", swapping_open)
+
+    configure_commons_mode(data_root, mode=CommonsMode.READ_ONLY)
+
+    assert swapped is True
+    assert (
+        json.loads((displaced / "user-config.json").read_text(encoding="utf-8"))["commons_mode"]
+        == "read_only"
+    )
+    assert json.loads(outside_config.read_text(encoding="utf-8"))["commons_mode"] == "local_only"
+
+
+def test_atomic_update_retries_short_writes_until_the_config_is_complete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original_write = os.write
+    writes = 0
+
+    def short_write(descriptor: int, data: bytes) -> int:
+        nonlocal writes
+        writes += 1
+        return original_write(descriptor, data[:3])
+
+    monkeypatch.setattr(commons_config.os, "write", short_write)
+
+    configure_commons_mode(tmp_path, mode=CommonsMode.CONTRIBUTOR)
+
+    assert writes > 1
+    assert load_commons_config(tmp_path).mode is CommonsMode.CONTRIBUTOR
+
+
+def test_atomic_update_preserves_the_old_file_when_a_partial_write_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    configure_commons_mode(tmp_path, mode=CommonsMode.CONTRIBUTOR)
+    path = tmp_path / "user-config.json"
+    before = path.read_bytes()
+    original_write = os.write
+    writes = 0
+
+    def interrupted_write(descriptor: int, data: bytes) -> int:
+        nonlocal writes
+        writes += 1
+        if writes == 1:
+            return original_write(descriptor, data[:4])
+        raise OSError("synthetic interrupted write")
+
+    monkeypatch.setattr(commons_config.os, "write", interrupted_write)
+
+    with pytest.raises(OSError, match="interrupted write"):
         configure_commons_mode(tmp_path, mode=CommonsMode.READ_ONLY)
 
     assert path.read_bytes() == before
