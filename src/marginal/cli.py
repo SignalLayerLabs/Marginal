@@ -197,6 +197,7 @@ def _build_parser() -> argparse.ArgumentParser:
     privacy = subparsers.add_parser("privacy", help="inspect local persistence categories")
     privacy_commands = privacy.add_subparsers(dest="privacy_command", required=True)
     privacy_inspect = privacy_commands.add_parser("inspect", help="show persisted data categories")
+    privacy_inspect.add_argument("--data-dir", type=Path)
     privacy_inspect.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
@@ -274,7 +275,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ).to_dict()
             exit_code = 0 if payload["found"] is True else 1
         else:
-            payload = inspect_privacy().to_dict()
+            payload = inspect_privacy(data_root=data_dir).to_dict()
             exit_code = 0
         if args.as_json:
             print(json.dumps(payload, sort_keys=True))

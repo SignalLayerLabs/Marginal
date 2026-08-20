@@ -8,6 +8,7 @@ import os
 import secrets
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from contextlib import suppress
@@ -16,6 +17,13 @@ from pathlib import Path
 from typing import Any
 
 from marginal import BudgetLimits, Treasury
+from marginal.commons.cache import CommonsCache, CommonsPrior
+from marginal.commons.client import CommonsClient, CommonsClientProtocol
+from marginal.commons.config import CommonsConfig, CommonsMode, load_commons_config
+from marginal.commons.evidence import compile_verified_evidence
+from marginal.commons.identity import CanonicalModelIdentity, resolve_canonical_model
+from marginal.commons.outbox import CommonsOutbox
+from marginal.commons.sync import CommonsSyncResult, synchronize_commons
 from marginal.protocol import AgentCapabilities
 from marginal.reason_codes import ReasonCode
 from marginal.runtime import UniversalRuntime
@@ -37,6 +45,20 @@ from .runtime import CodexSessionRuntime
 from .transport import ConnectionInfo, SessionServer, connection_filename, request_session
 
 _SERVERS: dict[tuple[Path, str], tuple[SessionServer, CodexSessionRuntime]] = {}
+_COMMONS_PACK_ORIGIN = "https://marginal-commons.pages.dev"
+_COMMONS_INGRESS_ORIGIN = "https://marginal-ingress.signallayerlabs.workers.dev"
+_COMMONS_SOURCE_COMMIT = "7347a1b4024329780139d17494430f2ccac94fec"
+
+
+@dataclass(slots=True)
+class _CommonsSession:
+    config: CommonsConfig
+    identity: CanonicalModelIdentity | None = None
+    cache: CommonsCache | None = None
+    outbox: CommonsOutbox | None = None
+    client: CommonsClientProtocol | None = None
+    priors: tuple[CommonsPrior, ...] = ()
+    attribution_valid: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +66,168 @@ class HookResult:
     exit_code: int
     output: dict[str, Any] | None = None
     warning_code: str = ""
+
+
+def _commons_client() -> CommonsClientProtocol:
+    return CommonsClient(
+        pack_origin=_COMMONS_PACK_ORIGIN,
+        ingress_origin=_COMMONS_INGRESS_ORIGIN,
+    )
+
+
+def _commons_status_path(data_root: Path) -> Path:
+    return data_root / "commons" / "status.json"
+
+
+def _safe_queue_count(outbox: CommonsOutbox | None) -> int:
+    if outbox is None:
+        return 0
+    try:
+        return len(outbox.pending(limit=100).entries)
+    except Exception:
+        return 0
+
+
+def _write_commons_status(
+    data_root: Path,
+    commons: _CommonsSession,
+    result: CommonsSyncResult | None,
+) -> None:
+    path = _commons_status_path(data_root)
+    payload = {
+        "schema_version": "1.0",
+        "mode": commons.config.mode.value,
+        "endpoint": _COMMONS_INGRESS_ORIGIN,
+        "model_namespace": commons.identity.namespace if commons.identity is not None else None,
+        "sharing_allowed": (
+            commons.config.mode is CommonsMode.CONTRIBUTOR and commons.identity is not None
+        ),
+        "safe_queue_count": _safe_queue_count(commons.outbox),
+        "last_sync_status": (
+            "not_attempted"
+            if result is None
+            else "ok"
+            if not result.failures
+            else "+".join(failure.value for failure in result.failures)
+        ),
+        "cache_revision": commons.cache.revision if commons.cache is not None else None,
+    }
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if os.name == "posix":
+        path.parent.chmod(0o700)
+    encoded = (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    descriptor, name = tempfile.mkstemp(prefix=".status-", suffix=".tmp", dir=path.parent)
+    temporary = Path(name)
+    try:
+        os.fchmod(descriptor, 0o600)
+        os.write(descriptor, encoded)
+        os.fsync(descriptor)
+        os.close(descriptor)
+        descriptor = -1
+        os.replace(temporary, path)
+        if os.name == "posix":
+            path.chmod(0o600)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        temporary.unlink(missing_ok=True)
+
+
+def _start_commons(data_root: Path, *, model: str) -> _CommonsSession:
+    try:
+        config = load_commons_config(data_root)
+    except Exception:
+        config = CommonsConfig()
+    identity = resolve_canonical_model(provider="openai", model=model)
+    commons = _CommonsSession(config=config, identity=identity)
+    if config.mode is CommonsMode.LOCAL_ONLY or identity is None:
+        with suppress(Exception):
+            _write_commons_status(data_root, commons, None)
+        return commons
+    try:
+        commons.cache = CommonsCache(
+            data_root,
+            model_namespace=identity.namespace,
+            expected_source_commit=_COMMONS_SOURCE_COMMIT,
+        )
+        commons.outbox = CommonsOutbox(data_root)
+        commons.client = _commons_client()
+        result = synchronize_commons(
+            config,
+            cache=commons.cache,
+            outbox=commons.outbox,
+            client=commons.client,
+        )
+        commons.priors = commons.cache.load_prior()
+        _write_commons_status(data_root, commons, result)
+    except Exception:
+        with suppress(Exception):
+            _write_commons_status(data_root, commons, None)
+    return commons
+
+
+def _finalize_local_session(
+    runtime: CodexSessionRuntime,
+    evidence_store: EvidenceStore,
+    *,
+    session_hash: str,
+) -> bool:
+    runtime.close()
+    report = evidence_store.verified_governance_root()
+    try:
+        checkpoint = evidence_store.read_checkpoint()
+    except (OSError, ValueError, json.JSONDecodeError):
+        checkpoint = None
+    if (
+        report.valid
+        and checkpoint is not None
+        and checkpoint.get("event") == "session_finalized"
+        and checkpoint.get("session_hash") == session_hash
+        and checkpoint.get("ledger_root") == report.root_hash
+        and checkpoint.get("ledger_records") == report.records
+    ):
+        return False
+    evidence_store.append(
+        {"schema_version": 1, "event": "session_end", "session_hash": session_hash}
+    )
+    finalized = evidence_store.verified_governance_root()
+    if not finalized.valid:
+        return False
+    evidence_store.write_checkpoint(
+        {
+            "schema_version": 1,
+            "event": "session_finalized",
+            "session_hash": session_hash,
+            "ledger_root": finalized.root_hash,
+            "ledger_records": finalized.records,
+        }
+    )
+    return True
+
+
+def _end_commons(
+    data_root: Path,
+    commons: _CommonsSession,
+    evidence_store: EvidenceStore,
+) -> None:
+    if (
+        commons.config.mode is not CommonsMode.CONTRIBUTOR
+        or commons.identity is None
+        or not commons.attribution_valid
+        or commons.cache is None
+        or commons.outbox is None
+        or commons.client is None
+    ):
+        return
+    evidence = compile_verified_evidence(evidence_store, model_identity=commons.identity)
+    result = synchronize_commons(
+        commons.config,
+        cache=commons.cache,
+        outbox=commons.outbox,
+        client=commons.client,
+        evidence=evidence,
+    )
+    _write_commons_status(data_root, commons, result)
 
 
 def _connection_path(data_root: Path, session_id: str) -> Path:
@@ -57,6 +241,7 @@ def _handler(
     session_hash: str,
     data_root: Path,
     identity: PromotionIdentity,
+    commons: _CommonsSession,
     shutdown_event: threading.Event | None = None,
 ) -> Any:
     def handle(operation: str, payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -64,20 +249,21 @@ def _handler(
             return {
                 **runtime.summary(),
                 "repository_hash": identity.repository_hash,
+                "commons_prior_count": len(commons.priors),
             }
         if operation == "close":
-            runtime.close()
-            evidence_store.append(
-                {
-                    "schema_version": 1,
-                    "event": "session_end",
-                    "session_hash": session_hash,
-                }
-            )
+            finalized = _finalize_local_session(runtime, evidence_store, session_hash=session_hash)
+            if finalized:
+                with suppress(Exception):
+                    _end_commons(data_root, commons, evidence_store)
             if shutdown_event is not None:
                 threading.Timer(0.05, shutdown_event.set).start()
             return runtime.summary()
         event = parse_hook_event(payload)
+        if getattr(event, "model", None) != (
+            commons.identity.model if commons.identity is not None else None
+        ):
+            commons.attribution_valid = False
         if operation == "prompt" and isinstance(event, UserPromptSubmitEvent):
             runtime.user_prompt_submit(event)
             return None
@@ -93,6 +279,17 @@ def _handler(
                     "event": "decision",
                     "session_hash": session_hash,
                     **action_evidence,
+                    **(
+                        {
+                            "model_namespace": commons.identity.namespace,
+                            "cost_bucket": "unknown",
+                            "gain_bucket": "unknown",
+                            "recommendation": "allow" if decision.allowed else "deny",
+                            "applied_decision": "allow" if decision.allowed else "deny",
+                        }
+                        if commons.identity is not None and commons.attribution_valid
+                        else {}
+                    ),
                     "reason_code": decision.reason_code,
                     "latency_ms": latency_ms,
                     "covered": decision.reason_code != ReasonCode.CONTROL_PLANE_BYPASS.value,
@@ -120,6 +317,11 @@ def _handler(
                     "event": "outcome",
                     "session_hash": session_hash,
                     **action_evidence,
+                    **(
+                        {"model_namespace": commons.identity.namespace}
+                        if commons.identity is not None and commons.attribution_valid
+                        else {}
+                    ),
                     "outcome": outcome.value,
                     "pending": False,
                 }
@@ -276,6 +478,7 @@ def _serve_bootstrap(path: Path) -> int:
     evidence_store.append(
         {"schema_version": 1, "event": "session_start", "session_hash": session_hash}
     )
+    commons = _start_commons(data_root, model=event.model)
     treasury = Treasury(BudgetLimits(), mode="shadow")
     universal = UniversalRuntime(
         treasury,
@@ -313,6 +516,7 @@ def _serve_bootstrap(path: Path) -> int:
             session_hash=session_hash,
             data_root=data_root,
             identity=identity,
+            commons=commons,
             shutdown_event=shutdown_event,
         ),
     )
@@ -345,6 +549,7 @@ def start_session_service(
     evidence_store.append(
         {"schema_version": 1, "event": "session_start", "session_hash": session_hash}
     )
+    commons = _start_commons(root, model=event.model)
     treasury = Treasury(BudgetLimits(), mode="shadow")
     universal = UniversalRuntime(
         treasury,
@@ -381,6 +586,7 @@ def start_session_service(
             session_hash=session_hash,
             data_root=root,
             identity=identity,
+            commons=commons,
         ),
     )
     connection = server.start()

@@ -9,6 +9,9 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from .commons.config import CommonsMode, load_commons_config
+from .commons.identity import is_canonical_namespace
+from .commons.sync import SyncFailure
 from .governance_ledger import GovernanceLedger
 from .integrations.codex.evidence import (
     EvidenceStore,
@@ -23,7 +26,7 @@ from .integrations.codex.promotion import (
     evaluate_promotion,
     read_promotion_receipt,
 )
-from .integrations.codex.service import read_mode
+from .integrations.codex.service import _COMMONS_INGRESS_ORIGIN, read_mode
 
 _PERSISTED_CATEGORIES = (
     "derived_enums",
@@ -92,11 +95,24 @@ class DecisionExplanationReport:
 class PrivacyInspectionReport:
     """The local persistence contract, without inspecting user content."""
 
+    commons: dict[str, object] | None = None
+
     def to_dict(self) -> dict[str, object]:
+        commons = self.commons or {
+            "mode": CommonsMode.LOCAL_ONLY.value,
+            "endpoint": _COMMONS_INGRESS_ORIGIN,
+            "model_namespace": None,
+            "sharing_allowed": False,
+            "safe_queue_count": 0,
+            "last_sync_status": "not_attempted",
+            "cache_revision": None,
+            "schema_version": "1.0",
+        }
         return {
             "persisted_categories": list(_PERSISTED_CATEGORIES),
             "never_persisted": list(_NEVER_PERSISTED),
-            "local_only": True,
+            "local_only": commons["mode"] == CommonsMode.LOCAL_ONLY.value,
+            "commons": dict(commons),
             "dictionary_attack_limit": (
                 "Derived hashes can reveal low-entropy inputs to a party with local ledger access."
             ),
@@ -291,8 +307,54 @@ def decision_explanation(
     return DecisionExplanationReport(decision_id, False, "DECISION_NOT_FOUND")
 
 
-def inspect_privacy() -> PrivacyInspectionReport:
-    return PrivacyInspectionReport()
+def inspect_privacy(*, data_root: str | Path | None = None) -> PrivacyInspectionReport:
+    if data_root is None:
+        return PrivacyInspectionReport()
+    root = Path(data_root).resolve()
+    try:
+        configured_mode = load_commons_config(root).mode
+    except Exception:
+        configured_mode = CommonsMode.LOCAL_ONLY
+    try:
+        raw = json.loads((root / "commons" / "status.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        raw = {}
+    if not isinstance(raw, dict):
+        raw = {}
+    try:
+        mode = CommonsMode.parse(raw.get("mode", configured_mode.value))
+    except (TypeError, ValueError):
+        mode = configured_mode
+    namespace = raw.get("model_namespace")
+    if not is_canonical_namespace(namespace):
+        namespace = None
+    queue_count = raw.get("safe_queue_count")
+    if (
+        isinstance(queue_count, bool)
+        or not isinstance(queue_count, int)
+        or not 0 <= queue_count <= 100
+    ):
+        queue_count = 0
+    revision = raw.get("cache_revision")
+    if isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
+        revision = None
+    sync_status = raw.get("last_sync_status")
+    allowed_statuses = {"not_attempted", "ok"} | {failure.value for failure in SyncFailure}
+    if not isinstance(sync_status, str) or any(
+        part not in allowed_statuses for part in sync_status.split("+")
+    ):
+        sync_status = "not_attempted"
+    commons = {
+        "mode": mode.value,
+        "endpoint": _COMMONS_INGRESS_ORIGIN,
+        "model_namespace": namespace,
+        "sharing_allowed": mode is CommonsMode.CONTRIBUTOR and namespace is not None,
+        "safe_queue_count": queue_count,
+        "last_sync_status": sync_status,
+        "cache_revision": revision,
+        "schema_version": "1.0",
+    }
+    return PrivacyInspectionReport(commons)
 
 
 def render_human(payload: dict[str, object]) -> str:

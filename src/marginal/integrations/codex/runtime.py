@@ -284,11 +284,21 @@ class CodexSessionRuntime:
 
     @staticmethod
     def _safe_action_evidence(action: AgentAction) -> dict[str, str]:
+        action_kinds = {
+            "edit": "file_write",
+            "shell": "command",
+            "verification": "verification",
+        }
+        tool_name = str(action.metadata.get("tool_name", "")).casefold()
+        action_kind = action_kinds.get(action.kind, "tool")
+        if tool_name in {"read", "read_file"}:
+            action_kind = "file_read"
         return {
             "action_hash": hashlib.sha256(action.action_id.encode("utf-8")).hexdigest(),
             "semantic_key": str(action.metadata.get("semantic_key", "")),
             "state_hash": action.state_hash,
             "evidence_hash": str(action.metadata.get("evidence_hash", "")),
+            "action_kind": action_kind,
         }
 
     @staticmethod

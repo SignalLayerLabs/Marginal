@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from marginal.diagnostics import (
@@ -96,6 +97,45 @@ def test_privacy_inspection_lists_persisted_categories_and_exclusions() -> None:
     ]
     assert "prompt" in payload["never_persisted"]
     assert "credentials" in payload["never_persisted"]
+
+
+def test_privacy_inspection_reports_only_safe_commons_operational_state(tmp_path: Path) -> None:
+    status = tmp_path / "commons" / "status.json"
+    status.parent.mkdir(parents=True)
+    status.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "mode": "contributor",
+                "endpoint": "https://marginal-ingress.signallayerlabs.workers.dev",
+                "model_namespace": "openai/gpt-5.6-sol",
+                "sharing_allowed": True,
+                "safe_queue_count": 2,
+                "last_sync_status": "submit_transport",
+                "cache_revision": 7,
+                "repository_hash": "must-not-escape",
+                "remote_identity": "must-not-escape",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    payload = inspect_privacy(data_root=tmp_path).to_dict()
+
+    assert payload["commons"] == {
+        "mode": "contributor",
+        "endpoint": "https://marginal-ingress.signallayerlabs.workers.dev",
+        "model_namespace": "openai/gpt-5.6-sol",
+        "sharing_allowed": True,
+        "safe_queue_count": 2,
+        "last_sync_status": "submit_transport",
+        "cache_revision": 7,
+        "schema_version": "1.0",
+    }
+    serialized = json.dumps(payload)
+    assert "must-not-escape" not in serialized
+    assert "remote_identity" not in serialized
+    assert "repository_hash" not in serialized
 
 
 def test_status_reports_unvalidated_enforcement_as_configured_but_not_effective(
