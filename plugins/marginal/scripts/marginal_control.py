@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import sys
+from contextlib import suppress
 from pathlib import Path
 
 from runtime_python import compatible_python
@@ -47,6 +48,8 @@ def main(argv: list[str] | None = None) -> int:
 
     data = _plugin_data()
     data.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with suppress(OSError):
+        data.chmod(0o700)
     environment = {
         name: value
         for name in ("PATH", "CODEX_HOME", "LANG", "LC_ALL", "SYSTEMROOT")

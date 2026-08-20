@@ -63,7 +63,7 @@ def _initialize_repository(path: Path, environment: dict[str, str]) -> None:
     _run(["git", "commit", "-qm", "initial"], environment=environment, cwd=path)
 
 
-def _hook_payloads(workspace: Path, secret: str) -> list[dict[str, Any]]:
+def _hook_payloads(workspace: Path, sentinel: str) -> list[dict[str, Any]]:
     common: dict[str, Any] = {
         "session_id": "smoke-session",
         "transcript_path": None,
@@ -76,7 +76,7 @@ def _hook_payloads(workspace: Path, secret: str) -> list[dict[str, Any]]:
         "turn_id": "smoke-turn",
         "tool_name": "Bash",
         "tool_use_id": "smoke-call",
-        "tool_input": {"command": f"echo {secret}", "description": secret},
+        "tool_input": {"command": f"echo {sentinel}", "description": sentinel},
     }
     return [
         {**common, "hook_event_name": "SessionStart", "source": "startup"},
@@ -86,11 +86,11 @@ def _hook_payloads(workspace: Path, secret: str) -> list[dict[str, Any]]:
     ]
 
 
-def _count_secret(root: Path, secret: str) -> int:
+def _count_secret(root: Path, sentinel: str) -> int:
     occurrences = 0
     if not root.exists():
         return 0
-    marker = secret.encode("utf-8")
+    marker = sentinel.encode("utf-8")
     for path in root.rglob("*"):
         if path.is_file():
             occurrences += path.read_bytes().count(marker)
@@ -154,14 +154,14 @@ def smoke_plugin(
         "PLUGIN_DATA": str(plugin_data),
     }
 
-    secret = "MARGINAL_SMOKE_SECRET_7fcd98"
+    sentinel = "MARGINAL_SMOKE_SECRET_7fcd98"
     completed_hooks = 0
     shadow_blocks = 0
     native_control_observed = False
     native_control_mode = "unknown"
     removed = False
     try:
-        for payload in _hook_payloads(workspace, secret):
+        for payload in _hook_payloads(workspace, sentinel):
             result = _run(
                 ["python3", str(hook_script)],
                 environment=hook_environment,
@@ -222,7 +222,7 @@ def smoke_plugin(
         native_control_observed=native_control_observed,
         native_control_mode=native_control_mode,
         launcher_python_version=launcher_python_version,
-        raw_secret_occurrences=_count_secret(plugin_data, secret),
+        raw_secret_occurrences=_count_secret(plugin_data, sentinel),
         removed=removed,
         codex_version=version,
     )

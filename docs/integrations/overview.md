@@ -68,6 +68,9 @@ Documentation must distinguish:
 
 A prompt instruction, skill, or advisory middleware is not equivalent to enforced interception.
 
+See the [capability glossary](../reference/capability-glossary.md) for the contributor-facing
+version of these definitions, including how to choose a label for a new adapter.
+
 ## Current status
 
 The v0.3 candidate implements and validates the native Codex plugin against Codex CLI 0.147.0.
@@ -75,6 +78,27 @@ It provides lifecycle correlation, privacy-safe normalization, outcome classific
 authenticated local service, Shadow Mode, Earned Enforcement receipts, and reversible native
 installation. See [Codex plugin](codex.md).
 
-OpenCode, Claude Code, and GitHub Copilot remain roadmap work. Codex is labeled Tool Enforcement,
+The Claude Code plugin is labeled **Observe**. It records normalized evidence and repeated-work
+recommendations in a local Decision Ledger, declares no control capability, and never blocks a tool
+call. Its outcome evidence is engine-declared, because Claude Code reports success and failure as
+separate hook events. See [Claude Code plugin](claude-code.md).
+
+The OpenCode plugin is labeled **Observe**. It runs inside the engine process and speaks to one bridge
+child process over pipes. Its outcome evidence is weaker than Claude Code's: the shell tool reports an
+exit code, most other tools prove nothing, and those outcomes stay `unknown`. See
+[OpenCode plugin](opencode.md).
+
+PrivacyCode is an **Observe** install target for the same OpenCode adapter because its validated plugin
+surface is currently compatible. It keeps a distinct engine label, configuration path, ledger root, and
+evidence history. Target compatibility does not transfer Earned Enforcement authority: trust remains
+engine-specific. If the plugin/event contract diverges, PrivacyCode becomes a separate adapter rather
+than accumulating target-specific governance semantics.
+
+GitHub Copilot remains roadmap work. Codex is labeled Tool Enforcement,
 not Full Compute Enforcement, because specialized and hosted tool paths can fall outside local
 hook coverage.
+
+Engine-independent parts of a hook integration live in `marginal.integrations.hookkit`: normalized
+events, action normalization, structured outcome classification, workspace state evidence, and
+session correlation. The Codex integration predates that module and still carries its own copies;
+migrating it is separate work so a new adapter never destabilizes the validated Codex path.

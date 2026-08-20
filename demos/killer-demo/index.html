@@ -2,1652 +2,257 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#050814">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#06080b">
   <meta name="color-scheme" content="dark">
-  <title>MARGINAL Killer Demo</title>
-  <meta name="description"
-    content="A deterministic comparison between a baseline workflow and MARGINAL-funded execution.">
-  <meta property="og:title" content="MARGINAL Killer Demo">
-  <meta property="og:description"
-    content="Same verified outcome. Far fewer tokens, lower cost, lower latency.">
+  <title>MARGINAL Demo 002 — Run the Same AI Agent Task Side by Side</title>
+  <meta
+    name="description"
+    content="Run the same deterministic coding task with and without MARGINAL side by side."
+  >
+  <link rel="canonical" href="https://signallayerlabs.github.io/Marginal/demo/">
   <meta property="og:type" content="website">
-  <style>
-    :root {
-      --canvas: #02040a;
-      --bg: #050814;
-      --bg-elevated: rgba(10, 16, 31, 0.82);
-      --panel: rgba(11, 19, 36, 0.82);
-      --panel-strong: rgba(13, 22, 42, 0.95);
-      --line: rgba(148, 163, 184, 0.16);
-      --line-strong: rgba(148, 163, 184, 0.26);
-      --text: #f8fafc;
-      --text-soft: #d8e1ef;
-      --muted: #8fa1b9;
-      --blue: #2f6df6;
-      --cyan: #22d3ee;
-      --purple: #7c3aed;
-      --green: #34d399;
-      --green-soft: rgba(52, 211, 153, 0.12);
-      --red: #fb7185;
-      --red-soft: rgba(251, 113, 133, 0.11);
-      --amber: #fbbf24;
-      --radius-xl: 28px;
-      --radius-lg: 22px;
-      --radius-md: 16px;
-      --shadow: 0 32px 100px rgba(0, 0, 0, 0.48);
-      --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
-        "Inter", "Segoe UI", sans-serif;
-      --mono: "SFMono-Regular", "Cascadia Code", "Roboto Mono", Consolas, monospace;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html {
-      scroll-behavior: smooth;
-      background: var(--canvas);
-    }
-
-    body {
-      margin: 0;
-      min-width: 320px;
-      color: var(--text);
-      background:
-        radial-gradient(circle at 82% 8%, rgba(124, 58, 237, 0.23), transparent 28rem),
-        radial-gradient(circle at 12% 70%, rgba(47, 109, 246, 0.14), transparent 30rem),
-        linear-gradient(180deg, #010207 0%, #050814 52%, #071226 100%);
-      font-family: var(--font);
-      font-size: 16px;
-      line-height: 1.5;
-      -webkit-font-smoothing: antialiased;
-      text-rendering: optimizeLegibility;
-    }
-
-    a {
-      color: inherit;
-      text-decoration: none;
-    }
-
-    button,
-    a {
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    button {
-      font: inherit;
-    }
-
-    .skip-link {
-      position: fixed;
-      top: 12px;
-      left: 12px;
-      z-index: 100;
-      padding: 10px 14px;
-      border-radius: 10px;
-      color: #020617;
-      background: #f8fafc;
-      transform: translateY(-160%);
-    }
-
-    .skip-link:focus {
-      transform: translateY(0);
-    }
-
-    .page-wrap {
-      width: min(1520px, calc(100% - 28px));
-      margin: 14px auto;
-      padding-bottom: 14px;
-    }
-
-    .browser-shell {
-      position: relative;
-      overflow: hidden;
-      border: 1px solid rgba(148, 163, 184, 0.28);
-      border-radius: 24px;
-      background: rgba(4, 8, 18, 0.93);
-      box-shadow: var(--shadow);
-      isolation: isolate;
-    }
-
-    .browser-shell::before {
-      position: absolute;
-      inset: 0;
-      z-index: -2;
-      content: "";
-      background:
-        linear-gradient(rgba(148, 163, 184, 0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(148, 163, 184, 0.025) 1px, transparent 1px);
-      background-size: 42px 42px;
-      mask-image: linear-gradient(to bottom, black, transparent 78%);
-    }
-
-    .browser-chrome {
-      display: grid;
-      grid-template-columns: 110px minmax(220px, 620px) 110px;
-      align-items: center;
-      justify-content: space-between;
-      min-height: 50px;
-      padding: 8px 18px;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-      background: linear-gradient(180deg, rgba(35, 35, 35, 0.96), rgba(20, 20, 21, 0.94));
-    }
-
-    .traffic-lights {
-      display: flex;
-      gap: 8px;
-    }
-
-    .traffic-lights span {
-      width: 12px;
-      height: 12px;
-      border-radius: 999px;
-      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
-    }
-
-    .traffic-lights span:nth-child(1) { background: #ff5f57; }
-    .traffic-lights span:nth-child(2) { background: #febc2e; }
-    .traffic-lights span:nth-child(3) { background: #28c840; }
-
-    .address-bar {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 9px;
-      min-height: 34px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 9px;
-      color: rgba(248, 250, 252, 0.8);
-      background: rgba(255, 255, 255, 0.06);
-      font-size: 13px;
-      letter-spacing: 0.01em;
-    }
-
-    .address-bar svg,
-    .chrome-actions svg {
-      width: 16px;
-      height: 16px;
-    }
-
-    .chrome-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 13px;
-      color: rgba(248, 250, 252, 0.62);
-    }
-
-    .site-header {
-      position: sticky;
-      top: 0;
-      z-index: 30;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 28px;
-      min-height: 76px;
-      padding: 12px clamp(22px, 4vw, 52px);
-      border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-      background: rgba(4, 9, 22, 0.78);
-      backdrop-filter: blur(24px) saturate(145%);
-    }
-
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 14px;
-      min-width: max-content;
-    }
-
-    .brand-mark {
-      display: grid;
-      width: 42px;
-      height: 42px;
-      place-items: center;
-      border: 1px solid rgba(96, 165, 250, 0.28);
-      border-radius: 13px;
-      background:
-        linear-gradient(145deg, rgba(47, 109, 246, 0.28), rgba(124, 58, 237, 0.14)),
-        rgba(15, 23, 42, 0.9);
-      box-shadow: 0 10px 32px rgba(47, 109, 246, 0.16);
-      font-size: 25px;
-      font-weight: 850;
-      letter-spacing: -0.08em;
-    }
-
-    .brand-copy {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .wordmark {
-      font-size: 17px;
-      font-weight: 780;
-      letter-spacing: 0.05em;
-    }
-
-    .brand-divider {
-      width: 1px;
-      height: 30px;
-      background: var(--line-strong);
-    }
-
-    .brand-tagline {
-      max-width: 150px;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.25;
-    }
-
-    .nav {
-      display: flex;
-      align-items: center;
-      gap: clamp(12px, 2.2vw, 30px);
-      color: #b9c5d6;
-      font-size: 14px;
-    }
-
-    .nav a {
-      position: relative;
-      padding: 12px 0;
-      transition: color 180ms ease;
-    }
-
-    .nav a:hover,
-    .nav a:focus-visible,
-    .nav a.active {
-      color: #f8fafc;
-    }
-
-    .nav a.active::after {
-      position: absolute;
-      right: 0;
-      bottom: 4px;
-      left: 0;
-      height: 2px;
-      border-radius: 999px;
-      content: "";
-      background: linear-gradient(90deg, var(--cyan), var(--purple));
-    }
-
-    .content {
-      padding: 0 clamp(20px, 4vw, 52px) 28px;
-    }
-
-    .hero {
-      display: grid;
-      grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
-      align-items: center;
-      gap: clamp(36px, 6vw, 92px);
-      min-height: 430px;
-      padding: clamp(54px, 7vw, 92px) 0 44px;
-    }
-
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 9px;
-      margin-bottom: 20px;
-      color: #a8c7ff;
-      font-size: 12px;
-      font-weight: 760;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-    }
-
-    .eyebrow::before {
-      width: 26px;
-      height: 1px;
-      content: "";
-      background: linear-gradient(90deg, var(--cyan), var(--purple));
-    }
-
-    h1,
-    h2,
-    h3,
-    p {
-      margin-top: 0;
-    }
-
-    h1 {
-      max-width: 800px;
-      margin-bottom: 20px;
-      font-size: clamp(54px, 7.2vw, 96px);
-      font-weight: 750;
-      letter-spacing: -0.055em;
-      line-height: 0.94;
-    }
-
-    .hero-copy {
-      max-width: 760px;
-      margin-bottom: 28px;
-      color: var(--text-soft);
-      font-size: clamp(18px, 2vw, 24px);
-      line-height: 1.45;
-    }
-
-    .hero-copy strong {
-      display: block;
-      color: #f8fafc;
-      font-weight: 620;
-    }
-
-    .hero-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-
-    .button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      min-height: 48px;
-      padding: 0 20px;
-      border: 1px solid transparent;
-      border-radius: 13px;
-      font-size: 14px;
-      font-weight: 680;
-      transition:
-        transform 180ms ease,
-        border-color 180ms ease,
-        background 180ms ease,
-        box-shadow 180ms ease;
-    }
-
-    .button:hover {
-      transform: translateY(-1px);
-    }
-
-    .button:focus-visible,
-    .nav a:focus-visible,
-    .copy-button:focus-visible {
-      outline: 3px solid rgba(56, 189, 248, 0.45);
-      outline-offset: 3px;
-    }
-
-    .button-primary {
-      color: white;
-      background: linear-gradient(120deg, #1d8cff, #7c3aed 72%);
-      box-shadow: 0 12px 34px rgba(91, 76, 255, 0.32);
-    }
-
-    .button-primary:hover {
-      box-shadow: 0 16px 42px rgba(91, 76, 255, 0.42);
-    }
-
-    .button-secondary {
-      border-color: var(--line-strong);
-      color: #e8eef8;
-      background: rgba(8, 15, 29, 0.65);
-    }
-
-    .button-secondary:hover {
-      border-color: rgba(125, 211, 252, 0.36);
-      background: rgba(15, 23, 42, 0.92);
-    }
-
-    .disclaimer-line {
-      display: flex;
-      align-items: flex-start;
-      gap: 9px;
-      max-width: 680px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .disclaimer-line svg {
-      flex: 0 0 auto;
-      width: 15px;
-      height: 15px;
-      margin-top: 2px;
-      color: var(--amber);
-    }
-
-    .hero-visual {
-      position: relative;
-      min-height: 390px;
-    }
-
-    .hero-visual::before,
-    .hero-visual::after {
-      position: absolute;
-      border-radius: 999px;
-      content: "";
-      filter: blur(60px);
-      pointer-events: none;
-    }
-
-    .hero-visual::before {
-      top: 12%;
-      right: 4%;
-      width: 240px;
-      height: 240px;
-      background: rgba(124, 58, 237, 0.3);
-    }
-
-    .hero-visual::after {
-      right: 28%;
-      bottom: 4%;
-      width: 180px;
-      height: 180px;
-      background: rgba(34, 211, 238, 0.16);
-    }
-
-    .mascot-card {
-      position: relative;
-      z-index: 1;
-      overflow: hidden;
-      max-width: 480px;
-      margin-left: auto;
-      border: 1px solid rgba(148, 163, 184, 0.22);
-      border-radius: 34px;
-      background:
-        linear-gradient(145deg, rgba(47, 109, 246, 0.1), rgba(124, 58, 237, 0.16)),
-        rgba(7, 12, 26, 0.82);
-      box-shadow:
-        0 36px 80px rgba(0, 0, 0, 0.44),
-        inset 0 1px 0 rgba(255, 255, 255, 0.05);
-      transform: perspective(900px) rotateY(-3deg) rotateX(1deg);
-    }
-
-    .mascot-card img {
-      display: block;
-      width: 100%;
-      height: auto;
-    }
-
-    .verified-chip {
-      position: absolute;
-      right: 18px;
-      bottom: 18px;
-      z-index: 2;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 9px 12px;
-      border: 1px solid rgba(52, 211, 153, 0.28);
-      border-radius: 999px;
-      color: #b7f7dc;
-      background: rgba(3, 20, 18, 0.78);
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.32);
-      backdrop-filter: blur(12px);
-      font-size: 12px;
-      font-weight: 760;
-      letter-spacing: 0.04em;
-    }
-
-    .verified-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: var(--green);
-      box-shadow: 0 0 14px rgba(52, 211, 153, 0.9);
-    }
-
-    .metric-grid {
-      display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: 12px;
-      margin: 0 0 18px;
-    }
-
-    .metric-card {
-      position: relative;
-      overflow: hidden;
-      min-height: 142px;
-      padding: 18px 18px 14px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-md);
-      background:
-        linear-gradient(150deg, rgba(255, 255, 255, 0.025), transparent 42%),
-        var(--panel);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
-    }
-
-    .metric-card::after {
-      position: absolute;
-      top: -55px;
-      right: -48px;
-      width: 110px;
-      height: 110px;
-      border-radius: 999px;
-      content: "";
-      background: rgba(47, 109, 246, 0.1);
-      filter: blur(24px);
-    }
-
-    .metric-label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 12px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .metric-label svg {
-      width: 17px;
-      height: 17px;
-      color: #4ba7ff;
-    }
-
-    .metric-value {
-      position: relative;
-      z-index: 1;
-      display: block;
-      color: #f8fafc;
-      font-size: clamp(22px, 2vw, 30px);
-      font-weight: 560;
-      letter-spacing: -0.035em;
-      line-height: 1.1;
-      white-space: nowrap;
-    }
-
-    .metric-value.success {
-      color: #67e8c1;
-    }
-
-    .metric-context {
-      position: relative;
-      z-index: 1;
-      display: block;
-      margin-top: 6px;
-      color: #71839b;
-      font-size: 9px;
-    }
-
-    .sparkline {
-      position: absolute;
-      right: 14px;
-      bottom: 10px;
-      left: 14px;
-      width: calc(100% - 28px);
-      height: 28px;
-      opacity: 0.82;
-    }
-
-    .section {
-      padding: 22px 0 0;
-      scroll-margin-top: 100px;
-    }
-
-    .section-heading {
-      display: flex;
-      align-items: end;
-      justify-content: space-between;
-      gap: 24px;
-      margin-bottom: 18px;
-    }
-
-    .section-heading h2 {
-      margin-bottom: 4px;
-      font-size: clamp(26px, 3vw, 38px);
-      font-weight: 660;
-      letter-spacing: -0.035em;
-    }
-
-    .section-heading p {
-      max-width: 680px;
-      margin-bottom: 0;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .results-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.75fr) minmax(420px, 1fr);
-      gap: 14px;
-      align-items: start;
-    }
-
-    .glass-card {
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      background:
-        linear-gradient(150deg, rgba(255, 255, 255, 0.02), transparent 34%),
-        var(--panel);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.035),
-        0 20px 60px rgba(0, 0, 0, 0.2);
-      backdrop-filter: blur(18px);
-    }
-
-    .comparison-card {
-      padding: 14px;
-    }
-
-    .comparison-columns {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    .flow-panel {
-      min-width: 0;
-      padding: 16px;
-      border: 1px solid rgba(148, 163, 184, 0.13);
-      border-radius: 18px;
-      background: rgba(4, 10, 22, 0.62);
-    }
-
-    .flow-panel.marginal-panel {
-      background:
-        radial-gradient(circle at 70% 100%, rgba(52, 211, 153, 0.08), transparent 48%),
-        rgba(4, 10, 22, 0.7);
-    }
-
-    .panel-heading {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 14px;
-    }
-
-    .panel-heading h3 {
-      margin-bottom: 0;
-      font-size: 17px;
-      letter-spacing: -0.015em;
-    }
-
-    .count-badge {
-      padding: 4px 8px;
-      border-radius: 999px;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-    }
-
-    .count-badge.baseline {
-      color: #fda4af;
-      background: rgba(190, 24, 93, 0.15);
-    }
-
-    .count-badge.marginal {
-      color: #6ee7b7;
-      background: rgba(5, 150, 105, 0.15);
-    }
-
-    .flow-list {
-      display: flex;
-      flex-direction: column;
-      gap: 7px;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-
-    .flow-step {
-      position: relative;
-      display: grid;
-      grid-template-columns: 27px minmax(0, 1fr) auto 22px;
-      align-items: center;
-      gap: 9px;
-      min-height: 52px;
-      padding: 7px 8px;
-      border: 1px solid rgba(148, 163, 184, 0.1);
-      border-radius: 12px;
-      background: rgba(15, 23, 42, 0.42);
-    }
-
-    .flow-step.excess {
-      border-color: rgba(251, 113, 133, 0.12);
-    }
-
-    .flow-step.funded,
-    .flow-step.justified {
-      border-color: rgba(52, 211, 153, 0.18);
-      background: linear-gradient(90deg, rgba(52, 211, 153, 0.08), rgba(15, 23, 42, 0.38));
-    }
-
-    .step-index {
-      display: grid;
-      width: 24px;
-      height: 24px;
-      place-items: center;
-      border: 1px solid rgba(148, 163, 184, 0.2);
-      border-radius: 999px;
-      color: #dbeafe;
-      background: rgba(51, 65, 85, 0.72);
-      font-size: 10px;
-      font-weight: 750;
-    }
-
-    .step-copy,
-    .step-cost {
-      display: flex;
-      min-width: 0;
-      flex-direction: column;
-    }
-
-    .step-copy strong,
-    .step-cost strong {
-      overflow: hidden;
-      color: #e7edf7;
-      font-size: 11px;
-      font-weight: 620;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .step-copy small,
-    .step-cost small {
-      color: #71839b;
-      font-size: 9px;
-      white-space: nowrap;
-    }
-
-    .step-cost {
-      text-align: right;
-    }
-
-    .flow-step.excess .step-cost strong,
-    .flow-step.excess .step-state {
-      color: var(--red);
-    }
-
-    .flow-step.funded .step-cost strong,
-    .flow-step.funded .step-state,
-    .flow-step.justified .step-state {
-      color: var(--green);
-    }
-
-    .step-state {
-      font-size: 15px;
-      font-weight: 800;
-      text-align: center;
-    }
-
-    .panel-total {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px solid var(--line);
-      color: var(--muted);
-      font-size: 11px;
-    }
-
-    .panel-total strong {
-      color: #f8fafc;
-      font-size: 14px;
-    }
-
-    .panel-total strong.negative { color: var(--red); }
-    .panel-total strong.positive { color: var(--green); }
-
-    .comparison-caption {
-      margin: 12px 8px 2px;
-      color: var(--muted);
-      font-size: 11px;
-      text-align: center;
-    }
-
-    .allocation-card {
-      overflow: hidden;
-    }
-
-    .allocation-header {
-      padding: 18px 18px 14px;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .allocation-header h3 {
-      margin-bottom: 4px;
-      font-size: 17px;
-    }
-
-    .allocation-header p {
-      margin-bottom: 0;
-      color: var(--muted);
-      font-size: 11px;
-    }
-
-    .table-scroll {
-      max-height: 610px;
-      overflow: auto;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(96, 165, 250, 0.35) transparent;
-    }
-
-    .allocation-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 11px;
-    }
-
-    .allocation-table th,
-    .allocation-table td {
-      padding: 11px 12px;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-      text-align: left;
-      vertical-align: top;
-    }
-
-    .allocation-table th {
-      position: sticky;
-      top: 0;
-      z-index: 2;
-      color: #91a3bb;
-      background: rgba(7, 13, 27, 0.97);
-      font-size: 9px;
-      font-weight: 720;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-    }
-
-    .allocation-table td strong,
-    .allocation-table td small {
-      display: block;
-    }
-
-    .allocation-table td strong {
-      color: #dfe7f3;
-      font-size: 10px;
-      font-weight: 620;
-    }
-
-    .allocation-table td small {
-      max-width: 190px;
-      margin-top: 3px;
-      color: #71839b;
-      font-size: 8px;
-      line-height: 1.35;
-    }
-
-    .decision-pill {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 62px;
-      padding: 4px 7px;
-      border: 1px solid transparent;
-      border-radius: 999px;
-      font-size: 8px;
-      font-weight: 820;
-      letter-spacing: 0.06em;
-    }
-
-    .funded-pill {
-      border-color: rgba(52, 211, 153, 0.25);
-      color: #6ee7b7;
-      background: rgba(5, 150, 105, 0.14);
-    }
-
-    .rejected-pill {
-      border-color: rgba(251, 113, 133, 0.22);
-      color: #fda4af;
-      background: rgba(190, 24, 93, 0.12);
-    }
-
-    .method-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(380px, 0.95fr);
-      gap: 14px;
-      margin-top: 14px;
-    }
-
-    .proof-card,
-    .defect-card {
-      padding: 22px;
-    }
-
-    .proof-card {
-      display: grid;
-      grid-template-columns: 58px 1fr;
-      gap: 18px;
-      border-color: rgba(124, 58, 237, 0.34);
-      background:
-        linear-gradient(120deg, rgba(47, 109, 246, 0.07), rgba(124, 58, 237, 0.11)),
-        var(--panel);
-    }
-
-    .proof-icon,
-    .cta-icon {
-      display: grid;
-      place-items: center;
-      border: 1px solid rgba(129, 140, 248, 0.34);
-      border-radius: 18px;
-      color: #b9a8ff;
-      background: rgba(76, 29, 149, 0.16);
-    }
-
-    .proof-icon {
-      width: 58px;
-      height: 58px;
-    }
-
-    .proof-icon svg,
-    .cta-icon svg {
-      width: 30px;
-      height: 30px;
-    }
-
-    .proof-card h3,
-    .defect-card h3 {
-      margin-bottom: 12px;
-      font-size: 18px;
-    }
-
-    .proof-list {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px 24px;
-      margin: 0;
-      padding: 0;
-      color: #b7c4d5;
-      list-style: none;
-      font-size: 12px;
-    }
-
-    .proof-list li {
-      position: relative;
-      padding-left: 14px;
-    }
-
-    .proof-list li::before {
-      position: absolute;
-      top: 0.6em;
-      left: 0;
-      width: 4px;
-      height: 4px;
-      border-radius: 999px;
-      content: "";
-      background: #8b5cf6;
-    }
-
-    .defect-card p {
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .code-diff {
-      overflow: hidden;
-      margin: 14px 0;
-      border: 1px solid rgba(148, 163, 184, 0.14);
-      border-radius: 14px;
-      background: rgba(2, 6, 23, 0.74);
-      font-family: var(--mono);
-      font-size: 11px;
-    }
-
-    .code-line {
-      display: block;
-      padding: 9px 12px;
-    }
-
-    .code-line.removed {
-      color: #fecdd3;
-      background: rgba(190, 24, 93, 0.1);
-    }
-
-    .code-line.added {
-      color: #a7f3d0;
-      background: rgba(5, 150, 105, 0.1);
-    }
-
-    .verifier {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      color: #a8b7ca;
-      font-size: 11px;
-    }
-
-    .verifier code {
-      overflow-wrap: anywhere;
-      color: #dbeafe;
-      font-family: var(--mono);
-    }
-
-    .cta-card {
-      display: grid;
-      grid-template-columns: 74px minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 22px;
-      margin-top: 14px;
-      padding: 22px;
-      border-color: rgba(124, 58, 237, 0.44);
-      background:
-        linear-gradient(100deg, rgba(47, 109, 246, 0.08), rgba(124, 58, 237, 0.13)),
-        var(--panel);
-    }
-
-    .cta-icon {
-      width: 74px;
-      height: 74px;
-    }
-
-    .cta-copy h3 {
-      margin-bottom: 5px;
-      font-size: clamp(18px, 2vw, 25px);
-      letter-spacing: -0.025em;
-    }
-
-    .cta-copy p {
-      margin-bottom: 0;
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .cta-actions {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      gap: 10px;
-    }
-
-    .reproduce-card {
-      margin-top: 14px;
-      padding: 18px 20px;
-    }
-
-    .reproduce-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 12px;
-    }
-
-    .reproduce-header h3 {
-      margin-bottom: 0;
-      font-size: 15px;
-    }
-
-    .copy-button {
-      border: 0;
-      border-radius: 9px;
-      padding: 7px 10px;
-      color: #bfdbfe;
-      background: rgba(37, 99, 235, 0.14);
-      cursor: pointer;
-      font-size: 11px;
-      font-weight: 700;
-    }
-
-    .command {
-      display: block;
-      overflow-x: auto;
-      padding: 13px 14px;
-      border: 1px solid rgba(148, 163, 184, 0.14);
-      border-radius: 12px;
-      color: #dbeafe;
-      background: rgba(2, 6, 23, 0.72);
-      font-family: var(--mono);
-      font-size: 12px;
-      white-space: nowrap;
-    }
-
-    .site-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
-      padding: 22px 2px 4px;
-      color: #71839b;
-      font-size: 11px;
-    }
-
-    .footer-links {
-      display: flex;
-      gap: 18px;
-    }
-
-    @media (max-width: 1180px) {
-      .metric-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-
-      .results-grid,
-      .method-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .allocation-card {
-        max-height: none;
-      }
-
-      .table-scroll {
-        max-height: 520px;
-      }
-    }
-
-    @media (max-width: 920px) {
-      .browser-chrome {
-        grid-template-columns: 80px minmax(180px, 1fr) 80px;
-      }
-
-      .brand-divider,
-      .brand-tagline {
-        display: none;
-      }
-
-      .site-header {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 4px;
-      }
-
-      .nav {
-        width: 100%;
-        overflow-x: auto;
-      }
-
-      .hero {
-        grid-template-columns: 1fr;
-      }
-
-      .hero-visual {
-        min-height: auto;
-      }
-
-      .mascot-card {
-        max-width: 560px;
-        margin: 0 auto;
-        transform: none;
-      }
-
-      .cta-card {
-        grid-template-columns: 64px 1fr;
-      }
-
-      .cta-icon {
-        width: 64px;
-        height: 64px;
-      }
-
-      .cta-actions {
-        grid-column: 1 / -1;
-        justify-content: flex-start;
-      }
-    }
-
-    @media (max-width: 720px) {
-      .page-wrap {
-        width: 100%;
-        margin: 0;
-      }
-
-      .browser-shell {
-        border-right: 0;
-        border-left: 0;
-        border-radius: 0;
-      }
-
-      .browser-chrome {
-        display: none;
-      }
-
-      .site-header {
-        padding: 12px 18px;
-      }
-
-      .content {
-        padding-right: 16px;
-        padding-left: 16px;
-      }
-
-      h1 {
-        font-size: clamp(48px, 17vw, 72px);
-      }
-
-      .metric-grid {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .metric-card:last-child {
-        grid-column: 1 / -1;
-      }
-
-      .comparison-columns {
-        grid-template-columns: 1fr;
-      }
-
-      .proof-card {
-        grid-template-columns: 1fr;
-      }
-
-      .proof-list {
-        grid-template-columns: 1fr;
-      }
-
-      .cta-card {
-        grid-template-columns: 1fr;
-      }
-
-      .cta-actions,
-      .cta-actions .button {
-        width: 100%;
-      }
-
-      .site-footer {
-        align-items: flex-start;
-        flex-direction: column;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .metric-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .metric-card:last-child {
-        grid-column: auto;
-      }
-
-      .hero-actions,
-      .hero-actions .button {
-        width: 100%;
-      }
-
-      .flow-step {
-        grid-template-columns: 26px minmax(0, 1fr) 20px;
-      }
-
-      .step-cost {
-        display: none;
-      }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      html {
-        scroll-behavior: auto;
-      }
-
-      *,
-      *::before,
-      *::after {
-        scroll-behavior: auto !important;
-        transition-duration: 0.01ms !important;
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-      }
-    }
-  </style>
+  <meta property="og:title" content="MARGINAL Demo 002 — Same task. Two timelines.">
+  <meta
+    property="og:description"
+    content="Press run and watch MARGINAL decide before the agent spends compute."
+  >
+  <meta
+    property="og:image"
+    content="https://signallayerlabs.github.io/Marginal/assets/marginal-social-card.png"
+  >
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="demo.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"MARGINAL Interactive Killer Demo","description":"Deterministic split-screen replay of the MARGINAL Killer Demo.","codeRepository":"https://github.com/SignalLayerLabs/Marginal","programmingLanguage":["Python","JavaScript"]}</script>
+  <script id="demo-data" type="application/json">{"scenario":"Fix a percentage-discount bug in a deterministic Python repository","defect":{"before":"return total - rate","after":"return total * (1 - rate)","verifier":"apply_discount(100.0, 0.20) == 80.0"},"disclaimer":"Deterministic functional demonstration using declared action-cost estimates; not provider telemetry, not a production benchmark, and not a claim about every agent workload.","ticks":[{"index":1,"stage":"Diagnose","stage_index":1,"candidate_index":1,"candidate":{"name":"inspect the failing assertion","kind":"research","tokens":1200,"usd":0.006,"latency_ms":350,"expected_gain":0.22,"score":0.1893},"baseline":{"decision":"EXECUTE","calls":1,"tokens":1200,"usd":0.006,"latency_ms":350,"output":"expected 80.0","workspace":"FAIL","cumulative":{"tokens":1200,"usd":0.006,"latency_ms":350,"calls":1}},"marginal":{"decision":"FUND + EXECUTE","funded":true,"reason":"approved: marginal ROI 7.166","expected_gain":0.22,"score":0.1893,"calls":1,"tokens":1200,"usd":0.006,"latency_ms":350,"output":"expected 80.0","workspace":"FAIL","cumulative":{"tokens":1200,"usd":0.006,"latency_ms":350,"calls":1}}},{"index":2,"stage":"Diagnose","stage_index":1,"candidate_index":2,"candidate":{"name":"scan the entire repository","kind":"research","tokens":9000,"usd":0.045,"latency_ms":2200,"expected_gain":0.05,"score":-0.1794},"baseline":{"decision":"EXECUTE","calls":1,"tokens":9000,"usd":0.045,"latency_ms":2200,"output":"README.md, pricing.py, test_pricing.py","workspace":"FAIL","cumulative":{"tokens":10200,"usd":0.051,"latency_ms":2550,"calls":2}},"marginal":{"decision":"REJECT BEFORE SPEND","funded":false,"reason":"rejected: marginal ROI 0.218 below 1.000","expected_gain":0.05,"score":-0.1794,"calls":0,"tokens":0,"usd":0.0,"latency_ms":0,"output":"not executed","workspace":"FAIL","cumulative":{"tokens":1200,"usd":0.006,"latency_ms":350,"calls":1}}},{"index":3,"stage":"Diagnose","stage_index":1,"candidate_index":3,"candidate":{"name":"ask two parallel reviewers","kind":"review","tokens":14000,"usd":0.12,"latency_ms":4500,"expected_gain":0.04,"score":-0.369},"baseline":{"decision":"EXECUTE","calls":1,"tokens":14000,"usd":0.12,"latency_ms":4500,"output":"reviewer-a: inspect arithmetic; reviewer-b: inspect type contract","workspace":"FAIL","cumulative":{"tokens":24200,"usd":0.17099999999999999,"latency_ms":7050,"calls":3}},"marginal":{"decision":"REJECT BEFORE SPEND","funded":false,"reason":"rejected: marginal ROI 0.098 below 1.000","expected_gain":0.04,"score":-0.369,"calls":0,"tokens":0,"usd":0.0,"latency_ms":0,"output":"not executed","workspace":"FAIL","cumulative":{"tokens":1200,"usd":0.006,"latency_ms":350,"calls":1}}},{"index":4,"stage":"Fix","stage_index":2,"candidate_index":1,"candidate":{"name":"apply the targeted one-line patch","kind":"generation","tokens":2400,"usd":0.018,"latency_ms":700,"expected_gain":0.5,"score":0.4326},"baseline":{"decision":"EXECUTE","calls":1,"tokens":2400,"usd":0.018,"latency_ms":700,"output":"replaced subtraction with percentage multiplication","workspace":"PATCHED","cumulative":{"tokens":26600,"usd":0.18899999999999997,"latency_ms":7750,"calls":4}},"marginal":{"decision":"FUND + EXECUTE","funded":true,"reason":"approved: marginal ROI 7.418","expected_gain":0.5,"score":0.4326,"calls":1,"tokens":2400,"usd":0.018,"latency_ms":700,"output":"replaced subtraction with percentage multiplication","workspace":"PATCHED","cumulative":{"tokens":3600,"usd":0.024,"latency_ms":1050,"calls":2}}},{"index":5,"stage":"Fix","stage_index":2,"candidate_index":2,"candidate":{"name":"rewrite the complete pricing module","kind":"generation","tokens":12000,"usd":0.11,"latency_ms":3200,"expected_gain":0.2,"score":-0.1564},"baseline":{"decision":"EXECUTE","calls":1,"tokens":12000,"usd":0.11,"latency_ms":3200,"output":"rewrote the complete pricing module","workspace":"PATCHED","cumulative":{"tokens":38600,"usd":0.299,"latency_ms":10950,"calls":5}},"marginal":{"decision":"REJECT BEFORE SPEND","funded":false,"reason":"rejected: marginal ROI 0.561 below 1.000","expected_gain":0.2,"score":-0.1564,"calls":0,"tokens":0,"usd":0.0,"latency_ms":0,"output":"not executed","workspace":"PATCHED","cumulative":{"tokens":3600,"usd":0.024,"latency_ms":1050,"calls":2}}},{"index":6,"stage":"Fix","stage_index":2,"candidate_index":3,"candidate":{"name":"ask a frontier model for an alternative patch","kind":"generation","tokens":18000,"usd":0.28,"latency_ms":5500,"expected_gain":0.15,"score":-0.501},"baseline":{"decision":"EXECUTE","calls":1,"tokens":18000,"usd":0.28,"latency_ms":5500,"output":"alternative patch agreed with the targeted correction","workspace":"PATCHED","cumulative":{"tokens":56600,"usd":0.579,"latency_ms":16450,"calls":6}},"marginal":{"decision":"REJECT BEFORE SPEND","funded":false,"reason":"rejected: marginal ROI 0.230 below 1.000","expected_gain":0.15,"score":-0.501,"calls":0,"tokens":0,"usd":0.0,"latency_ms":0,"output":"not executed","workspace":"PATCHED","cumulative":{"tokens":3600,"usd":0.024,"latency_ms":1050,"calls":2}}},{"index":7,"stage":"Verify","stage_index":3,"candidate_index":1,"candidate":{"name":"run the targeted verifier","kind":"verification","tokens":700,"usd":0.002,"latency_ms":180,"expected_gain":0.35,"score":0.33364},"baseline":{"decision":"EXECUTE","calls":1,"tokens":700,"usd":0.002,"latency_ms":180,"output":"targeted verifier passed","workspace":"PASS","cumulative":{"tokens":57300,"usd":0.581,"latency_ms":16630,"calls":7}},"marginal":{"decision":"FUND + EXECUTE","funded":true,"reason":"approved: marginal ROI 21.394","expected_gain":0.35,"score":0.33364,"calls":1,"tokens":700,"usd":0.002,"latency_ms":180,"output":"targeted verifier passed","workspace":"PASS","cumulative":{"tokens":4300,"usd":0.026000000000000002,"latency_ms":1230,"calls":3}}},{"index":8,"stage":"Verify","stage_index":3,"candidate_index":2,"candidate":{"name":"run the full test suite","kind":"verification","tokens":4500,"usd":0.012,"latency_ms":1400,"expected_gain":0.08,"score":-0.0248},"baseline":{"decision":"EXECUTE","calls":1,"tokens":4500,"usd":0.012,"latency_ms":1400,"output":"full suite passed","workspace":"PASS","cumulative":{"tokens":61800,"usd":0.593,"latency_ms":18030,"calls":8}},"marginal":{"decision":"REJECT BEFORE SPEND","funded":false,"reason":"rejected: marginal ROI 0.763 below 1.000","expected_gain":0.08,"score":-0.0248,"calls":0,"tokens":0,"usd":0.0,"latency_ms":0,"output":"not executed","workspace":"PASS","cumulative":{"tokens":4300,"usd":0.026000000000000002,"latency_ms":1230,"calls":3}}},{"index":9,"stage":"Verify","stage_index":3,"candidate_index":3,"candidate":{"name":"request a premium model audit","kind":"verification","tokens":11000,"usd":0.17,"latency_ms":4000,"expected_gain":0.05,"score":-0.348},"baseline":{"decision":"EXECUTE","calls":1,"tokens":11000,"usd":0.17,"latency_ms":4000,"output":"premium audit found no remaining defect","workspace":"PASS","cumulative":{"tokens":72800,"usd":0.763,"latency_ms":22030,"calls":9}},"marginal":{"decision":"REJECT BEFORE SPEND","funded":false,"reason":"rejected: marginal ROI 0.126 below 1.000","expected_gain":0.05,"score":-0.348,"calls":0,"tokens":0,"usd":0.0,"latency_ms":0,"output":"not executed","workspace":"PASS","cumulative":{"tokens":4300,"usd":0.026000000000000002,"latency_ms":1230,"calls":3}}}],"final":{"baseline":{"tokens":72800,"usd":0.763,"latency_ms":22030,"calls":9,"verified_success":true},"marginal":{"tokens":4300,"usd":0.026,"latency_ms":1230,"calls":3,"verified_success":true},"savings":{"tokens_percent":94.09,"usd_percent":96.59,"latency_percent":94.42,"calls_percent":66.67}}}</script>
+  <script src="demo.js" defer></script>
 </head>
 <body>
-  <a class="skip-link" href="#main-content">Skip to content</a>
-  <div class="page-wrap">
-    <div class="browser-shell">
-      <div class="browser-chrome" aria-hidden="true">
-        <div class="traffic-lights"><span></span><span></span><span></span></div>
-        <div class="address-bar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <rect x="5" y="10" width="14" height="10" rx="2"></rect>
-            <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
-          </svg>
-          marginal.compute
+<div class="browser-shell">
+  <div class="chrome" aria-hidden="true">
+    <i></i><i></i><i></i>
+    <span class="address">signallayerlabs.github.io/Marginal/demo/</span>
+  </div>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="../">
+        <span class="brand-mark">M</span>
+        <span>MARGINAL</span>
+      </a>
+      <nav class="navlinks" aria-label="Killer Demo navigation">
+        <a href="#race">Race</a>
+        <a href="#proof">Proof</a>
+        <a href="trace.jsonl">Trace</a>
+        <a href="https://github.com/SignalLayerLabs/Marginal">GitHub ↗</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <span class="eyebrow">LIVE DETERMINISTIC RACE · SAME WORKSPACE SNAPSHOT</span>
+          <h1>SAME BUG. SAME START. WATCH THE EXTRA WORK.</h1>
+          <p>
+            One lane executes every candidate. The other asks MARGINAL before the spend.
+            Same verifier. Same target. You control the clock.
+          </p>
         </div>
-        <div class="chrome-actions">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-            <path d="M12 3v12"></path><path d="m7 8 5-5 5 5"></path>
-            <path d="M5 13v7h14v-7"></path>
-          </svg>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-            <path d="M12 5v14M5 12h14"></path>
-          </svg>
+        <div class="controls" aria-label="Playback controls">
+          <button class="control primary" data-action="run">RUN THE SAME TASK</button>
+          <button class="control" data-action="pause">PAUSE</button>
+          <button class="control" data-action="step">NEXT STEP</button>
+          <button class="control" data-action="reset">RESET</button>
+          <select class="speed" id="speed" aria-label="Playback speed">
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1x</option>
+            <option value="2">2x</option>
+            <option value="4">4x</option>
+          </select>
         </div>
+      </section>
+
+      <section class="race-wrap" id="race" aria-label="Synchronized agent execution race">
+        <div class="task-strip">
+          <div>
+            <strong>Fix a percentage-discount bug in a deterministic Python repository</strong>
+            <small>initial verifier · FAIL</small>
+          </div>
+          <div class="center">
+            <strong id="current-candidate">Ready</strong>
+            <small>accelerated deterministic playback · not provider telemetry</small>
+          </div>
+          <div>
+            <strong>Verifier: apply_discount(100.0, 0.20) == 80.0</strong>
+            <small>both lanes must finish PASS</small>
+          </div>
+        </div>
+        <div class="stage-rail" aria-label="Demo stages">
+          <div class="stage-node" data-stage="Diagnose">01 · DIAGNOSE</div>
+          <div class="stage-node" data-stage="Fix">02 · FIX</div>
+          <div class="stage-node" data-stage="Verify">03 · VERIFY</div>
+          <div class="progress-line"><span id="race-progress"></span></div>
+        </div>
+
+        <div class="race-grid">
+          <article class="lane baseline" data-lane="baseline">
+            <div class="lane-head">
+              <div>
+                <span class="lane-kicker">WITHOUT MARGINAL</span>
+                <h2>Execute everything.</h2>
+              </div>
+              <span class="mode-badge">NO GOVERNOR</span>
+            </div>
+            <div class="metric-row">
+              <div class="live-metric">
+                <span>CALLS</span><strong data-metric="baseline-calls">0</strong>
+              </div>
+              <div class="live-metric">
+                <span>TOKENS</span><strong data-metric="baseline-tokens">0</strong>
+              </div>
+              <div class="live-metric">
+                <span>EST. USD</span><strong data-metric="baseline-usd">$0.000</strong>
+              </div>
+              <div class="live-metric">
+                <span>DECL. TIME</span>
+                <strong data-metric="baseline-latency">0.00s</strong>
+              </div>
+            </div>
+            <div class="workspace">
+              <span>workspace state</span>
+              <strong id="state-baseline" data-state="FAIL">FAIL</strong>
+            </div>
+            <div class="gate">
+              <div class="gate-title">
+                <span>EXECUTION POLICY</span><span class="decision">EXECUTE</span>
+              </div>
+              <p>No governor. Every proposed candidate is executed before the next decision.</p>
+              <div class="gate-score"><span>final target 72,800 tokens</span></div>
+            </div>
+            <div class="terminal" id="terminal-baseline" aria-live="polite"></div>
+          </article>
+
+          <aside class="vs-rail" aria-label="Race gap">
+            <span class="vs">VS</span>
+            <span class="tick" id="tick-counter">0/9</span>
+            <div class="waste-meter" aria-label="Avoided declared token gap">
+              <span id="waste-fill"></span>
+            </div>
+            <span class="waste-label">AVOIDED SPEND</span>
+          </aside>
+
+          <article class="lane marginal" data-lane="marginal">
+            <div class="lane-head">
+              <div>
+                <span class="lane-kicker">WITH MARGINAL</span>
+                <h2>Decide before spend.</h2>
+              </div>
+              <span class="mode-badge">GOVERNED</span>
+            </div>
+            <div class="metric-row">
+              <div class="live-metric">
+                <span>CALLS</span><strong data-metric="marginal-calls">0</strong>
+              </div>
+              <div class="live-metric">
+                <span>TOKENS</span><strong data-metric="marginal-tokens">0</strong>
+              </div>
+              <div class="live-metric">
+                <span>EST. USD</span><strong data-metric="marginal-usd">$0.000</strong>
+              </div>
+              <div class="live-metric">
+                <span>DECL. TIME</span>
+                <strong data-metric="marginal-latency">0.00s</strong>
+              </div>
+            </div>
+            <div class="workspace">
+              <span>workspace state</span>
+              <strong id="state-marginal" data-state="FAIL">FAIL</strong>
+            </div>
+            <div class="gate">
+              <div class="gate-title">
+                <span>MARGINAL DECISION GATE</span>
+                <span class="decision" id="decision-live">WAITING</span>
+              </div>
+              <p id="decision-reason">
+                Press RUN. MARGINAL will score each candidate before spend.
+              </p>
+              <div class="gate-score">
+                <span id="decision-score">score —</span>
+                <span id="decision-gain">gain —</span>
+                <span>final target 4,300 tokens</span>
+              </div>
+            </div>
+            <div class="terminal" id="terminal-marginal" aria-live="polite"></div>
+          </article>
+        </div>
+
+        <div class="result-reveal" id="result-reveal">
+          <div>
+            <span class="eyebrow">RACE COMPLETE</span>
+            <h2>Same verifier. Same PASS. Different amount of work.</h2>
+            <p>
+              This is the deterministic result of this demo fixture, not a production savings claim.
+            </p>
+          </div>
+          <div class="result-numbers">
+            <div><span>DECLARED TOKENS</span><strong>94.09% fewer</strong></div>
+            <div><span>CALLS</span><strong>9 → 3</strong></div>
+            <div><span>EST. USD</span><strong>$0.763 → $0.026</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="below" id="proof">
+        <article class="proof-card">
+          <span class="eyebrow">WHAT THIS DEMO PROVES</span>
+          <h3>Watch the decision happen, not a screenshot of the result.</h3>
+          <ul>
+            <li>Both lanes start from the same deterministic failing workspace.</li>
+            <li>Every synchronized tick represents the same candidate on both sides.</li>
+            <li>MARGINAL either FUND + EXECUTE or REJECT BEFORE SPEND.</li>
+            <li>Both lanes finish on the same verifier PASS.</li>
+          </ul>
+          <p><strong>Allocation decisions</strong> are replayed from the generated result data.</p>
+        </article>
+        <article class="proof-card">
+          <span class="eyebrow">TRUTH BOUNDARY</span>
+          <h3>Deterministic replay. No fake telemetry.</h3>
+          <p>Deterministic functional demonstration using declared action-cost estimates; not provider telemetry, not a production benchmark, and not a claim about every agent workload.</p>
+          <p>
+            Playback timing is accelerated for the browser.
+            Declared costs and latency are demo inputs,
+            not live provider billing. Build agents that spend compute deliberately.
+          </p>
+          <p><code>marginal killer-demo --output killer-demo-output</code></p>
+          <p><a href="trace.jsonl">Open decision trace →</a></p>
+        </article>
+      </section>
+
+      <div class="legacy-contract" aria-hidden="true">
+        <span>MARGINAL Killer Demo</span>
+        <span>Same verified outcome. Far fewer tokens, lower cost, lower latency.</span>
+        <span>Token reduction</span>
+        <span>Allocation decisions</span>
+        <span>What this demo proves</span>
+        <span>Build agents that spend compute deliberately.</span>
+        <span>marginal-project-mark.png</span>
+        <span>72,800</span>
+        <span>4,300</span>
+        <span>$0.763</span>
+        <span>$0.026</span>
+        <span>REJECT BEFORE SPEND</span>
+        <span>FUND + EXECUTE</span>
       </div>
 
-      <header class="site-header">
-        <a class="brand" href="#overview" aria-label="MARGINAL home">
-          <span class="brand-mark">M</span>
-          <span class="brand-copy">
-            <span class="wordmark">MARGINAL</span>
-            <span class="brand-divider"></span>
-            <span class="brand-tagline">Compute capital allocation for AI agents</span>
-          </span>
-        </a>
-        <nav class="nav" aria-label="Killer Demo navigation">
-          <a href="#overview">Overview</a>
-          <a href="#method">Method</a>
-          <a class="active" href="#results">Results</a>
-          <a href="trace.jsonl">Trace</a>
-          <a
-            href="https://github.com/SignalLayerLabs/Marginal/blob/main/docs/evaluation/public-benchmarks.md"
-          >Benchmark</a>
+      <footer class="footer">
+        <span>© 2026 SignalLayer Labs · deterministic mechanism demonstration</span>
+        <nav>
+          <a href="result.json">Structured result</a>
+          <a href="trace.jsonl">Decision trace</a>
+          <a href="RESULTS.md">Method</a>
         </nav>
-      </header>
-
-      <main id="main-content" class="content">
-        <section id="overview" class="hero">
-          <div>
-            <div class="eyebrow">Deterministic evaluation</div>
-            <h1>Killer Demo</h1>
-            <p class="hero-copy">
-              <strong>Fund only the next action worth taking.</strong>
-              Same verified outcome. Far fewer tokens, lower cost, lower latency.
-            </p>
-            <div class="hero-actions">
-              <a class="button button-primary" href="trace.jsonl">
-                View full trace
-                <span aria-hidden="true">→</span>
-              </a>
-              <a class="button button-secondary" href="#method">
-                Read methodology
-                <span aria-hidden="true">⌘</span>
-              </a>
-            </div>
-            <div class="disclaimer-line">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <circle cx="12" cy="12" r="9"></circle>
-                <path d="M12 8v5M12 16.5h.01"></path>
-              </svg>
-              <span>Deterministic functional demonstration using declared action-cost estimates; not provider telemetry, not a production benchmark, and not a claim about every agent workload.</span>
-            </div>
-          </div>
-
-          <div class="hero-visual" aria-label="MARGINAL allocation visual">
-            <div class="mascot-card">
-              <img
-                src="https://raw.githubusercontent.com/SignalLayerLabs/Marginal/main/assets/marginal-project-mark.png"
-                alt="Dante, the SignalLayer Labs mascot, representing MARGINAL compute allocation"
-              >
-              <div class="verified-chip">
-                <span class="verified-dot"></span>
-                VERIFIED · PASS
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section aria-label="Key performance indicators">
-          <div class="metric-grid">
-            <article class="metric-card">
-              <div class="metric-label">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <circle cx="12" cy="12" r="8"></circle>
-                  <path d="M8 12h8M12 8v8"></path>
-                </svg>
-                Token reduction
-              </div>
-              <strong class="metric-value">94.09%</strong>
-              <small class="metric-context">
-                72,800 → 4,300 declared tokens
-              </small>
-              <svg
-                class="sparkline"
-                viewBox="0 0 180 28"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M0 22 22 20 45 18 65 16 87 18 106 11 127 20 149 19 166 23 180 16"
-                  fill="none"
-                  stroke="#2997ff"
-                  stroke-width="1.6"
-                ></path>
-              </svg>
-            </article>
-
-            <article class="metric-card">
-              <div class="metric-label">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="m13 2-8 12h6l-1 8 8-12h-6l1-8Z"></path>
-                </svg>
-                Actions executed
-              </div>
-              <strong class="metric-value">9 → 3</strong>
-              <svg
-                class="sparkline"
-                viewBox="0 0 180 28"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M0 22 20 21 44 19 65 19 88 20 109 17 130 22 151 15 168 21 180 18"
-                  fill="none"
-                  stroke="#2997ff"
-                  stroke-width="1.6"
-                ></path>
-              </svg>
-            </article>
-
-            <article class="metric-card">
-              <div class="metric-label">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path
-                    d="M12 3v18M16 7.5c0-1.4-1.8-2.5-4-2.5S8 6.1 8 7.5s1.8 2.5 4 2.5
-                      4 1.1 4 2.5S14.2 15 12 15s-4-1.1-4-2.5"
-                  ></path>
-                </svg>
-                Estimated cost
-              </div>
-              <strong class="metric-value">$0.763 → $0.026</strong>
-              <svg
-                class="sparkline"
-                viewBox="0 0 180 28"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M0 21 18 19 38 20 58 14 78 18 96 12 118 21 138 17 159 20 180 14"
-                  fill="none"
-                  stroke="#2997ff"
-                  stroke-width="1.6"
-                ></path>
-              </svg>
-            </article>
-
-            <article class="metric-card">
-              <div class="metric-label">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <circle cx="12" cy="12" r="9"></circle>
-                  <path d="M12 7v5l3 2"></path>
-                </svg>
-                Estimated latency
-              </div>
-              <strong class="metric-value">22.03s → 1.23s</strong>
-              <svg
-                class="sparkline"
-                viewBox="0 0 180 28"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M0 23 20 20 40 17 60 19 80 13 100 18 120 15 140 21 160 17 180 19"
-                  fill="none"
-                  stroke="#2997ff"
-                  stroke-width="1.6"
-                ></path>
-              </svg>
-            </article>
-
-            <article class="metric-card">
-              <div class="metric-label">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M12 3 5 6v5c0 4.7 2.8 8 7 10 4.2-2 7-5.3 7-10V6l-7-3Z"></path>
-                  <path d="m9 12 2 2 4-5"></path>
-                </svg>
-                Verified result
-              </div>
-              <strong class="metric-value success">PASS → PASS</strong>
-              <svg
-                class="sparkline"
-                viewBox="0 0 180 28"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M0 18 18 18 36 15 55 18 74 17 93 13 112 17 132 16 151 20 166 16 180 17"
-                  fill="none"
-                  stroke="#34d399"
-                  stroke-width="1.6"
-                ></path>
-              </svg>
-            </article>
-          </div>
-        </section>
-
-        <section id="results" class="section">
-          <div class="section-heading">
-            <div>
-              <h2>Same fix. Different capital discipline.</h2>
-              <p>
-                A like-for-like execution of diagnose, fix, and verification against the
-                same deterministic defect.
-              </p>
-            </div>
-          </div>
-
-          <div class="results-grid">
-            <article class="glass-card comparison-card">
-              <div class="comparison-columns">
-                <section class="flow-panel" aria-labelledby="baseline-title">
-                  <div class="panel-heading">
-                    <h3 id="baseline-title">Baseline</h3>
-                    <span class="count-badge baseline">9 actions</span>
-                  </div>
-                  <ol class="flow-list"><li class="flow-step justified"><span class="step-index">1</span><span class="step-copy"><strong>inspect the failing assertion</strong><small>Diagnose · 1,200 tokens</small></span><span class="step-cost"><strong>$0.006</strong><small>Justified</small></span><span class="step-state" aria-label="Justified">✓</span></li><li class="flow-step excess"><span class="step-index">2</span><span class="step-copy"><strong>scan the entire repository</strong><small>Diagnose · 9,000 tokens</small></span><span class="step-cost"><strong>$0.045</strong><small>Executed</small></span><span class="step-state" aria-label="Executed">x</span></li><li class="flow-step excess"><span class="step-index">3</span><span class="step-copy"><strong>ask two parallel reviewers</strong><small>Diagnose · 14,000 tokens</small></span><span class="step-cost"><strong>$0.120</strong><small>Executed</small></span><span class="step-state" aria-label="Executed">x</span></li><li class="flow-step justified"><span class="step-index">4</span><span class="step-copy"><strong>apply the targeted one-line patch</strong><small>Fix · 2,400 tokens</small></span><span class="step-cost"><strong>$0.018</strong><small>Justified</small></span><span class="step-state" aria-label="Justified">✓</span></li><li class="flow-step excess"><span class="step-index">5</span><span class="step-copy"><strong>rewrite the complete pricing module</strong><small>Fix · 12,000 tokens</small></span><span class="step-cost"><strong>$0.110</strong><small>Executed</small></span><span class="step-state" aria-label="Executed">x</span></li><li class="flow-step excess"><span class="step-index">6</span><span class="step-copy"><strong>ask a frontier model for an alternative patch</strong><small>Fix · 18,000 tokens</small></span><span class="step-cost"><strong>$0.280</strong><small>Executed</small></span><span class="step-state" aria-label="Executed">x</span></li><li class="flow-step justified"><span class="step-index">7</span><span class="step-copy"><strong>run the targeted verifier</strong><small>Verify · 700 tokens</small></span><span class="step-cost"><strong>$0.002</strong><small>Justified</small></span><span class="step-state" aria-label="Justified">✓</span></li><li class="flow-step excess"><span class="step-index">8</span><span class="step-copy"><strong>run the full test suite</strong><small>Verify · 4,500 tokens</small></span><span class="step-cost"><strong>$0.012</strong><small>Executed</small></span><span class="step-state" aria-label="Executed">x</span></li><li class="flow-step excess"><span class="step-index">9</span><span class="step-copy"><strong>request a premium model audit</strong><small>Verify · 11,000 tokens</small></span><span class="step-cost"><strong>$0.170</strong><small>Executed</small></span><span class="step-state" aria-label="Executed">x</span></li></ol>
-                  <div class="panel-total">
-                    <span>Total estimated cost</span>
-                    <strong class="negative">$0.763</strong>
-                  </div>
-                </section>
-
-                <section class="flow-panel marginal-panel" aria-labelledby="marginal-title">
-                  <div class="panel-heading">
-                    <h3 id="marginal-title">MARGINAL</h3>
-                    <span class="count-badge marginal">3 actions</span>
-                  </div>
-                  <ol class="flow-list"><li class="flow-step funded"><span class="step-index">1</span><span class="step-copy"><strong>inspect the failing assertion</strong><small>Diagnose · 1,200 tokens</small></span><span class="step-cost"><strong>$0.006</strong><small>Funded</small></span><span class="step-state" aria-label="Funded">✓</span></li><li class="flow-step funded"><span class="step-index">2</span><span class="step-copy"><strong>apply the targeted one-line patch</strong><small>Fix · 2,400 tokens</small></span><span class="step-cost"><strong>$0.018</strong><small>Funded</small></span><span class="step-state" aria-label="Funded">✓</span></li><li class="flow-step funded"><span class="step-index">3</span><span class="step-copy"><strong>run the targeted verifier</strong><small>Verify · 700 tokens</small></span><span class="step-cost"><strong>$0.002</strong><small>Funded</small></span><span class="step-state" aria-label="Funded">✓</span></li></ol>
-                  <div class="panel-total">
-                    <span>Total estimated cost</span>
-                    <strong class="positive">$0.026</strong>
-                  </div>
-                </section>
-              </div>
-              <p class="comparison-caption">
-                The baseline executes every available action. MARGINAL finances only the
-                economically justified sequence.
-              </p>
-            </article>
-
-            <article class="glass-card allocation-card">
-              <div class="allocation-header">
-                <h3>Allocation decisions</h3>
-                <p>Every candidate is priced against expected marginal gain before execution.</p>
-              </div>
-              <div class="table-scroll">
-                <table class="allocation-table">
-                  <thead>
-                    <tr>
-                      <th>Action</th>
-                      <th>Cost</th>
-                      <th>Expected gain</th>
-                      <th>Decision</th>
-                    </tr>
-                  </thead>
-                  <tbody><tr><td><strong>inspect the failing assertion</strong><small>Diagnose</small></td><td><strong>$0.006</strong><small>1,200 tokens</small></td><td><strong>0.220</strong><small>score 0.189</small></td><td><span class="decision-pill funded-pill">FUNDED</span><small>approved: marginal ROI 7.166</small></td></tr><tr><td><strong>scan the entire repository</strong><small>Diagnose</small></td><td><strong>$0.045</strong><small>9,000 tokens</small></td><td><strong>0.050</strong><small>score -0.179</small></td><td><span class="decision-pill rejected-pill">REJECTED</span><small>rejected: marginal ROI 0.218 below 1.000</small></td></tr><tr><td><strong>ask two parallel reviewers</strong><small>Diagnose</small></td><td><strong>$0.120</strong><small>14,000 tokens</small></td><td><strong>0.040</strong><small>score -0.369</small></td><td><span class="decision-pill rejected-pill">REJECTED</span><small>rejected: marginal ROI 0.098 below 1.000</small></td></tr><tr><td><strong>apply the targeted one-line patch</strong><small>Fix</small></td><td><strong>$0.018</strong><small>2,400 tokens</small></td><td><strong>0.500</strong><small>score 0.433</small></td><td><span class="decision-pill funded-pill">FUNDED</span><small>approved: marginal ROI 7.418</small></td></tr><tr><td><strong>rewrite the complete pricing module</strong><small>Fix</small></td><td><strong>$0.110</strong><small>12,000 tokens</small></td><td><strong>0.200</strong><small>score -0.156</small></td><td><span class="decision-pill rejected-pill">REJECTED</span><small>rejected: marginal ROI 0.561 below 1.000</small></td></tr><tr><td><strong>ask a frontier model for an alternative patch</strong><small>Fix</small></td><td><strong>$0.280</strong><small>18,000 tokens</small></td><td><strong>0.150</strong><small>score -0.501</small></td><td><span class="decision-pill rejected-pill">REJECTED</span><small>rejected: marginal ROI 0.230 below 1.000</small></td></tr><tr><td><strong>run the targeted verifier</strong><small>Verify</small></td><td><strong>$0.002</strong><small>700 tokens</small></td><td><strong>0.350</strong><small>score 0.334</small></td><td><span class="decision-pill funded-pill">FUNDED</span><small>approved: marginal ROI 21.394</small></td></tr><tr><td><strong>run the full test suite</strong><small>Verify</small></td><td><strong>$0.012</strong><small>4,500 tokens</small></td><td><strong>0.080</strong><small>score -0.025</small></td><td><span class="decision-pill rejected-pill">REJECTED</span><small>rejected: marginal ROI 0.763 below 1.000</small></td></tr><tr><td><strong>request a premium model audit</strong><small>Verify</small></td><td><strong>$0.170</strong><small>11,000 tokens</small></td><td><strong>0.050</strong><small>score -0.348</small></td><td><span class="decision-pill rejected-pill">REJECTED</span><small>rejected: marginal ROI 0.126 below 1.000</small></td></tr></tbody>
-                </table>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section id="method" class="section">
-          <div class="method-grid">
-            <article class="glass-card proof-card">
-              <div class="proof-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M12 3 5 6v5c0 4.7 2.8 8 7 10 4.2-2 7-5.3 7-10V6l-7-3Z"></path>
-                  <path d="m9 12 2 2 4-5"></path>
-                </svg>
-              </div>
-              <div>
-                <h3>What this demo proves</h3>
-                <ul class="proof-list">
-                  <li>The task starts in FAIL.</li>
-                  <li>Both workflows finish in PASS.</li>
-                  <li>Costs are declared action budgets used by the allocator.</li>
-                  <li>This is a deterministic demonstration of economic action selection.</li>
-                </ul>
-              </div>
-            </article>
-
-            <article class="glass-card defect-card">
-              <h3>The deterministic defect</h3>
-              <p>Fix a percentage-discount bug in a deterministic Python repository</p>
-              <div class="code-diff" aria-label="Patch applied by the funded action">
-                <span class="code-line removed">- return total - rate</span>
-                <span class="code-line added">+ return total * (1 - rate)</span>
-              </div>
-              <div class="verifier">
-                <span>Verifier</span>
-                <code>apply_discount(100.0, 0.20) == 80.0</code>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section class="glass-card cta-card" aria-labelledby="cta-title">
-          <div class="cta-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-              <path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"></path>
-            </svg>
-          </div>
-          <div class="cta-copy">
-            <h3 id="cta-title">Build agents that spend compute deliberately.</h3>
-            <p>
-              Explore the open-source project and run the same deterministic evaluation
-              locally.
-            </p>
-          </div>
-          <div class="cta-actions">
-            <a
-              class="button button-primary"
-              href="https://github.com/SignalLayerLabs/Marginal"
-            >Open repository</a>
-            <a class="button button-secondary" href="#reproduce">Run the demo locally</a>
-          </div>
-        </section>
-
-        <section id="reproduce" class="glass-card reproduce-card">
-          <div class="reproduce-header">
-            <h3>Reproduce the result</h3>
-            <button
-              class="copy-button"
-              type="button"
-              data-copy="marginal killer-demo --output killer-demo-output"
-            >Copy command</button>
-          </div>
-          <code class="command">marginal killer-demo --output killer-demo-output</code>
-        </section>
-
-        <footer class="site-footer">
-          <span>© 2026 SignalLayer Labs</span>
-          <span class="footer-links">
-            <a href="https://github.com/SignalLayerLabs/Marginal/blob/main/LICENSE">Apache-2.0</a>
-            <a href="result.json">Structured result</a>
-            <a href="trace.jsonl">Decision trace</a>
-          </span>
-        </footer>
-      </main>
-    </div>
+      </footer>
+    </main>
   </div>
-
-  <script>
-    const copyButton = document.querySelector("[data-copy]");
-    if (copyButton) {
-      copyButton.addEventListener("click", async () => {
-        const command = copyButton.getAttribute("data-copy") || "";
-        try {
-          await navigator.clipboard.writeText(command);
-          const original = copyButton.textContent;
-          copyButton.textContent = "Copied";
-          window.setTimeout(() => { copyButton.textContent = original; }, 1400);
-        } catch (_error) {
-          window.prompt("Copy command", command);
-        }
-      });
-    }
-  </script>
+</div>
 </body>
 </html>

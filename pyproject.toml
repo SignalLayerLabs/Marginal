@@ -61,7 +61,7 @@ dev = [
   "pytest>=8.3",
   "PyYAML>=6.0",
   "jsonschema>=4.23",
-  "ruff==0.16.2",
+  "ruff==0.16.3",
   "twine>=6.1",
 ]
 
@@ -97,6 +97,9 @@ src = ["src", "tests", "examples"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/marginal/killer_demo.py" = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"

@@ -1,65 +1,72 @@
 <div align="center">
 
-<img src="assets/marginal-readme-hero.png" alt="MARGINAL — compute governance for AI agents" width="100%">
+<img src="assets/marginal-readme-hero.svg" alt="MARGINAL catches AI agent work that repeats without progress" width="100%">
 
 # MARGINAL
 
-### Evidence-based compute governance for AI agents
+## AI agents repeat work that changed nothing. **MARGINAL catches it.**
 
-**MARGINAL watches agent work, detects proven no-progress repetition, and earns limited authority to stop it.**
+**Open-source runtime governor for AI coding agents.** MARGINAL observes agent work, detects proven no-progress repetition, and only earns limited authority to stop it after enough local evidence.
+
+### **Observe first. Prove waste. Earn enforcement.**
 
 Open source · Local first · Provider neutral · Zero mandatory runtime dependencies
 
-[Quickstart](docs/getting-started/quickstart.md) · [Architecture](docs/product/architecture.md) ·
-[Evidence standard](docs/evaluation/governance-evidence.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+[**Try the visual demo →**](https://signallayerlabs.github.io/Marginal/#demo) · [Quickstart](docs/getting-started/quickstart.md) · [Architecture](docs/product/architecture.md) · [Evidence standard](docs/evaluation/governance-evidence.md)
 
 [![CI](https://github.com/SignalLayerLabs/Marginal/actions/workflows/ci.yml/badge.svg)](https://github.com/SignalLayerLabs/Marginal/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/SignalLayerLabs/Marginal/actions/workflows/codeql.yml/badge.svg)](https://github.com/SignalLayerLabs/Marginal/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/github/v/release/SignalLayerLabs/Marginal?style=flat-square)](https://github.com/SignalLayerLabs/Marginal/releases)
 [![Python 3.10–3.13](https://img.shields.io/badge/python-3.10--3.13-blue.svg?style=flat-square)](https://www.python.org/)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green.svg?style=flat-square)](LICENSE)
+[![Awesome AI Agent Governance](https://img.shields.io/badge/awesome-AI%20Agent%20Governance-FC60A8?style=flat-square)](https://github.com/systempromptio/awesome-ai-agent-governance)
 
 </div>
 
 ---
 
-## What MARGINAL does
+## The problem in one trace
 
-- Observes tool actions, outcomes, workspace state, and new evidence.
-- Distinguishes useful repetition from the same successful action repeated without progress.
-- Records decisions in a verifiable, hash-chained Decision Ledger.
-- Grants authority gradually and removes it when evidence, identity, capability, or integrity changes.
+```text
+WITHOUT MARGINAL                 WITH MARGINAL
 
-MARGINAL does not assume that more calls are wasteful. Missing or ambiguous evidence fails open.
+Read config.py    RUN            Read config.py    NEW EVIDENCE
+Read config.py    RUN            Read config.py    VERIFY
+Read config.py    RUN            Read config.py    SAME STATE
+Read config.py    RUN            Read config.py    STOP CANDIDATE
+Read config.py    RUN            ...               BLOCK only if earned
+```
+
+MARGINAL does **not** assume that repetition is waste. Another read, test, or verification can be exactly what a risky task needs. It looks for a stronger pattern: **the same eligible successful action, unchanged observable state, and no new evidence**.
+
+> **Installation is not permission to block your agent.** New integrations start in Shadow Mode. Enforcement has to be earned from evidence and can be removed again when evidence, identity, capability, coverage, or integrity changes.
 
 ## Install for Codex
-
-Install the native plugin from the repository:
 
 ```bash
 codex plugin marketplace add SignalLayerLabs/Marginal --ref main
 codex plugin add marginal@marginal
 ```
 
-The plugin starts globally in **Shadow Mode**. Open `/hooks` in Codex and approve the exact hook
-definitions after inspection. One local Python 3.10–3.13 interpreter is required; the launcher can
-find a compatible interpreter even when macOS resolves `python3` to an older Xcode runtime.
-
-Remove the plugin with:
+Open `/hooks` and inspect the exact MARGINAL lifecycle hooks before granting trust. The plugin starts globally in **Shadow Mode**.
 
 ```bash
 codex plugin remove marginal@marginal
 ```
 
-If the Python package is installed, the equivalent installer can also record explicit Autopilot
-consent:
+With the Python package, explicit Autopilot consent can be recorded with:
 
 ```bash
 marginal install codex --autopilot-consent
 ```
 
-Installation alone never enables enforcement. Earned Enforcement requires verified evidence and
-explicit promotion.
+## How MARGINAL earns authority
+
+1. **Observe** — collect derived action, outcome, coverage, state and evidence signals locally.
+2. **Verify** — bind decisions, policy identity, trust state and governance cost into Decision Receipts.
+3. **Earn** — require representative local evidence, clean coverage and explicit promotion.
+4. **Intervene narrowly** — only exact eligible actions can be denied under the proven no-progress condition.
+5. **Recover** — immediate retry is allowed; drift, unknown outcomes or failures demote authority and fail open.
 
 ### Optional Commons modes
 
@@ -82,61 +89,52 @@ outside MARGINAL's application boundary. The production contribution endpoint is
 Wrangler authentication and a dedicated least-privilege GitHub service credential are both
 verified. See the [privacy model](docs/operations/privacy.md).
 
-## How Autopilot works
+## Current integrations
 
-1. **Observe.** Hooks collect derived state, outcome, and coverage signals in Shadow Mode.
-2. **Verify.** Decision Receipts bind the decision, policy, trust state, and governance cost.
-3. **Earn authority.** Promotion requires explicit consent, a valid receipt, and a verified ledger range.
-4. **Intervene narrowly.** Only an exact eligible action with two prior successes and no state or evidence change can be denied on the third attempt.
-5. **Recover.** An immediate retry is allowed after a deny. Failures, unknown outcomes, drift, or integrity errors demote authority and fail open.
+| Engine | Capability | Current behavior |
+|---|---|---|
+| **Codex** | **Tool Enforcement** | Native plugin. Shadow Mode first; narrow blocking requires repository-local Earned Enforcement evidence. |
+| **Claude Code** | **Observe-only** | Native hooks record engine-declared success/failure and recommendations; they do not alter the next action. |
+| **OpenCode** | **Observe-only** | JavaScript plugin + persistent stdio bridge to the provider-neutral runtime. |
+| **PrivacyCode** | **Observe-only** | OpenCode-compatible target with a distinct engine identity, ledger root and trust history. |
 
-Authority is contextual, not permanent. The Trust Engine evaluates sample size, coverage, harmful
-outcomes, regret, governance tax, recency, policy identity, and available adapter capabilities.
+Same adapter does **not** mean same trust. Enforcement evidence stays engine- and repository-specific.
 
-The promotion gate assumes a non-adversarial, same-user trust domain. Receipt and ledger hashes
-detect corruption and make decisions reproducible; they do not prove authorship or stop the agent,
-a prompt-injected tool, or another same-user process from rewriting local state. Do not treat local
-Earned Enforcement as a security boundary against software running as the same OS user.
-
-## User intent and controls
-
-Codex user prompts can express deliberate repeat intent in English or Italian, including `repeat`,
-`force`, and `ripeti`. Negated or ambiguous phrases fail open. The prompt is processed in memory;
-its text and hash are not written to evidence.
-
-With the Python CLI:
-
+### Claude Code
 ```bash
-marginal status --json
-marginal doctor --json
-marginal explain DECISION_ID --json
-marginal privacy inspect --json
+marginal install claude-code
+marginal uninstall claude-code
 ```
 
-- `status` separates configured mode from effective authority and lists promotion blockers.
-- `doctor` checks runtime, hooks, schemas, policy identity, ledger integrity, and file permissions.
-- `explain` returns the redacted evidence behind one decision.
-- `privacy inspect` lists every persisted data category.
+### OpenCode
+```bash
+marginal install opencode
+marginal uninstall opencode
+```
 
-The bundled `$marginal` skill exposes native `status`, `doctor`, `review`, `promote`, and `demote`
-operations without requiring a global executable.
+### PrivacyCode
+```bash
+marginal install privacycode
+marginal uninstall privacycode
+```
 
-## Enforcement boundary
+See the [integration overview](docs/integrations/overview.md), [Claude Code guide](docs/integrations/claude-code.md), and [OpenCode / PrivacyCode guide](docs/integrations/opencode.md).
 
-The current Codex integration provides **Tool Enforcement**, not Full Compute Enforcement.
+## Current enforcement boundary
+
+The Codex integration provides **Tool Enforcement**, not Full Compute Enforcement.
 
 | Action family | Current behavior |
 |---|---|
 | Absolute workspace-local `Read` / `read_file` with only a path argument | Eligible after verified repeated success and no progress |
 | User-requested repeat or force | Allowed |
 | Polling, waiting, failure, or unknown outcome | Allowed |
-| Changed workspace state or evidence | Allowed and repetition proof reset |
+| Changed workspace state or evidence | Allowed; repetition proof resets |
 | Generic shell, tests, or search | Observe/recommend only |
 | Writes, network, deploy, external APIs, unknown MCP | Observe/recommend only |
 | MARGINAL status, doctor, demote, and recovery | Trusted control-plane bypass |
 
-MARGINAL counts actual avoided actions and recoveries. It does not invent token savings for actions
-that did not run.
+MARGINAL counts actual avoided actions and recoveries. It does not invent token savings for actions that did not run.
 
 ## Privacy and integrity
 
@@ -145,47 +143,49 @@ that did not run.
 - The v3 governance ledger links every canonical record to the previous record hash.
 - Promotion reads verified ledger payloads, not mutable summary files.
 - Ledger files use owner-only permissions, file locking, no-follow opens, and non-destructive quarantine.
-- Integration errors demote enforcement and allow the requested tool action.
+- Integration errors demote enforcement and allow the requested action.
 - `SAFE_TELEMETRY` exports derived pseudonyms and approved measurements, never raw private payloads.
 - `AGGREGATE_EXPORT` publishes only grouped statistics that meet the configured minimum group size.
 - Optional Commons sharing remains Local Only unless the user explicitly selects Read-Only or
   Contributor; shared Commons priors never grant enforcement authority.
 
-Read the [privacy model](docs/operations/privacy.md) and
-[governance evidence standard](docs/evaluation/governance-evidence.md).
+Read the [privacy model](docs/operations/privacy.md) and [governance evidence standard](docs/evaluation/governance-evidence.md).
 
-## Measured evidence
+## Controls
 
-**Exploratory 3-task smoke, one paired run per task.** This SWE-bench Lite result validates the
-integration path; it does not establish performance.
+```bash
+marginal status --json
+marginal doctor --json
+marginal explain DECISION_ID --json
+marginal privacy inspect --json
+```
+
+The bundled `$marginal` skill also exposes native `status`, `doctor`, `review`, `promote`, and `demote` operations.
+
+## Public evidence
+
+### Exploratory SWE-bench Lite smoke
+
+**Exploratory 3-task smoke, one paired run per task.** The first measured Codex integration validated the integration path; it did **not** establish performance.
 
 | Metric | Codex OFF | Codex + MARGINAL | Observed change |
 |---|---:|---:|---:|
 | Verified tasks resolved | 0/3 | 0/3 | 0/3 → 0/3 |
-| Effective tokens | 1,098,747 | 824,839 | 24.93% fewer |
-| Effective latency | 593.11 s | 565.77 s | 4.61% lower |
-| Tool calls | 33 | 32 | 3.03% fewer |
+| Effective tokens | 1,098,747 | 824,839 | 24.93% fewer observed |
+| Effective latency | 593.11 s | 565.77 s | 4.61% lower observed |
+| Tool calls | 33 | 32 | 3.03% fewer observed |
 | Governance overhead | — | 0 tokens · $0 · 7.06 s | measured separately |
 | Evaluator decision | — | `pass_through` | no support claim |
 
-The observed token difference is 24.93%, but neither lane resolved a task.
+**Important:** neither lane resolved a task. **No deny was applied in these three agent trajectories.** The observed 24.93% token difference therefore cannot be attributed to MARGINAL and is not a token-saving claim.
 
-**No deny was applied in these three agent trajectories.** The difference therefore cannot be
-attributed to MARGINAL and is not a useful-token-saving claim. Tokens per resolved task remain
-undefined.
-
-[Public report](benchmarks/swebench_lite/PUBLIC_BENCHMARK.md) · [Raw JSON](benchmarks/swebench_lite/public-benchmark.json) ·
-[Evidence bundle](benchmarks/swebench_lite/evidence/smoke-2026-08-11-dbce533/) · [Protocol](benchmarks/swebench_lite/README.md)
+[Public report](benchmarks/swebench_lite/PUBLIC_BENCHMARK.md) · [Raw JSON](benchmarks/swebench_lite/public-benchmark.json) · [Evidence bundle](benchmarks/swebench_lite/evidence/smoke-2026-08-11-dbce533/) · [Protocol](benchmarks/swebench_lite/README.md)
 
 ## Python library
-
-Install the current tagged version:
 
 ```bash
 pip install "marginal-ai @ git+https://github.com/SignalLayerLabs/Marginal.git@v0.3.3"
 ```
-
-Minimal Shadow Mode example:
 
 ```python
 from marginal import BudgetLimits, Treasury, build_policy
@@ -197,9 +197,6 @@ treasury = Treasury(
 )
 ```
 
-Start new integrations in Shadow Mode. Promote only after representative evidence shows that the
-policy preserves verified quality.
-
 ## Architecture
 
 ```text
@@ -210,11 +207,10 @@ Universal Agent Protocol
       ├── Treasury and policy
       ├── progress and utility evidence
       ├── Trust Engine and authority levels
-      └── Decision Receipts and governance ledger
+      └── Decision Receipts and Decision Ledger
 ```
 
-Adapters own native interception. The provider-neutral core owns policy, accounting, trust, and
-evidence semantics. See the [architecture guide](docs/product/architecture.md).
+Adapters own native interception. The provider-neutral core owns policy, accounting, trust and evidence semantics. See the [architecture guide](docs/product/architecture.md).
 
 ## Documentation
 
@@ -223,14 +219,15 @@ evidence semantics. See the [architecture guide](docs/product/architecture.md).
 | Getting started | [Quickstart](docs/getting-started/quickstart.md) |
 | Product | [Concepts](docs/product/concepts.md) · [Architecture](docs/product/architecture.md) |
 | Codex | [Plugin guide](docs/integrations/codex.md) · [Benchmark readiness](docs/integrations/codex-benchmark-readiness.md) |
+| Claude Code | [Observe plugin](docs/integrations/claude-code.md) |
+| OpenCode / PrivacyCode | [Observe plugin and compatible targets](docs/integrations/opencode.md) |
 | Evaluation | [Benchmarking](docs/evaluation/benchmarking.md) · [Public benchmarks](docs/evaluation/public-benchmarks.md) |
 | Operations | [Privacy](docs/operations/privacy.md) · [Governance](docs/project/governance.md) |
 | Reference | [API](docs/reference/api.md) · [Roadmap](ROADMAP.md) |
 
 ## Contributing
 
-Contributions and falsifiable criticism are welcome. Performance changes should include the
-evidence that could prove them wrong.
+Contributions and falsifiable criticism are welcome. Performance changes should include the evidence that could prove them wrong.
 
 ```bash
 ruff format --check .
@@ -242,5 +239,4 @@ pytest -q
 Read [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
-
 Apache-2.0. See [LICENSE](LICENSE).

@@ -315,8 +315,8 @@ git commit -m "feat: add evidence-gated Codex promotion receipts"
 
 ```python
 def test_wrong_token_is_rejected(tmp_path: Path) -> None:
-    with running_server(tmp_path, token="expected") as server:
-        response = send(server, token="wrong", operation="status", payload={})
+    with running_server(tmp_path, token="<expected-token>") as server:
+        response = send(server, token="<wrong-token>", operation="status", payload={})
     assert response["error_code"] == "AUTH_FAILED"
 
 

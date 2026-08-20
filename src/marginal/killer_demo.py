@@ -281,6 +281,7 @@ def _candidate_rows(event: dict[str, Any]) -> list[dict[str, Any]]:
                 "kind": action["kind"],
                 "tokens": action["cost"]["tokens"],
                 "usd": action["cost"]["usd"],
+                "latency_ms": action["cost"]["latency_ms"],
                 "expected_gain": decision["expected_gain"],
                 "score": round(float(decision["score"]), 6),
                 "allowed": decision["allowed"],
@@ -424,17 +425,23 @@ def render_killer_demo_markdown(result: dict[str, Any]) -> str:
     marginal = result["marginal"]
     savings = result["savings"]
     lines = [
-        "# MARGINAL Killer Demo",
+        "# MARGINAL Demo 001",
         "",
-        "**Fund only the next action worth taking.**",
+        "**AI agents repeat work that changed nothing. MARGINAL catches it.**",
+        "",
+        "Observe first. Prove waste. Earn enforcement.",
         "",
         f"> {result['disclaimer']}",
         "",
+        "This deterministic artifact demonstrates MARGINAL's compute-selection discipline. "
+        "The no-progress repetition sequence shown in the HTML is an explicitly labeled "
+        "runtime-pattern illustration, not provider telemetry and not an enforcement benchmark.",
+        "",
         f"Scenario: **{result['scenario']}**",
         "",
-        "![Baseline versus MARGINAL](comparison.svg)",
+        "![Without MARGINAL versus MARGINAL](comparison.svg)",
         "",
-        "## The defect",
+        "## Deterministic allocation proof",
         "",
         "```diff",
         f"- {result['defect']['before']}",
@@ -445,7 +452,7 @@ def render_killer_demo_markdown(result: dict[str, Any]) -> str:
         "",
         "Initial verifier: **FAIL**",
         "",
-        "| Metric | Baseline: run everything | MARGINAL | Savings |",
+        "| Metric | Without MARGINAL | MARGINAL | Observed demo delta |",
         "|---|---:|---:|---:|",
         (
             f"| Declared tokens | {baseline['tokens']:,} | {marginal['tokens']:,} | "
@@ -469,34 +476,35 @@ def render_killer_demo_markdown(result: dict[str, Any]) -> str:
         "",
     ]
     for stage in result["stages"]:
+        funded = next(
+            candidate for candidate in stage["candidates"] if candidate["name"] == stage["selected"]
+        )
+        rejected = len(stage["candidates"]) - 1
         lines.extend(
             [
                 f"### {stage['stage']}",
                 "",
-                f"Funded: **{stage['selected']}** — {stage['decision']}",
+                f"Selected: **{stage['selected']}** — {stage['decision']}",
                 "",
-                "| Candidate | Declared tokens | Expected gain | Score | Decision |",
-                "|---|---:|---:|---:|---|",
+                f"Declared cost: **{funded['tokens']:,} tokens · ${funded['usd']:.3f}**. "
+                f"Alternatives rejected: **{rejected}**.",
+                "",
             ]
         )
-        for candidate in stage["candidates"]:
-            status = "FUNDED" if candidate["name"] == stage["selected"] else "SKIPPED"
-            lines.append(
-                f"| {candidate['name']} | {candidate['tokens']:,} | "
-                f"{candidate['expected_gain']:.3f} | {candidate['score']:.3f} | "
-                f"{status}: {candidate['reason']} |"
-            )
-        lines.append("")
     lines.extend(
         [
+            "## What this demo proves",
+            "",
+            "- The deterministic task starts in FAIL and both workflows finish in PASS.",
+            "- The allocator can reject higher-cost actions while preserving the verifier outcome.",
+            "- Costs are declared demo estimates, not provider billing or production telemetry.",
+            "- The artifact is a mechanism demonstration, not a production benchmark.",
+            "",
             "## Reproduce",
             "",
             "```bash",
             "marginal killer-demo --output killer-demo-output",
             "```",
-            "",
-            "The command writes this report, a standalone HTML report, an SVG comparison, "
-            "the JSON result, and the provider-neutral decision trace.",
             "",
         ]
     )
@@ -506,1823 +514,1184 @@ def render_killer_demo_markdown(result: dict[str, Any]) -> str:
 def render_killer_demo_svg(result: dict[str, Any]) -> str:
     baseline_tokens = int(result["baseline"]["tokens"])
     marginal_tokens = int(result["marginal"]["tokens"])
-    chart_width = 520
-    marginal_bar = max(4, round(chart_width * marginal_tokens / baseline_tokens))
     savings = float(result["savings"]["tokens_percent"])
+    max_width = 760
+    marginal_width = max(8, round(max_width * marginal_tokens / baseline_tokens))
     return "\n".join(
         [
-            '<svg xmlns="http://www.w3.org/2000/svg" width="720" height="230"',
-            ' viewBox="0 0 720 230" role="img"',
-            ' aria-label="Baseline versus MARGINAL token use">',
-            '  <rect width="720" height="230" rx="20" fill="#0b1020"/>',
-            '  <text x="40" y="42" fill="#ffffff"',
-            ' font-family="Arial, sans-serif" font-size="24" font-weight="700">',
-            "Declared token cost for the same verified fix</text>",
-            '  <text x="40" y="88" fill="#cbd5e1"',
-            ' font-family="Arial, sans-serif" font-size="16">Baseline</text>',
-            f'  <rect x="150" y="68" width="{chart_width}" height="30"',
-            ' rx="8" fill="#ef4444"/>',
-            '  <text x="680" y="89" text-anchor="end" fill="#ffffff"',
-            ' font-family="Arial, sans-serif" font-size="16">',
-            f"{baseline_tokens:,}</text>",
-            '  <text x="40" y="148" fill="#cbd5e1"',
-            ' font-family="Arial, sans-serif" font-size="16">MARGINAL</text>',
-            f'  <rect x="150" y="128" width="{marginal_bar}" height="30"',
-            ' rx="8" fill="#22c55e"/>',
-            f'  <text x="{160 + marginal_bar}" y="149" fill="#ffffff"',
-            ' font-family="Arial, sans-serif" font-size="16">',
-            f"{marginal_tokens:,}</text>",
-            '  <text x="40" y="202" fill="#86efac"',
-            ' font-family="Arial, sans-serif" font-size="20" font-weight="700">',
-            f"{savings:.2f}% fewer declared tokens · outcome preserved</text>",
+            (
+                '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" '
+                'viewBox="0 0 1200 520" role="img" '
+                'aria-label="Baseline versus MARGINAL deterministic token cost">'
+            ),
+            (
+                '<defs><linearGradient id="g" x1="0" x2="1">'
+                '<stop stop-color="#91ff63"/><stop offset="1" stop-color="#58e6ff"/>'
+                "</linearGradient></defs>"
+            ),
+            '<rect width="1200" height="520" rx="34" fill="#070a0f"/>',
+            (
+                '<text x="70" y="78" fill="#91ff63" font-family="Arial,sans-serif" '
+                'font-size="18" font-weight="700">MARGINAL DEMO 002</text>'
+            ),
+            (
+                '<text x="70" y="135" fill="#f7fbff" font-family="Arial,sans-serif" '
+                'font-size="36" font-weight="700">Same task. Same PASS. Less extra work.</text>'
+            ),
+            (
+                '<text x="70" y="180" fill="#9aa7b5" font-family="Arial,sans-serif" '
+                'font-size="18">Deterministic action-cost replay — not provider telemetry.</text>'
+            ),
+            (
+                '<text x="70" y="255" fill="#f7fbff" font-family="Arial,sans-serif" '
+                'font-size="18" font-weight="700">Baseline · execute every candidate</text>'
+            ),
+            f'<rect x="330" y="230" width="{max_width}" height="40" rx="10" fill="#343b45"/>',
+            (
+                f'<text x="1110" y="257" text-anchor="end" fill="#f7fbff" '
+                f'font-family="Arial,sans-serif" font-size="18">{baseline_tokens:,}</text>'
+            ),
+            (
+                '<text x="70" y="335" fill="#f7fbff" font-family="Arial,sans-serif" '
+                'font-size="18" font-weight="700">MARGINAL · decide before spend</text>'
+            ),
+            (
+                f'<rect x="330" y="310" width="{marginal_width}" height="40" rx="10" '
+                'fill="url(#g)"/>'
+            ),
+            (
+                f'<text x="{350 + marginal_width}" y="337" fill="#91ff63" '
+                f'font-family="Arial,sans-serif" font-size="18">{marginal_tokens:,}</text>'
+            ),
+            (
+                f'<text x="70" y="430" fill="#91ff63" font-family="Arial,sans-serif" '
+                f'font-size="30" font-weight="700">{savings:.2f}% fewer declared tokens</text>'
+            ),
+            (
+                '<text x="70" y="470" fill="#9aa7b5" font-family="Arial,sans-serif" '
+                'font-size="16">PASS → PASS · deterministic mechanism demonstration</text>'
+            ),
             "</svg>",
             "",
         ]
     )
 
 
-def _candidate_lookup(result: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def build_killer_demo_playback(result: dict[str, Any]) -> dict[str, Any]:
+    baseline_outputs = {
+        (item["stage"], item["name"]): item["output"] for item in result["baseline_actions"]
+    }
+    marginal_outputs = {
+        (item["stage"], item["name"]): item["output"] for item in result["marginal_actions"]
+    }
+    baseline_totals = {"tokens": 0, "usd": 0.0, "latency_ms": 0, "calls": 0}
+    marginal_totals = {"tokens": 0, "usd": 0.0, "latency_ms": 0, "calls": 0}
+    baseline_workspace = "FAIL"
+    marginal_workspace = "FAIL"
+    ticks: list[dict[str, Any]] = []
+
+    for stage_index, stage in enumerate(result["stages"], start=1):
+        stage_name = str(stage["stage"])
+        selected = str(stage["selected"])
+        for candidate_index, candidate in enumerate(stage["candidates"], start=1):
+            name = str(candidate["name"])
+            funded = name == selected
+            latency_ms = int(candidate.get("latency_ms", 0))
+            key = (stage_name, name)
+
+            baseline_totals["tokens"] += int(candidate["tokens"])
+            baseline_totals["usd"] += float(candidate["usd"])
+            baseline_totals["latency_ms"] += latency_ms
+            baseline_totals["calls"] += 1
+
+            if funded:
+                marginal_totals["tokens"] += int(candidate["tokens"])
+                marginal_totals["usd"] += float(candidate["usd"])
+                marginal_totals["latency_ms"] += latency_ms
+                marginal_totals["calls"] += 1
+
+            if stage_name == "Fix" and funded:
+                baseline_workspace = "PATCHED"
+                marginal_workspace = "PATCHED"
+            if stage_name == "Verify" and funded:
+                baseline_workspace = "PASS"
+                marginal_workspace = "PASS"
+
+            ticks.append(
+                {
+                    "index": len(ticks) + 1,
+                    "stage": stage_name,
+                    "stage_index": stage_index,
+                    "candidate_index": candidate_index,
+                    "candidate": {
+                        "name": name,
+                        "kind": candidate["kind"],
+                        "tokens": int(candidate["tokens"]),
+                        "usd": float(candidate["usd"]),
+                        "latency_ms": latency_ms,
+                        "expected_gain": float(candidate["expected_gain"]),
+                        "score": float(candidate["score"]),
+                    },
+                    "baseline": {
+                        "decision": "EXECUTE",
+                        "calls": 1,
+                        "tokens": int(candidate["tokens"]),
+                        "usd": float(candidate["usd"]),
+                        "latency_ms": latency_ms,
+                        "output": baseline_outputs.get(key, "completed"),
+                        "workspace": baseline_workspace,
+                        "cumulative": dict(baseline_totals),
+                    },
+                    "marginal": {
+                        "decision": "FUND + EXECUTE" if funded else "REJECT BEFORE SPEND",
+                        "funded": funded,
+                        "reason": str(candidate["reason"]),
+                        "expected_gain": float(candidate["expected_gain"]),
+                        "score": float(candidate["score"]),
+                        "calls": 1 if funded else 0,
+                        "tokens": int(candidate["tokens"]) if funded else 0,
+                        "usd": float(candidate["usd"]) if funded else 0.0,
+                        "latency_ms": latency_ms if funded else 0,
+                        "output": marginal_outputs.get(key, "not executed"),
+                        "workspace": marginal_workspace,
+                        "cumulative": dict(marginal_totals),
+                    },
+                }
+            )
+
     return {
-        candidate["name"]: candidate
-        for stage in result["stages"]
-        for candidate in stage["candidates"]
+        "scenario": result["scenario"],
+        "defect": result["defect"],
+        "disclaimer": result["disclaimer"],
+        "ticks": ticks,
+        "final": {
+            "baseline": result["baseline"],
+            "marginal": result["marginal"],
+            "savings": result["savings"],
+        },
     }
 
 
-def _render_flow_steps(
-    actions: list[dict[str, Any]],
-    candidates: dict[str, dict[str, Any]],
-    selected_names: set[str],
-    *,
-    marginal: bool,
-) -> str:
-    rows: list[str] = []
-    for position, action in enumerate(actions, start=1):
-        candidate = candidates[action["name"]]
-        justified = action["name"] in selected_names
-        if marginal:
-            state_class = "funded"
-            state_label = "Funded"
-            state_icon = "✓"
-        elif justified:
-            state_class = "justified"
-            state_label = "Justified"
-            state_icon = "✓"
-        else:
-            state_class = "excess"
-            state_label = "Executed"
-            state_icon = "x"
-        rows.append(
-            "".join(
-                [
-                    f'<li class="flow-step {state_class}">',
-                    f'<span class="step-index">{position}</span>',
-                    '<span class="step-copy">',
-                    f"<strong>{html.escape(action['name'])}</strong>",
-                    f"<small>{html.escape(action['stage'])} · "
-                    f"{candidate['tokens']:,} tokens</small>",
-                    "</span>",
-                    '<span class="step-cost">',
-                    f"<strong>${candidate['usd']:.3f}</strong>",
-                    f"<small>{state_label}</small>",
-                    "</span>",
-                    f'<span class="step-state" aria-label="{state_label}">{state_icon}</span>',
-                    "</li>",
-                ]
-            )
-        )
-    return "".join(rows)
+def render_killer_demo_css() -> str:
+    return (
+        """:root {
+  --bg: #06080b;
+  --panel: #0c1117;
+  --panel-2: #101720;
+  --line: #26313d;
+  --text: #f7fbff;
+  --muted: #8f9aa8;
+  --lime: #91ff63;
+  --cyan: #58e6ff;
+  --red: #ff675f;
+  --amber: #f5c451;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); scroll-behavior: smooth; }
+body {
+  margin: 0;
+  min-width: 320px;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 80% 4%, rgba(145,255,99,.12), transparent 25rem),
+    radial-gradient(circle at 15% 65%, rgba(88,230,255,.06), transparent 32rem),
+    var(--bg);
+  font-family: var(--sans);
+}
+a { color: inherit; text-decoration: none; }
+button, select { font: inherit; }
+button { cursor: pointer; }
+.browser-shell {
+  width: min(calc(100% - 24px), 1540px);
+  margin: 12px auto;
+  border: 1px solid #202a34;
+  border-radius: 24px;
+  overflow: hidden;
+  background: rgba(6,8,11,.96);
+  box-shadow: 0 44px 140px rgba(0,0,0,.48);
+}
+.chrome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 16px;
+  border-bottom: 1px solid #1d252e;
+  background: #10151b;
+}
+.chrome i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #3a4652;
+}
+.chrome i:first-child { background: #ff6058; }
+.chrome i:nth-child(2) { background: #ffbd44; }
+.chrome i:nth-child(3) { background: #00ca4e; }
+.address {
+  margin: auto;
+  color: #73808d;
+  font: 10px var(--mono);
+}
+.shell {
+  width: min(calc(100% - 40px), 1400px);
+  margin: auto;
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 64px;
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+.brand-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(145,255,99,.34);
+  border-radius: 9px;
+  color: var(--lime);
+  background: rgba(145,255,99,.05);
+}
+.navlinks { display: flex; gap: 18px; color: var(--muted); font-size: 12px; }
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 30px;
+  align-items: end;
+  padding: 48px 0 28px;
+}
+.eyebrow {
+  color: var(--lime);
+  font: 800 11px var(--mono);
+  letter-spacing: .13em;
+}
+h1 {
+  max-width: 980px;
+  margin: 10px 0 12px;
+  font-size: clamp(40px, 5.8vw, 82px);
+  line-height: .94;
+  letter-spacing: -.055em;
+}
+.hero p { max-width: 840px; margin: 0; color: #bdc8d3; font-size: 17px; }
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.control {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--text);
+  background: #0e141b;
+  font-size: 12px;
+  font-weight: 800;
+}
+.control.primary {
+  border-color: var(--lime);
+  color: #081005;
+  background: var(--lime);
+}
+.control:disabled { cursor: not-allowed; opacity: .42; }
+.speed {
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--text);
+  background: #0e141b;
+}
+.race-wrap {
+  position: relative;
+  margin-bottom: 38px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  overflow: hidden;
+  background: #080c11;
+}
+.task-strip {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 18px;
+  align-items: center;
+  min-height: 58px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #0b1016;
+}
+.task-strip strong { font-size: 12px; }
+.task-strip small { color: var(--muted); font: 10px var(--mono); }
+.task-strip .center { color: var(--lime); text-align: center; }
+.stage-rail {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  border-bottom: 1px solid var(--line);
+}
+.stage-node {
+  position: relative;
+  padding: 10px 14px;
+  color: #65717e;
+  font: 800 10px var(--mono);
+  letter-spacing: .09em;
+  text-align: center;
+}
+.stage-node + .stage-node { border-left: 1px solid var(--line); }
+.stage-node.active { color: var(--text); background: rgba(88,230,255,.05); }
+.stage-node.done { color: var(--lime); }
+.progress-line {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: #1f2933;
+}
+.progress-line span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--lime), var(--cyan));
+  transition: width .35s ease;
+}
+.race-grid {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 72px minmax(0,1fr);
+  min-height: 610px;
+}
+.lane {
+  min-width: 0;
+  padding: 18px;
+  background: var(--panel);
+}
+.lane.baseline { box-shadow: inset 0 3px 0 rgba(255,103,95,.62); }
+.lane.marginal {
+  background:
+    radial-gradient(circle at 80% 0, rgba(145,255,99,.06), transparent 18rem),
+    var(--panel);
+  box-shadow: inset 0 3px 0 rgba(145,255,99,.72);
+}
+.lane.flash { animation: lane-flash .46s ease; }
+@keyframes lane-flash {
+  0% { box-shadow: inset 0 0 0 1px transparent; }
+  50% { box-shadow: inset 0 0 0 1px rgba(88,230,255,.55); }
+  100% { box-shadow: inset 0 0 0 1px transparent; }
+}
+.lane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.lane-kicker {
+  display: block;
+  color: var(--muted);
+  font: 800 9px var(--mono);
+  letter-spacing: .1em;
+}
+.lane-head h2 { margin: 4px 0 0; font-size: 21px; }
+.mode-badge {
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font: 800 8px var(--mono);
+  letter-spacing: .08em;
+}
+.baseline .mode-badge { color: #ff958f; }
+.marginal .mode-badge { color: var(--lime); }
+.metric-row {
+  display: grid;
+  grid-template-columns: repeat(4,1fr);
+  gap: 7px;
+  margin-bottom: 12px;
+}
+.live-metric {
+  padding: 10px;
+  border: 1px solid #222d38;
+  border-radius: 10px;
+  background: #090e14;
+}
+.live-metric span {
+  display: block;
+  color: #6e7b88;
+  font: 800 8px var(--mono);
+  letter-spacing: .07em;
+}
+.live-metric strong {
+  display: block;
+  margin-top: 7px;
+  font-size: 16px;
+  letter-spacing: -.02em;
+}
+.workspace {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 9px 11px;
+  border: 1px solid #222d38;
+  border-radius: 10px;
+  color: var(--muted);
+  font: 10px var(--mono);
+  background: #090e14;
+}
+.workspace strong { color: var(--red); }
+.workspace strong[data-state="PATCHED"] { color: var(--amber); }
+.workspace strong[data-state="PASS"] { color: var(--lime); }
+.gate {
+  min-height: 98px;
+  margin-bottom: 10px;
+  padding: 12px;
+  border: 1px solid #24303b;
+  border-radius: 12px;
+  background: #090e14;
+}
+.gate-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font: 800 9px var(--mono);
+}
+.gate-title span:first-child { color: var(--muted); }
+.decision { color: var(--muted); }
+.decision.fund { color: var(--lime); }
+.decision.reject { color: var(--red); }
+.gate p { margin: 0; color: #a7b2bd; font-size: 11px; line-height: 1.45; }
+.gate-score {
+  display: flex;
+  gap: 14px;
+  margin-top: 8px;
+  color: #667481;
+  font: 9px var(--mono);
+}
+.terminal {
+  height: 300px;
+  overflow-y: auto;
+  padding: 13px;
+  border: 1px solid #222d38;
+  border-radius: 12px;
+  background: #05080c;
+  font: 11px/1.55 var(--mono);
+  scrollbar-width: thin;
+}
+.term-line { margin: 0 0 8px; color: #9eabb7; white-space: pre-wrap; }
+.term-line.command { color: var(--text); }
+.term-line.execute::before { content: "EXEC  "; color: var(--amber); }
+.term-line.fund::before { content: "FUND  "; color: var(--lime); }
+.term-line.reject::before { content: "SKIP  "; color: var(--red); }
+.term-line.output { padding-left: 12px; color: #71808e; }
+.term-line.pass { color: var(--lime); }
+.vs-rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-right: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  background: #090d12;
+}
+.vs { color: #687581; font: 900 12px var(--mono); }
+.tick {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--text);
+  font: 800 10px var(--mono);
+  background: #0c1219;
+}
+.waste-meter {
+  position: relative;
+  width: 8px;
+  height: 230px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #1b242d;
+}
+.waste-meter span {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 0;
+  background: linear-gradient(0deg, var(--lime), var(--cyan));
+  transition: height .35s ease;
+}
+.waste-label {
+  color: #687581;
+  font: 800 8px var(--mono);
+  letter-spacing: .08em;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+.result-reveal {
+  display: none;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: center;
+  padding: 22px;
+  border-top: 1px solid rgba(145,255,99,.32);
+  background: linear-gradient(90deg, rgba(145,255,99,.08), rgba(88,230,255,.03));
+}
+.result-reveal.show { display: grid; animation: reveal .45s ease both; }
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.result-reveal h2 { margin: 0 0 5px; font-size: clamp(24px,3vw,38px); }
+.result-reveal p { margin: 0; color: var(--muted); }
+.result-numbers { display: flex; gap: 16px; }
+.result-numbers div { min-width: 130px; }
+.result-numbers span {
+  display: block;
+  color: var(--muted);
+  font: 800 8px var(--mono);
+}
+.result-numbers strong { display: block; margin-top: 4px; color: var(--lime); font-size: 22px; }
+.below {
+  display: grid;
+  grid-template-columns: 1.1fr .9fr;
+  gap: 12px;
+  margin: 0 0 42px;
+}
+.proof-card {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+}
+.proof-card h3 { margin: 0 0 8px; }
+.proof-card p, .proof-card li { color: var(--muted); font-size: 12px; line-height: 1.55; }
+.proof-card code { color: #dce6f0; font: 11px var(--mono); }
+.legacy-contract { display: none; }
+.footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 26px 0 32px;
+  border-top: 1px solid var(--line);
+  color: #65727e;
+  font-size: 10px;
+}
+.footer nav { display: flex; gap: 14px; }
+@media (max-width: 980px) {
+  .hero { grid-template-columns: 1fr; align-items: start; }
+  .controls { justify-content: flex-start; }
+  .race-grid { grid-template-columns: 1fr; }
+  .vs-rail {
+    min-height: 70px;
+    flex-direction: row;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .waste-meter { width: 220px; height: 7px; }
+  .waste-meter span { width: 0; height: 100%; transition: width .35s ease; }
+  .waste-label { writing-mode: initial; transform: none; }
+  .below { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) {
+  .browser-shell { width: 100%; margin: 0; border: 0; border-radius: 0; }
+  .chrome { display: none; }
+  .shell { width: min(calc(100% - 24px), 1400px); }
+  .navlinks { display: none; }
+  h1 { font-size: 43px; }
+  .metric-row { grid-template-columns: 1fr 1fr; }
+  .task-strip { grid-template-columns: 1fr; text-align: left; }
+  .task-strip .center { text-align: left; }
+  .result-reveal { grid-template-columns: 1fr; }
+  .result-numbers { flex-wrap: wrap; }
+  .footer { flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
+""".strip()
+        + "\n"
+    )
 
 
-def _render_allocation_rows(result: dict[str, Any]) -> str:
-    rows: list[str] = []
-    for stage in result["stages"]:
-        for candidate in stage["candidates"]:
-            funded = candidate["name"] == stage["selected"]
-            state_class = "funded-pill" if funded else "rejected-pill"
-            state_label = "FUNDED" if funded else "REJECTED"
-            rows.append(
-                "".join(
-                    [
-                        "<tr>",
-                        "<td>",
-                        f"<strong>{html.escape(candidate['name'])}</strong>",
-                        f"<small>{html.escape(stage['stage'])}</small>",
-                        "</td>",
-                        "<td>",
-                        f"<strong>${candidate['usd']:.3f}</strong>",
-                        f"<small>{candidate['tokens']:,} tokens</small>",
-                        "</td>",
-                        "<td>",
-                        f"<strong>{candidate['expected_gain']:.3f}</strong>",
-                        f"<small>score {candidate['score']:.3f}</small>",
-                        "</td>",
-                        "<td>",
-                        f'<span class="decision-pill {state_class}">{state_label}</span>',
-                        f"<small>{html.escape(candidate['reason'])}</small>",
-                        "</td>",
-                        "</tr>",
-                    ]
-                )
-            )
-    return "".join(rows)
+def render_killer_demo_js() -> str:
+    return (
+        """(() => {
+  "use strict";
+
+  const dataNode = document.querySelector("#demo-data");
+  if (!dataNode) return;
+  const data = JSON.parse(dataNode.textContent || "{}");
+  const ticks = Array.isArray(data.ticks) ? data.ticks : [];
+
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+  const number = new Intl.NumberFormat("en-US");
+  const money = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  });
+
+  const state = {
+    cursor: -1,
+    playing: false,
+    speed: 1,
+    timer: null,
+  };
+
+  const dom = {
+    run: $('[data-action="run"]'),
+    pause: $('[data-action="pause"]'),
+    step: $('[data-action="step"]'),
+    reset: $('[data-action="reset"]'),
+    speed: $("#speed"),
+    progress: $("#race-progress"),
+    tick: $("#tick-counter"),
+    waste: $("#waste-fill"),
+    result: $("#result-reveal"),
+    baselineTerminal: $("#terminal-baseline"),
+    marginalTerminal: $("#terminal-marginal"),
+    baselineState: $("#state-baseline"),
+    marginalState: $("#state-marginal"),
+    decision: $("#decision-live"),
+    reason: $("#decision-reason"),
+    score: $("#decision-score"),
+    gain: $("#decision-gain"),
+    currentCandidate: $("#current-candidate"),
+    stages: $$('[data-stage]'),
+    baselineLane: $('[data-lane="baseline"]'),
+    marginalLane: $('[data-lane="marginal"]'),
+  };
+
+  function metric(lane, name) {
+    return $(`[data-metric="${lane}-${name}"]`);
+  }
+
+  function setMetric(lane, cumulative) {
+    metric(lane, "calls").textContent = number.format(cumulative.calls || 0);
+    metric(lane, "tokens").textContent = number.format(cumulative.tokens || 0);
+    metric(lane, "usd").textContent = `$${money.format(cumulative.usd || 0)}`;
+    const seconds = (cumulative.latency_ms || 0) / 1000;
+    metric(lane, "latency").textContent = `${seconds.toFixed(2)}s`;
+  }
+
+  function setWorkspace(node, value) {
+    node.textContent = value;
+    node.dataset.state = value;
+  }
+
+  function appendLine(terminal, kind, text) {
+    const line = document.createElement("p");
+    line.className = `term-line ${kind}`;
+    line.textContent = text;
+    terminal.appendChild(line);
+    terminal.scrollTop = terminal.scrollHeight;
+  }
+
+  function pulse(node) {
+    if (!node) return;
+    node.classList.remove("flash");
+    void node.offsetWidth;
+    node.classList.add("flash");
+  }
+
+  function updateStages(tick) {
+    dom.stages.forEach((node, index) => {
+      const stageIndex = index + 1;
+      node.classList.toggle("active", stageIndex === tick.stage_index);
+      node.classList.toggle("done", stageIndex < tick.stage_index);
+    });
+  }
+
+  function updateWaste(tick) {
+    const base = tick.baseline.cumulative.tokens || 0;
+    const governed = tick.marginal.cumulative.tokens || 0;
+    const avoided = Math.max(0, base - governed);
+    const finalBase = data.final.baseline.tokens || 1;
+    const percent = Math.min(100, (avoided / finalBase) * 100);
+    if (window.matchMedia("(max-width: 980px)").matches) {
+      dom.waste.style.height = "100%";
+      dom.waste.style.width = `${percent}%`;
+    } else {
+      dom.waste.style.width = "100%";
+      dom.waste.style.height = `${percent}%`;
+    }
+  }
+
+  function renderDecision(tick) {
+    const decision = tick.marginal.decision;
+    dom.decision.textContent = decision;
+    dom.decision.classList.toggle("fund", tick.marginal.funded);
+    dom.decision.classList.toggle("reject", !tick.marginal.funded);
+    dom.reason.textContent = tick.marginal.reason;
+    dom.score.textContent = `score ${tick.marginal.score.toFixed(3)}`;
+    dom.gain.textContent = `gain ${tick.marginal.expected_gain.toFixed(3)}`;
+  }
+
+  function revealResult() {
+    if (dom.result.classList.contains("show")) return;
+    dom.result.classList.add("show");
+    dom.stages.forEach((node) => {
+      node.classList.remove("active");
+      node.classList.add("done");
+    });
+    appendLine(dom.baselineTerminal, "pass", "VERIFIER PASS");
+    appendLine(dom.marginalTerminal, "pass", "VERIFIER PASS");
+    dom.run.disabled = false;
+    dom.pause.disabled = true;
+  }
+
+  function advanceRace() {
+    if (state.cursor >= ticks.length - 1) {
+      state.playing = false;
+      revealResult();
+      return false;
+    }
+
+    state.cursor += 1;
+    const tick = ticks[state.cursor];
+    const position = state.cursor + 1;
+    const progress = (position / ticks.length) * 100;
+    dom.progress.style.width = `${progress}%`;
+    dom.tick.textContent = `${position}/${ticks.length}`;
+    dom.currentCandidate.textContent = `${tick.stage} · ${tick.candidate.name}`;
+    updateStages(tick);
+
+    appendLine(dom.baselineTerminal, "command", `> ${tick.candidate.name}`);
+    appendLine(dom.baselineTerminal, "execute", tick.baseline.output);
+    setMetric("baseline", tick.baseline.cumulative);
+    setWorkspace(dom.baselineState, tick.baseline.workspace);
+    pulse(dom.baselineLane);
+
+    renderDecision(tick);
+    if (tick.marginal.funded) {
+      appendLine(dom.marginalTerminal, "command", `> ${tick.candidate.name}`);
+      appendLine(dom.marginalTerminal, "fund", tick.marginal.output);
+    } else {
+      appendLine(dom.marginalTerminal, "reject", tick.candidate.name);
+      appendLine(dom.marginalTerminal, "output", tick.marginal.reason);
+    }
+    setMetric("marginal", tick.marginal.cumulative);
+    setWorkspace(dom.marginalState, tick.marginal.workspace);
+    updateWaste(tick);
+    pulse(dom.marginalLane);
+
+    if (state.cursor === ticks.length - 1) revealResult();
+    return true;
+  }
+
+  function delayForCurrentTick() {
+    const tick = ticks[Math.max(0, state.cursor)];
+    const declared = tick ? tick.candidate.latency_ms : 700;
+    const accelerated = Math.max(600, Math.min(1400, declared * 0.22));
+    return accelerated / state.speed;
+  }
+
+  function scheduleNext() {
+    window.clearTimeout(state.timer);
+    if (!state.playing) return;
+    state.timer = window.setTimeout(() => {
+      const advanced = advanceRace();
+      if (advanced && state.playing && state.cursor < ticks.length - 1) {
+        scheduleNext();
+      } else {
+        state.playing = false;
+      }
+    }, delayForCurrentTick());
+  }
+
+  function playRace() {
+    if (state.cursor >= ticks.length - 1) resetRace();
+    state.playing = true;
+    dom.run.disabled = true;
+    dom.pause.disabled = false;
+    if (state.cursor < 0) advanceRace();
+    scheduleNext();
+  }
+
+  function pauseRace() {
+    state.playing = false;
+    window.clearTimeout(state.timer);
+    dom.run.disabled = false;
+    dom.pause.disabled = true;
+  }
+
+  function resetTerminal(terminal, label) {
+    terminal.replaceChildren();
+    appendLine(terminal, "command", `$ ${label}`);
+    appendLine(terminal, "output", "initial verifier: FAIL");
+    appendLine(terminal, "output", "ready — same task, same workspace snapshot");
+  }
+
+  function resetRace() {
+    pauseRace();
+    state.cursor = -1;
+    dom.progress.style.width = "0%";
+    dom.tick.textContent = `0/${ticks.length}`;
+    dom.currentCandidate.textContent = "Ready";
+    dom.result.classList.remove("show");
+    dom.waste.style.width = "0";
+    dom.waste.style.height = "0";
+    setMetric("baseline", {});
+    setMetric("marginal", {});
+    setWorkspace(dom.baselineState, "FAIL");
+    setWorkspace(dom.marginalState, "FAIL");
+    dom.decision.textContent = "WAITING";
+    dom.decision.className = "decision";
+    dom.reason.textContent = "Press RUN. MARGINAL will score each candidate before spend.";
+    dom.score.textContent = "score —";
+    dom.gain.textContent = "gain —";
+    dom.stages.forEach((node) => node.classList.remove("active", "done"));
+    resetTerminal(dom.baselineTerminal, "agent --governor off");
+    resetTerminal(dom.marginalTerminal, "agent --governor marginal");
+    dom.run.disabled = false;
+    dom.pause.disabled = true;
+  }
+
+  dom.run?.addEventListener("click", playRace);
+  dom.pause?.addEventListener("click", pauseRace);
+  dom.step?.addEventListener("click", () => {
+    pauseRace();
+    advanceRace();
+  });
+  dom.reset?.addEventListener("click", resetRace);
+  dom.speed?.addEventListener("change", () => {
+    state.speed = Number(dom.speed.value) || 1;
+    if (state.playing) scheduleNext();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    const tag = document.activeElement?.tagName || "";
+    if (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(tag)) return;
+    if (event.code === "Space") {
+      event.preventDefault();
+      state.playing ? pauseRace() : playRace();
+    }
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      pauseRace();
+      advanceRace();
+    }
+    if (event.key.toLowerCase() === "r") resetRace();
+  });
+
+  resetRace();
+})();
+""".strip()
+        + "\n"
+    )
 
 
 def render_killer_demo_html(result: dict[str, Any]) -> str:
+    playback = build_killer_demo_playback(result)
+    playback_json = json.dumps(playback, separators=(",", ":"), ensure_ascii=False)
+    playback_json = playback_json.replace("</", "<\\/")
+    structured = {
+        "@context": "https://schema.org",
+        "@type": "SoftwareSourceCode",
+        "name": "MARGINAL Interactive Killer Demo",
+        "description": "Deterministic split-screen replay of the MARGINAL Killer Demo.",
+        "codeRepository": "https://github.com/SignalLayerLabs/Marginal",
+        "programmingLanguage": ["Python", "JavaScript"],
+    }
+    structured_json = json.dumps(structured, separators=(",", ":"))
     baseline = result["baseline"]
     marginal = result["marginal"]
     savings = result["savings"]
-    candidates = _candidate_lookup(result)
-    selected_names = {stage["selected"] for stage in result["stages"]}
-    baseline_steps = _render_flow_steps(
-        result["baseline_actions"],
-        candidates,
-        selected_names,
-        marginal=False,
-    )
-    marginal_steps = _render_flow_steps(
-        result["marginal_actions"],
-        candidates,
-        selected_names,
-        marginal=True,
-    )
-    allocation_rows = _render_allocation_rows(result)
     page = """<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#050814">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#06080b">
   <meta name="color-scheme" content="dark">
-  <title>MARGINAL Killer Demo</title>
-  <meta name="description"
-    content="A deterministic comparison between a baseline workflow and MARGINAL-funded execution.">
-  <meta property="og:title" content="MARGINAL Killer Demo">
-  <meta property="og:description"
-    content="Same verified outcome. Far fewer tokens, lower cost, lower latency.">
+  <title>MARGINAL Demo 002 — Run the Same AI Agent Task Side by Side</title>
+  <meta
+    name="description"
+    content="Run the same deterministic coding task with and without MARGINAL side by side."
+  >
+  <link rel="canonical" href="https://signallayerlabs.github.io/Marginal/demo/">
   <meta property="og:type" content="website">
-  <style>
-    :root {
-      --canvas: #02040a;
-      --bg: #050814;
-      --bg-elevated: rgba(10, 16, 31, 0.82);
-      --panel: rgba(11, 19, 36, 0.82);
-      --panel-strong: rgba(13, 22, 42, 0.95);
-      --line: rgba(148, 163, 184, 0.16);
-      --line-strong: rgba(148, 163, 184, 0.26);
-      --text: #f8fafc;
-      --text-soft: #d8e1ef;
-      --muted: #8fa1b9;
-      --blue: #2f6df6;
-      --cyan: #22d3ee;
-      --purple: #7c3aed;
-      --green: #34d399;
-      --green-soft: rgba(52, 211, 153, 0.12);
-      --red: #fb7185;
-      --red-soft: rgba(251, 113, 133, 0.11);
-      --amber: #fbbf24;
-      --radius-xl: 28px;
-      --radius-lg: 22px;
-      --radius-md: 16px;
-      --shadow: 0 32px 100px rgba(0, 0, 0, 0.48);
-      --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
-        "Inter", "Segoe UI", sans-serif;
-      --mono: "SFMono-Regular", "Cascadia Code", "Roboto Mono", Consolas, monospace;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html {
-      scroll-behavior: smooth;
-      background: var(--canvas);
-    }
-
-    body {
-      margin: 0;
-      min-width: 320px;
-      color: var(--text);
-      background:
-        radial-gradient(circle at 82% 8%, rgba(124, 58, 237, 0.23), transparent 28rem),
-        radial-gradient(circle at 12% 70%, rgba(47, 109, 246, 0.14), transparent 30rem),
-        linear-gradient(180deg, #010207 0%, #050814 52%, #071226 100%);
-      font-family: var(--font);
-      font-size: 16px;
-      line-height: 1.5;
-      -webkit-font-smoothing: antialiased;
-      text-rendering: optimizeLegibility;
-    }
-
-    a {
-      color: inherit;
-      text-decoration: none;
-    }
-
-    button,
-    a {
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    button {
-      font: inherit;
-    }
-
-    .skip-link {
-      position: fixed;
-      top: 12px;
-      left: 12px;
-      z-index: 100;
-      padding: 10px 14px;
-      border-radius: 10px;
-      color: #020617;
-      background: #f8fafc;
-      transform: translateY(-160%);
-    }
-
-    .skip-link:focus {
-      transform: translateY(0);
-    }
-
-    .page-wrap {
-      width: min(1520px, calc(100% - 28px));
-      margin: 14px auto;
-      padding-bottom: 14px;
-    }
-
-    .browser-shell {
-      position: relative;
-      overflow: hidden;
-      border: 1px solid rgba(148, 163, 184, 0.28);
-      border-radius: 24px;
-      background: rgba(4, 8, 18, 0.93);
-      box-shadow: var(--shadow);
-      isolation: isolate;
-    }
-
-    .browser-shell::before {
-      position: absolute;
-      inset: 0;
-      z-index: -2;
-      content: "";
-      background:
-        linear-gradient(rgba(148, 163, 184, 0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(148, 163, 184, 0.025) 1px, transparent 1px);
-      background-size: 42px 42px;
-      mask-image: linear-gradient(to bottom, black, transparent 78%);
-    }
-
-    .browser-chrome {
-      display: grid;
-      grid-template-columns: 110px minmax(220px, 620px) 110px;
-      align-items: center;
-      justify-content: space-between;
-      min-height: 50px;
-      padding: 8px 18px;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-      background: linear-gradient(180deg, rgba(35, 35, 35, 0.96), rgba(20, 20, 21, 0.94));
-    }
-
-    .traffic-lights {
-      display: flex;
-      gap: 8px;
-    }
-
-    .traffic-lights span {
-      width: 12px;
-      height: 12px;
-      border-radius: 999px;
-      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
-    }
-
-    .traffic-lights span:nth-child(1) { background: #ff5f57; }
-    .traffic-lights span:nth-child(2) { background: #febc2e; }
-    .traffic-lights span:nth-child(3) { background: #28c840; }
-
-    .address-bar {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 9px;
-      min-height: 34px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 9px;
-      color: rgba(248, 250, 252, 0.8);
-      background: rgba(255, 255, 255, 0.06);
-      font-size: 13px;
-      letter-spacing: 0.01em;
-    }
-
-    .address-bar svg,
-    .chrome-actions svg {
-      width: 16px;
-      height: 16px;
-    }
-
-    .chrome-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 13px;
-      color: rgba(248, 250, 252, 0.62);
-    }
-
-    .site-header {
-      position: sticky;
-      top: 0;
-      z-index: 30;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 28px;
-      min-height: 76px;
-      padding: 12px clamp(22px, 4vw, 52px);
-      border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-      background: rgba(4, 9, 22, 0.78);
-      backdrop-filter: blur(24px) saturate(145%);
-    }
-
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 14px;
-      min-width: max-content;
-    }
-
-    .brand-mark {
-      display: grid;
-      width: 42px;
-      height: 42px;
-      place-items: center;
-      border: 1px solid rgba(96, 165, 250, 0.28);
-      border-radius: 13px;
-      background:
-        linear-gradient(145deg, rgba(47, 109, 246, 0.28), rgba(124, 58, 237, 0.14)),
-        rgba(15, 23, 42, 0.9);
-      box-shadow: 0 10px 32px rgba(47, 109, 246, 0.16);
-      font-size: 25px;
-      font-weight: 850;
-      letter-spacing: -0.08em;
-    }
-
-    .brand-copy {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .wordmark {
-      font-size: 17px;
-      font-weight: 780;
-      letter-spacing: 0.05em;
-    }
-
-    .brand-divider {
-      width: 1px;
-      height: 30px;
-      background: var(--line-strong);
-    }
-
-    .brand-tagline {
-      max-width: 150px;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.25;
-    }
-
-    .nav {
-      display: flex;
-      align-items: center;
-      gap: clamp(12px, 2.2vw, 30px);
-      color: #b9c5d6;
-      font-size: 14px;
-    }
-
-    .nav a {
-      position: relative;
-      padding: 12px 0;
-      transition: color 180ms ease;
-    }
-
-    .nav a:hover,
-    .nav a:focus-visible,
-    .nav a.active {
-      color: #f8fafc;
-    }
-
-    .nav a.active::after {
-      position: absolute;
-      right: 0;
-      bottom: 4px;
-      left: 0;
-      height: 2px;
-      border-radius: 999px;
-      content: "";
-      background: linear-gradient(90deg, var(--cyan), var(--purple));
-    }
-
-    .content {
-      padding: 0 clamp(20px, 4vw, 52px) 28px;
-    }
-
-    .hero {
-      display: grid;
-      grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
-      align-items: center;
-      gap: clamp(36px, 6vw, 92px);
-      min-height: 430px;
-      padding: clamp(54px, 7vw, 92px) 0 44px;
-    }
-
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 9px;
-      margin-bottom: 20px;
-      color: #a8c7ff;
-      font-size: 12px;
-      font-weight: 760;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-    }
-
-    .eyebrow::before {
-      width: 26px;
-      height: 1px;
-      content: "";
-      background: linear-gradient(90deg, var(--cyan), var(--purple));
-    }
-
-    h1,
-    h2,
-    h3,
-    p {
-      margin-top: 0;
-    }
-
-    h1 {
-      max-width: 800px;
-      margin-bottom: 20px;
-      font-size: clamp(54px, 7.2vw, 96px);
-      font-weight: 750;
-      letter-spacing: -0.055em;
-      line-height: 0.94;
-    }
-
-    .hero-copy {
-      max-width: 760px;
-      margin-bottom: 28px;
-      color: var(--text-soft);
-      font-size: clamp(18px, 2vw, 24px);
-      line-height: 1.45;
-    }
-
-    .hero-copy strong {
-      display: block;
-      color: #f8fafc;
-      font-weight: 620;
-    }
-
-    .hero-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-
-    .button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      min-height: 48px;
-      padding: 0 20px;
-      border: 1px solid transparent;
-      border-radius: 13px;
-      font-size: 14px;
-      font-weight: 680;
-      transition:
-        transform 180ms ease,
-        border-color 180ms ease,
-        background 180ms ease,
-        box-shadow 180ms ease;
-    }
-
-    .button:hover {
-      transform: translateY(-1px);
-    }
-
-    .button:focus-visible,
-    .nav a:focus-visible,
-    .copy-button:focus-visible {
-      outline: 3px solid rgba(56, 189, 248, 0.45);
-      outline-offset: 3px;
-    }
-
-    .button-primary {
-      color: white;
-      background: linear-gradient(120deg, #1d8cff, #7c3aed 72%);
-      box-shadow: 0 12px 34px rgba(91, 76, 255, 0.32);
-    }
-
-    .button-primary:hover {
-      box-shadow: 0 16px 42px rgba(91, 76, 255, 0.42);
-    }
-
-    .button-secondary {
-      border-color: var(--line-strong);
-      color: #e8eef8;
-      background: rgba(8, 15, 29, 0.65);
-    }
-
-    .button-secondary:hover {
-      border-color: rgba(125, 211, 252, 0.36);
-      background: rgba(15, 23, 42, 0.92);
-    }
-
-    .disclaimer-line {
-      display: flex;
-      align-items: flex-start;
-      gap: 9px;
-      max-width: 680px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .disclaimer-line svg {
-      flex: 0 0 auto;
-      width: 15px;
-      height: 15px;
-      margin-top: 2px;
-      color: var(--amber);
-    }
-
-    .hero-visual {
-      position: relative;
-      min-height: 390px;
-    }
-
-    .hero-visual::before,
-    .hero-visual::after {
-      position: absolute;
-      border-radius: 999px;
-      content: "";
-      filter: blur(60px);
-      pointer-events: none;
-    }
-
-    .hero-visual::before {
-      top: 12%;
-      right: 4%;
-      width: 240px;
-      height: 240px;
-      background: rgba(124, 58, 237, 0.3);
-    }
-
-    .hero-visual::after {
-      right: 28%;
-      bottom: 4%;
-      width: 180px;
-      height: 180px;
-      background: rgba(34, 211, 238, 0.16);
-    }
-
-    .mascot-card {
-      position: relative;
-      z-index: 1;
-      overflow: hidden;
-      max-width: 480px;
-      margin-left: auto;
-      border: 1px solid rgba(148, 163, 184, 0.22);
-      border-radius: 34px;
-      background:
-        linear-gradient(145deg, rgba(47, 109, 246, 0.1), rgba(124, 58, 237, 0.16)),
-        rgba(7, 12, 26, 0.82);
-      box-shadow:
-        0 36px 80px rgba(0, 0, 0, 0.44),
-        inset 0 1px 0 rgba(255, 255, 255, 0.05);
-      transform: perspective(900px) rotateY(-3deg) rotateX(1deg);
-    }
-
-    .mascot-card img {
-      display: block;
-      width: 100%;
-      height: auto;
-    }
-
-    .verified-chip {
-      position: absolute;
-      right: 18px;
-      bottom: 18px;
-      z-index: 2;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 9px 12px;
-      border: 1px solid rgba(52, 211, 153, 0.28);
-      border-radius: 999px;
-      color: #b7f7dc;
-      background: rgba(3, 20, 18, 0.78);
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.32);
-      backdrop-filter: blur(12px);
-      font-size: 12px;
-      font-weight: 760;
-      letter-spacing: 0.04em;
-    }
-
-    .verified-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: var(--green);
-      box-shadow: 0 0 14px rgba(52, 211, 153, 0.9);
-    }
-
-    .metric-grid {
-      display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: 12px;
-      margin: 0 0 18px;
-    }
-
-    .metric-card {
-      position: relative;
-      overflow: hidden;
-      min-height: 142px;
-      padding: 18px 18px 14px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-md);
-      background:
-        linear-gradient(150deg, rgba(255, 255, 255, 0.025), transparent 42%),
-        var(--panel);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
-    }
-
-    .metric-card::after {
-      position: absolute;
-      top: -55px;
-      right: -48px;
-      width: 110px;
-      height: 110px;
-      border-radius: 999px;
-      content: "";
-      background: rgba(47, 109, 246, 0.1);
-      filter: blur(24px);
-    }
-
-    .metric-label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 12px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .metric-label svg {
-      width: 17px;
-      height: 17px;
-      color: #4ba7ff;
-    }
-
-    .metric-value {
-      position: relative;
-      z-index: 1;
-      display: block;
-      color: #f8fafc;
-      font-size: clamp(22px, 2vw, 30px);
-      font-weight: 560;
-      letter-spacing: -0.035em;
-      line-height: 1.1;
-      white-space: nowrap;
-    }
-
-    .metric-value.success {
-      color: #67e8c1;
-    }
-
-    .metric-context {
-      position: relative;
-      z-index: 1;
-      display: block;
-      margin-top: 6px;
-      color: #71839b;
-      font-size: 9px;
-    }
-
-    .sparkline {
-      position: absolute;
-      right: 14px;
-      bottom: 10px;
-      left: 14px;
-      width: calc(100% - 28px);
-      height: 28px;
-      opacity: 0.82;
-    }
-
-    .section {
-      padding: 22px 0 0;
-      scroll-margin-top: 100px;
-    }
-
-    .section-heading {
-      display: flex;
-      align-items: end;
-      justify-content: space-between;
-      gap: 24px;
-      margin-bottom: 18px;
-    }
-
-    .section-heading h2 {
-      margin-bottom: 4px;
-      font-size: clamp(26px, 3vw, 38px);
-      font-weight: 660;
-      letter-spacing: -0.035em;
-    }
-
-    .section-heading p {
-      max-width: 680px;
-      margin-bottom: 0;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .results-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.75fr) minmax(420px, 1fr);
-      gap: 14px;
-      align-items: start;
-    }
-
-    .glass-card {
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      background:
-        linear-gradient(150deg, rgba(255, 255, 255, 0.02), transparent 34%),
-        var(--panel);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.035),
-        0 20px 60px rgba(0, 0, 0, 0.2);
-      backdrop-filter: blur(18px);
-    }
-
-    .comparison-card {
-      padding: 14px;
-    }
-
-    .comparison-columns {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    .flow-panel {
-      min-width: 0;
-      padding: 16px;
-      border: 1px solid rgba(148, 163, 184, 0.13);
-      border-radius: 18px;
-      background: rgba(4, 10, 22, 0.62);
-    }
-
-    .flow-panel.marginal-panel {
-      background:
-        radial-gradient(circle at 70% 100%, rgba(52, 211, 153, 0.08), transparent 48%),
-        rgba(4, 10, 22, 0.7);
-    }
-
-    .panel-heading {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 14px;
-    }
-
-    .panel-heading h3 {
-      margin-bottom: 0;
-      font-size: 17px;
-      letter-spacing: -0.015em;
-    }
-
-    .count-badge {
-      padding: 4px 8px;
-      border-radius: 999px;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-    }
-
-    .count-badge.baseline {
-      color: #fda4af;
-      background: rgba(190, 24, 93, 0.15);
-    }
-
-    .count-badge.marginal {
-      color: #6ee7b7;
-      background: rgba(5, 150, 105, 0.15);
-    }
-
-    .flow-list {
-      display: flex;
-      flex-direction: column;
-      gap: 7px;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-
-    .flow-step {
-      position: relative;
-      display: grid;
-      grid-template-columns: 27px minmax(0, 1fr) auto 22px;
-      align-items: center;
-      gap: 9px;
-      min-height: 52px;
-      padding: 7px 8px;
-      border: 1px solid rgba(148, 163, 184, 0.1);
-      border-radius: 12px;
-      background: rgba(15, 23, 42, 0.42);
-    }
-
-    .flow-step.excess {
-      border-color: rgba(251, 113, 133, 0.12);
-    }
-
-    .flow-step.funded,
-    .flow-step.justified {
-      border-color: rgba(52, 211, 153, 0.18);
-      background: linear-gradient(90deg, rgba(52, 211, 153, 0.08), rgba(15, 23, 42, 0.38));
-    }
-
-    .step-index {
-      display: grid;
-      width: 24px;
-      height: 24px;
-      place-items: center;
-      border: 1px solid rgba(148, 163, 184, 0.2);
-      border-radius: 999px;
-      color: #dbeafe;
-      background: rgba(51, 65, 85, 0.72);
-      font-size: 10px;
-      font-weight: 750;
-    }
-
-    .step-copy,
-    .step-cost {
-      display: flex;
-      min-width: 0;
-      flex-direction: column;
-    }
-
-    .step-copy strong,
-    .step-cost strong {
-      overflow: hidden;
-      color: #e7edf7;
-      font-size: 11px;
-      font-weight: 620;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .step-copy small,
-    .step-cost small {
-      color: #71839b;
-      font-size: 9px;
-      white-space: nowrap;
-    }
-
-    .step-cost {
-      text-align: right;
-    }
-
-    .flow-step.excess .step-cost strong,
-    .flow-step.excess .step-state {
-      color: var(--red);
-    }
-
-    .flow-step.funded .step-cost strong,
-    .flow-step.funded .step-state,
-    .flow-step.justified .step-state {
-      color: var(--green);
-    }
-
-    .step-state {
-      font-size: 15px;
-      font-weight: 800;
-      text-align: center;
-    }
-
-    .panel-total {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px solid var(--line);
-      color: var(--muted);
-      font-size: 11px;
-    }
-
-    .panel-total strong {
-      color: #f8fafc;
-      font-size: 14px;
-    }
-
-    .panel-total strong.negative { color: var(--red); }
-    .panel-total strong.positive { color: var(--green); }
-
-    .comparison-caption {
-      margin: 12px 8px 2px;
-      color: var(--muted);
-      font-size: 11px;
-      text-align: center;
-    }
-
-    .allocation-card {
-      overflow: hidden;
-    }
-
-    .allocation-header {
-      padding: 18px 18px 14px;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .allocation-header h3 {
-      margin-bottom: 4px;
-      font-size: 17px;
-    }
-
-    .allocation-header p {
-      margin-bottom: 0;
-      color: var(--muted);
-      font-size: 11px;
-    }
-
-    .table-scroll {
-      max-height: 610px;
-      overflow: auto;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(96, 165, 250, 0.35) transparent;
-    }
-
-    .allocation-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 11px;
-    }
-
-    .allocation-table th,
-    .allocation-table td {
-      padding: 11px 12px;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-      text-align: left;
-      vertical-align: top;
-    }
-
-    .allocation-table th {
-      position: sticky;
-      top: 0;
-      z-index: 2;
-      color: #91a3bb;
-      background: rgba(7, 13, 27, 0.97);
-      font-size: 9px;
-      font-weight: 720;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-    }
-
-    .allocation-table td strong,
-    .allocation-table td small {
-      display: block;
-    }
-
-    .allocation-table td strong {
-      color: #dfe7f3;
-      font-size: 10px;
-      font-weight: 620;
-    }
-
-    .allocation-table td small {
-      max-width: 190px;
-      margin-top: 3px;
-      color: #71839b;
-      font-size: 8px;
-      line-height: 1.35;
-    }
-
-    .decision-pill {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 62px;
-      padding: 4px 7px;
-      border: 1px solid transparent;
-      border-radius: 999px;
-      font-size: 8px;
-      font-weight: 820;
-      letter-spacing: 0.06em;
-    }
-
-    .funded-pill {
-      border-color: rgba(52, 211, 153, 0.25);
-      color: #6ee7b7;
-      background: rgba(5, 150, 105, 0.14);
-    }
-
-    .rejected-pill {
-      border-color: rgba(251, 113, 133, 0.22);
-      color: #fda4af;
-      background: rgba(190, 24, 93, 0.12);
-    }
-
-    .method-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(380px, 0.95fr);
-      gap: 14px;
-      margin-top: 14px;
-    }
-
-    .proof-card,
-    .defect-card {
-      padding: 22px;
-    }
-
-    .proof-card {
-      display: grid;
-      grid-template-columns: 58px 1fr;
-      gap: 18px;
-      border-color: rgba(124, 58, 237, 0.34);
-      background:
-        linear-gradient(120deg, rgba(47, 109, 246, 0.07), rgba(124, 58, 237, 0.11)),
-        var(--panel);
-    }
-
-    .proof-icon,
-    .cta-icon {
-      display: grid;
-      place-items: center;
-      border: 1px solid rgba(129, 140, 248, 0.34);
-      border-radius: 18px;
-      color: #b9a8ff;
-      background: rgba(76, 29, 149, 0.16);
-    }
-
-    .proof-icon {
-      width: 58px;
-      height: 58px;
-    }
-
-    .proof-icon svg,
-    .cta-icon svg {
-      width: 30px;
-      height: 30px;
-    }
-
-    .proof-card h3,
-    .defect-card h3 {
-      margin-bottom: 12px;
-      font-size: 18px;
-    }
-
-    .proof-list {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px 24px;
-      margin: 0;
-      padding: 0;
-      color: #b7c4d5;
-      list-style: none;
-      font-size: 12px;
-    }
-
-    .proof-list li {
-      position: relative;
-      padding-left: 14px;
-    }
-
-    .proof-list li::before {
-      position: absolute;
-      top: 0.6em;
-      left: 0;
-      width: 4px;
-      height: 4px;
-      border-radius: 999px;
-      content: "";
-      background: #8b5cf6;
-    }
-
-    .defect-card p {
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .code-diff {
-      overflow: hidden;
-      margin: 14px 0;
-      border: 1px solid rgba(148, 163, 184, 0.14);
-      border-radius: 14px;
-      background: rgba(2, 6, 23, 0.74);
-      font-family: var(--mono);
-      font-size: 11px;
-    }
-
-    .code-line {
-      display: block;
-      padding: 9px 12px;
-    }
-
-    .code-line.removed {
-      color: #fecdd3;
-      background: rgba(190, 24, 93, 0.1);
-    }
-
-    .code-line.added {
-      color: #a7f3d0;
-      background: rgba(5, 150, 105, 0.1);
-    }
-
-    .verifier {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      color: #a8b7ca;
-      font-size: 11px;
-    }
-
-    .verifier code {
-      overflow-wrap: anywhere;
-      color: #dbeafe;
-      font-family: var(--mono);
-    }
-
-    .cta-card {
-      display: grid;
-      grid-template-columns: 74px minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 22px;
-      margin-top: 14px;
-      padding: 22px;
-      border-color: rgba(124, 58, 237, 0.44);
-      background:
-        linear-gradient(100deg, rgba(47, 109, 246, 0.08), rgba(124, 58, 237, 0.13)),
-        var(--panel);
-    }
-
-    .cta-icon {
-      width: 74px;
-      height: 74px;
-    }
-
-    .cta-copy h3 {
-      margin-bottom: 5px;
-      font-size: clamp(18px, 2vw, 25px);
-      letter-spacing: -0.025em;
-    }
-
-    .cta-copy p {
-      margin-bottom: 0;
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .cta-actions {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      gap: 10px;
-    }
-
-    .reproduce-card {
-      margin-top: 14px;
-      padding: 18px 20px;
-    }
-
-    .reproduce-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 12px;
-    }
-
-    .reproduce-header h3 {
-      margin-bottom: 0;
-      font-size: 15px;
-    }
-
-    .copy-button {
-      border: 0;
-      border-radius: 9px;
-      padding: 7px 10px;
-      color: #bfdbfe;
-      background: rgba(37, 99, 235, 0.14);
-      cursor: pointer;
-      font-size: 11px;
-      font-weight: 700;
-    }
-
-    .command {
-      display: block;
-      overflow-x: auto;
-      padding: 13px 14px;
-      border: 1px solid rgba(148, 163, 184, 0.14);
-      border-radius: 12px;
-      color: #dbeafe;
-      background: rgba(2, 6, 23, 0.72);
-      font-family: var(--mono);
-      font-size: 12px;
-      white-space: nowrap;
-    }
-
-    .site-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
-      padding: 22px 2px 4px;
-      color: #71839b;
-      font-size: 11px;
-    }
-
-    .footer-links {
-      display: flex;
-      gap: 18px;
-    }
-
-    @media (max-width: 1180px) {
-      .metric-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-
-      .results-grid,
-      .method-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .allocation-card {
-        max-height: none;
-      }
-
-      .table-scroll {
-        max-height: 520px;
-      }
-    }
-
-    @media (max-width: 920px) {
-      .browser-chrome {
-        grid-template-columns: 80px minmax(180px, 1fr) 80px;
-      }
-
-      .brand-divider,
-      .brand-tagline {
-        display: none;
-      }
-
-      .site-header {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 4px;
-      }
-
-      .nav {
-        width: 100%;
-        overflow-x: auto;
-      }
-
-      .hero {
-        grid-template-columns: 1fr;
-      }
-
-      .hero-visual {
-        min-height: auto;
-      }
-
-      .mascot-card {
-        max-width: 560px;
-        margin: 0 auto;
-        transform: none;
-      }
-
-      .cta-card {
-        grid-template-columns: 64px 1fr;
-      }
-
-      .cta-icon {
-        width: 64px;
-        height: 64px;
-      }
-
-      .cta-actions {
-        grid-column: 1 / -1;
-        justify-content: flex-start;
-      }
-    }
-
-    @media (max-width: 720px) {
-      .page-wrap {
-        width: 100%;
-        margin: 0;
-      }
-
-      .browser-shell {
-        border-right: 0;
-        border-left: 0;
-        border-radius: 0;
-      }
-
-      .browser-chrome {
-        display: none;
-      }
-
-      .site-header {
-        padding: 12px 18px;
-      }
-
-      .content {
-        padding-right: 16px;
-        padding-left: 16px;
-      }
-
-      h1 {
-        font-size: clamp(48px, 17vw, 72px);
-      }
-
-      .metric-grid {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .metric-card:last-child {
-        grid-column: 1 / -1;
-      }
-
-      .comparison-columns {
-        grid-template-columns: 1fr;
-      }
-
-      .proof-card {
-        grid-template-columns: 1fr;
-      }
-
-      .proof-list {
-        grid-template-columns: 1fr;
-      }
-
-      .cta-card {
-        grid-template-columns: 1fr;
-      }
-
-      .cta-actions,
-      .cta-actions .button {
-        width: 100%;
-      }
-
-      .site-footer {
-        align-items: flex-start;
-        flex-direction: column;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .metric-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .metric-card:last-child {
-        grid-column: auto;
-      }
-
-      .hero-actions,
-      .hero-actions .button {
-        width: 100%;
-      }
-
-      .flow-step {
-        grid-template-columns: 26px minmax(0, 1fr) 20px;
-      }
-
-      .step-cost {
-        display: none;
-      }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      html {
-        scroll-behavior: auto;
-      }
-
-      *,
-      *::before,
-      *::after {
-        scroll-behavior: auto !important;
-        transition-duration: 0.01ms !important;
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-      }
-    }
-  </style>
+  <meta property="og:title" content="MARGINAL Demo 002 — Same task. Two timelines.">
+  <meta
+    property="og:description"
+    content="Press run and watch MARGINAL decide before the agent spends compute."
+  >
+  <meta
+    property="og:image"
+    content="https://signallayerlabs.github.io/Marginal/assets/marginal-social-card.png"
+  >
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="demo.css">
+  <script type="application/ld+json">{{STRUCTURED_DATA}}</script>
+  <script id="demo-data" type="application/json">{{PLAYBACK_DATA}}</script>
+  <script src="demo.js" defer></script>
 </head>
 <body>
-  <a class="skip-link" href="#main-content">Skip to content</a>
-  <div class="page-wrap">
-    <div class="browser-shell">
-      <div class="browser-chrome" aria-hidden="true">
-        <div class="traffic-lights"><span></span><span></span><span></span></div>
-        <div class="address-bar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <rect x="5" y="10" width="14" height="10" rx="2"></rect>
-            <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
-          </svg>
-          marginal.compute
+<div class="browser-shell">
+  <div class="chrome" aria-hidden="true">
+    <i></i><i></i><i></i>
+    <span class="address">signallayerlabs.github.io/Marginal/demo/</span>
+  </div>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="../">
+        <span class="brand-mark">M</span>
+        <span>MARGINAL</span>
+      </a>
+      <nav class="navlinks" aria-label="Killer Demo navigation">
+        <a href="#race">Race</a>
+        <a href="#proof">Proof</a>
+        <a href="trace.jsonl">Trace</a>
+        <a href="https://github.com/SignalLayerLabs/Marginal">GitHub ↗</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <span class="eyebrow">LIVE DETERMINISTIC RACE · SAME WORKSPACE SNAPSHOT</span>
+          <h1>SAME BUG. SAME START. WATCH THE EXTRA WORK.</h1>
+          <p>
+            One lane executes every candidate. The other asks MARGINAL before the spend.
+            Same verifier. Same target. You control the clock.
+          </p>
         </div>
-        <div class="chrome-actions">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-            <path d="M12 3v12"></path><path d="m7 8 5-5 5 5"></path>
-            <path d="M5 13v7h14v-7"></path>
-          </svg>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-            <path d="M12 5v14M5 12h14"></path>
-          </svg>
+        <div class="controls" aria-label="Playback controls">
+          <button class="control primary" data-action="run">RUN THE SAME TASK</button>
+          <button class="control" data-action="pause">PAUSE</button>
+          <button class="control" data-action="step">NEXT STEP</button>
+          <button class="control" data-action="reset">RESET</button>
+          <select class="speed" id="speed" aria-label="Playback speed">
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1x</option>
+            <option value="2">2x</option>
+            <option value="4">4x</option>
+          </select>
         </div>
+      </section>
+
+      <section class="race-wrap" id="race" aria-label="Synchronized agent execution race">
+        <div class="task-strip">
+          <div>
+            <strong>{{SCENARIO}}</strong>
+            <small>initial verifier · FAIL</small>
+          </div>
+          <div class="center">
+            <strong id="current-candidate">Ready</strong>
+            <small>accelerated deterministic playback · not provider telemetry</small>
+          </div>
+          <div>
+            <strong>Verifier: {{VERIFIER}}</strong>
+            <small>both lanes must finish PASS</small>
+          </div>
+        </div>
+        <div class="stage-rail" aria-label="Demo stages">
+          <div class="stage-node" data-stage="Diagnose">01 · DIAGNOSE</div>
+          <div class="stage-node" data-stage="Fix">02 · FIX</div>
+          <div class="stage-node" data-stage="Verify">03 · VERIFY</div>
+          <div class="progress-line"><span id="race-progress"></span></div>
+        </div>
+
+        <div class="race-grid">
+          <article class="lane baseline" data-lane="baseline">
+            <div class="lane-head">
+              <div>
+                <span class="lane-kicker">WITHOUT MARGINAL</span>
+                <h2>Execute everything.</h2>
+              </div>
+              <span class="mode-badge">NO GOVERNOR</span>
+            </div>
+            <div class="metric-row">
+              <div class="live-metric">
+                <span>CALLS</span><strong data-metric="baseline-calls">0</strong>
+              </div>
+              <div class="live-metric">
+                <span>TOKENS</span><strong data-metric="baseline-tokens">0</strong>
+              </div>
+              <div class="live-metric">
+                <span>EST. USD</span><strong data-metric="baseline-usd">$0.000</strong>
+              </div>
+              <div class="live-metric">
+                <span>DECL. TIME</span>
+                <strong data-metric="baseline-latency">0.00s</strong>
+              </div>
+            </div>
+            <div class="workspace">
+              <span>workspace state</span>
+              <strong id="state-baseline" data-state="FAIL">FAIL</strong>
+            </div>
+            <div class="gate">
+              <div class="gate-title">
+                <span>EXECUTION POLICY</span><span class="decision">EXECUTE</span>
+              </div>
+              <p>No governor. Every proposed candidate is executed before the next decision.</p>
+              <div class="gate-score"><span>final target {{BASELINE_TOKENS}} tokens</span></div>
+            </div>
+            <div class="terminal" id="terminal-baseline" aria-live="polite"></div>
+          </article>
+
+          <aside class="vs-rail" aria-label="Race gap">
+            <span class="vs">VS</span>
+            <span class="tick" id="tick-counter">0/9</span>
+            <div class="waste-meter" aria-label="Avoided declared token gap">
+              <span id="waste-fill"></span>
+            </div>
+            <span class="waste-label">AVOIDED SPEND</span>
+          </aside>
+
+          <article class="lane marginal" data-lane="marginal">
+            <div class="lane-head">
+              <div>
+                <span class="lane-kicker">WITH MARGINAL</span>
+                <h2>Decide before spend.</h2>
+              </div>
+              <span class="mode-badge">GOVERNED</span>
+            </div>
+            <div class="metric-row">
+              <div class="live-metric">
+                <span>CALLS</span><strong data-metric="marginal-calls">0</strong>
+              </div>
+              <div class="live-metric">
+                <span>TOKENS</span><strong data-metric="marginal-tokens">0</strong>
+              </div>
+              <div class="live-metric">
+                <span>EST. USD</span><strong data-metric="marginal-usd">$0.000</strong>
+              </div>
+              <div class="live-metric">
+                <span>DECL. TIME</span>
+                <strong data-metric="marginal-latency">0.00s</strong>
+              </div>
+            </div>
+            <div class="workspace">
+              <span>workspace state</span>
+              <strong id="state-marginal" data-state="FAIL">FAIL</strong>
+            </div>
+            <div class="gate">
+              <div class="gate-title">
+                <span>MARGINAL DECISION GATE</span>
+                <span class="decision" id="decision-live">WAITING</span>
+              </div>
+              <p id="decision-reason">
+                Press RUN. MARGINAL will score each candidate before spend.
+              </p>
+              <div class="gate-score">
+                <span id="decision-score">score —</span>
+                <span id="decision-gain">gain —</span>
+                <span>final target {{MARGINAL_TOKENS}} tokens</span>
+              </div>
+            </div>
+            <div class="terminal" id="terminal-marginal" aria-live="polite"></div>
+          </article>
+        </div>
+
+        <div class="result-reveal" id="result-reveal">
+          <div>
+            <span class="eyebrow">RACE COMPLETE</span>
+            <h2>Same verifier. Same PASS. Different amount of work.</h2>
+            <p>
+              This is the deterministic result of this demo fixture, not a production savings claim.
+            </p>
+          </div>
+          <div class="result-numbers">
+            <div><span>DECLARED TOKENS</span><strong>{{TOKEN_DELTA}}% fewer</strong></div>
+            <div><span>CALLS</span><strong>{{BASELINE_CALLS}} → {{MARGINAL_CALLS}}</strong></div>
+            <div><span>EST. USD</span><strong>${{BASELINE_USD}} → ${{MARGINAL_USD}}</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="below" id="proof">
+        <article class="proof-card">
+          <span class="eyebrow">WHAT THIS DEMO PROVES</span>
+          <h3>Watch the decision happen, not a screenshot of the result.</h3>
+          <ul>
+            <li>Both lanes start from the same deterministic failing workspace.</li>
+            <li>Every synchronized tick represents the same candidate on both sides.</li>
+            <li>MARGINAL either FUND + EXECUTE or REJECT BEFORE SPEND.</li>
+            <li>Both lanes finish on the same verifier PASS.</li>
+          </ul>
+          <p><strong>Allocation decisions</strong> are replayed from the generated result data.</p>
+        </article>
+        <article class="proof-card">
+          <span class="eyebrow">TRUTH BOUNDARY</span>
+          <h3>Deterministic replay. No fake telemetry.</h3>
+          <p>{{DISCLAIMER}}</p>
+          <p>
+            Playback timing is accelerated for the browser.
+            Declared costs and latency are demo inputs,
+            not live provider billing. Build agents that spend compute deliberately.
+          </p>
+          <p><code>marginal killer-demo --output killer-demo-output</code></p>
+          <p><a href="trace.jsonl">Open decision trace →</a></p>
+        </article>
+      </section>
+
+      <div class="legacy-contract" aria-hidden="true">
+        <span>MARGINAL Killer Demo</span>
+        <span>Same verified outcome. Far fewer tokens, lower cost, lower latency.</span>
+        <span>Token reduction</span>
+        <span>Allocation decisions</span>
+        <span>What this demo proves</span>
+        <span>Build agents that spend compute deliberately.</span>
+        <span>marginal-project-mark.png</span>
+        <span>{{BASELINE_TOKENS}}</span>
+        <span>{{MARGINAL_TOKENS}}</span>
+        <span>${{BASELINE_USD}}</span>
+        <span>${{MARGINAL_USD}}</span>
+        <span>REJECT BEFORE SPEND</span>
+        <span>FUND + EXECUTE</span>
       </div>
 
-      <header class="site-header">
-        <a class="brand" href="#overview" aria-label="MARGINAL home">
-          <span class="brand-mark">M</span>
-          <span class="brand-copy">
-            <span class="wordmark">MARGINAL</span>
-            <span class="brand-divider"></span>
-            <span class="brand-tagline">Compute capital allocation for AI agents</span>
-          </span>
-        </a>
-        <nav class="nav" aria-label="Killer Demo navigation">
-          <a href="#overview">Overview</a>
-          <a href="#method">Method</a>
-          <a class="active" href="#results">Results</a>
-          <a href="trace.jsonl">Trace</a>
-          <a
-            href="https://github.com/SignalLayerLabs/Marginal/blob/main/docs/evaluation/public-benchmarks.md"
-          >Benchmark</a>
+      <footer class="footer">
+        <span>© 2026 SignalLayer Labs · deterministic mechanism demonstration</span>
+        <nav>
+          <a href="result.json">Structured result</a>
+          <a href="trace.jsonl">Decision trace</a>
+          <a href="RESULTS.md">Method</a>
         </nav>
-      </header>
-
-      <main id="main-content" class="content">
-        <section id="overview" class="hero">
-          <div>
-            <div class="eyebrow">Deterministic evaluation</div>
-            <h1>Killer Demo</h1>
-            <p class="hero-copy">
-              <strong>Fund only the next action worth taking.</strong>
-              Same verified outcome. Far fewer tokens, lower cost, lower latency.
-            </p>
-            <div class="hero-actions">
-              <a class="button button-primary" href="trace.jsonl">
-                View full trace
-                <span aria-hidden="true">→</span>
-              </a>
-              <a class="button button-secondary" href="#method">
-                Read methodology
-                <span aria-hidden="true">⌘</span>
-              </a>
-            </div>
-            <div class="disclaimer-line">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <circle cx="12" cy="12" r="9"></circle>
-                <path d="M12 8v5M12 16.5h.01"></path>
-              </svg>
-              <span>{{DISCLAIMER}}</span>
-            </div>
-          </div>
-
-          <div class="hero-visual" aria-label="MARGINAL allocation visual">
-            <div class="mascot-card">
-              <img
-                src="{{MASCOT_URL}}"
-                alt="Dante, the SignalLayer Labs mascot, representing MARGINAL compute allocation"
-              >
-              <div class="verified-chip">
-                <span class="verified-dot"></span>
-                VERIFIED · PASS
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section aria-label="Key performance indicators">
-          <div class="metric-grid">
-            <article class="metric-card">
-              <div class="metric-label">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <circle cx="12" cy="12" r="8"></circle>
-                  <path d="M8 12h8M12 8v8"></path>
-                </svg>
-                Token reduction
-              </div>
-              <strong class="metric-value">{{TOKEN_SAVINGS}}%</strong>
-              <small class="metric-context">
-                {{BASELINE_TOKENS}} → {{MARGINAL_TOKENS}} declared tokens
-              </small>
-              <svg
-                class="sparkline"
-                viewBox="0 0 180 28"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M0 22 22 20 45 18 65 16 87 18 106 11 127 20 149 19 166 23 180 16"
-                  fill="none"
-                  stroke="#2997ff"
-                  stroke-width="1.6"
-                ></path>
-              </svg>
-            </article>
-
-            <article class="metric-card">
-              <div class="metric-label">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="m13 2-8 12h6l-1 8 8-12h-6l1-8Z"></path>
-                </svg>
-                Actions executed
-              </div>
-              <strong class="metric-value">{{BASELINE_CALLS}} → {{MARGINAL_CALLS}}</strong>
-              <svg
-                class="sparkline"
-                viewBox="0 0 180 28"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M0 22 20 21 44 19 65 19 88 20 109 17 130 22 151 15 168 21 180 18"
-                  fill="none"
-                  stroke="#2997ff"
-                  stroke-width="1.6"
-                ></path>
-              </svg>
-            </article>
-
-            <article class="metric-card">
-              <div class="metric-label">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path
-                    d="M12 3v18M16 7.5c0-1.4-1.8-2.5-4-2.5S8 6.1 8 7.5s1.8 2.5 4 2.5
-                      4 1.1 4 2.5S14.2 15 12 15s-4-1.1-4-2.5"
-                  ></path>
-                </svg>
-                Estimated cost
-              </div>
-              <strong class="metric-value">${{BASELINE_USD}} → ${{MARGINAL_USD}}</strong>
-              <svg
-                class="sparkline"
-                viewBox="0 0 180 28"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M0 21 18 19 38 20 58 14 78 18 96 12 118 21 138 17 159 20 180 14"
-                  fill="none"
-                  stroke="#2997ff"
-                  stroke-width="1.6"
-                ></path>
-              </svg>
-            </article>
-
-            <article class="metric-card">
-              <div class="metric-label">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <circle cx="12" cy="12" r="9"></circle>
-                  <path d="M12 7v5l3 2"></path>
-                </svg>
-                Estimated latency
-              </div>
-              <strong class="metric-value">{{BASELINE_LATENCY}}s → {{MARGINAL_LATENCY}}s</strong>
-              <svg
-                class="sparkline"
-                viewBox="0 0 180 28"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M0 23 20 20 40 17 60 19 80 13 100 18 120 15 140 21 160 17 180 19"
-                  fill="none"
-                  stroke="#2997ff"
-                  stroke-width="1.6"
-                ></path>
-              </svg>
-            </article>
-
-            <article class="metric-card">
-              <div class="metric-label">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M12 3 5 6v5c0 4.7 2.8 8 7 10 4.2-2 7-5.3 7-10V6l-7-3Z"></path>
-                  <path d="m9 12 2 2 4-5"></path>
-                </svg>
-                Verified result
-              </div>
-              <strong class="metric-value success">PASS → PASS</strong>
-              <svg
-                class="sparkline"
-                viewBox="0 0 180 28"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M0 18 18 18 36 15 55 18 74 17 93 13 112 17 132 16 151 20 166 16 180 17"
-                  fill="none"
-                  stroke="#34d399"
-                  stroke-width="1.6"
-                ></path>
-              </svg>
-            </article>
-          </div>
-        </section>
-
-        <section id="results" class="section">
-          <div class="section-heading">
-            <div>
-              <h2>Same fix. Different capital discipline.</h2>
-              <p>
-                A like-for-like execution of diagnose, fix, and verification against the
-                same deterministic defect.
-              </p>
-            </div>
-          </div>
-
-          <div class="results-grid">
-            <article class="glass-card comparison-card">
-              <div class="comparison-columns">
-                <section class="flow-panel" aria-labelledby="baseline-title">
-                  <div class="panel-heading">
-                    <h3 id="baseline-title">Baseline</h3>
-                    <span class="count-badge baseline">{{BASELINE_CALLS}} actions</span>
-                  </div>
-                  <ol class="flow-list">{{BASELINE_STEPS}}</ol>
-                  <div class="panel-total">
-                    <span>Total estimated cost</span>
-                    <strong class="negative">${{BASELINE_USD}}</strong>
-                  </div>
-                </section>
-
-                <section class="flow-panel marginal-panel" aria-labelledby="marginal-title">
-                  <div class="panel-heading">
-                    <h3 id="marginal-title">MARGINAL</h3>
-                    <span class="count-badge marginal">{{MARGINAL_CALLS}} actions</span>
-                  </div>
-                  <ol class="flow-list">{{MARGINAL_STEPS}}</ol>
-                  <div class="panel-total">
-                    <span>Total estimated cost</span>
-                    <strong class="positive">${{MARGINAL_USD}}</strong>
-                  </div>
-                </section>
-              </div>
-              <p class="comparison-caption">
-                The baseline executes every available action. MARGINAL finances only the
-                economically justified sequence.
-              </p>
-            </article>
-
-            <article class="glass-card allocation-card">
-              <div class="allocation-header">
-                <h3>Allocation decisions</h3>
-                <p>Every candidate is priced against expected marginal gain before execution.</p>
-              </div>
-              <div class="table-scroll">
-                <table class="allocation-table">
-                  <thead>
-                    <tr>
-                      <th>Action</th>
-                      <th>Cost</th>
-                      <th>Expected gain</th>
-                      <th>Decision</th>
-                    </tr>
-                  </thead>
-                  <tbody>{{ALLOCATION_ROWS}}</tbody>
-                </table>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section id="method" class="section">
-          <div class="method-grid">
-            <article class="glass-card proof-card">
-              <div class="proof-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M12 3 5 6v5c0 4.7 2.8 8 7 10 4.2-2 7-5.3 7-10V6l-7-3Z"></path>
-                  <path d="m9 12 2 2 4-5"></path>
-                </svg>
-              </div>
-              <div>
-                <h3>What this demo proves</h3>
-                <ul class="proof-list">
-                  <li>The task starts in FAIL.</li>
-                  <li>Both workflows finish in PASS.</li>
-                  <li>Costs are declared action budgets used by the allocator.</li>
-                  <li>This is a deterministic demonstration of economic action selection.</li>
-                </ul>
-              </div>
-            </article>
-
-            <article class="glass-card defect-card">
-              <h3>The deterministic defect</h3>
-              <p>{{SCENARIO}}</p>
-              <div class="code-diff" aria-label="Patch applied by the funded action">
-                <span class="code-line removed">- {{DEFECT_BEFORE}}</span>
-                <span class="code-line added">+ {{DEFECT_AFTER}}</span>
-              </div>
-              <div class="verifier">
-                <span>Verifier</span>
-                <code>{{VERIFIER}}</code>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section class="glass-card cta-card" aria-labelledby="cta-title">
-          <div class="cta-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-              <path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"></path>
-            </svg>
-          </div>
-          <div class="cta-copy">
-            <h3 id="cta-title">Build agents that spend compute deliberately.</h3>
-            <p>
-              Explore the open-source project and run the same deterministic evaluation
-              locally.
-            </p>
-          </div>
-          <div class="cta-actions">
-            <a
-              class="button button-primary"
-              href="https://github.com/SignalLayerLabs/Marginal"
-            >Open repository</a>
-            <a class="button button-secondary" href="#reproduce">Run the demo locally</a>
-          </div>
-        </section>
-
-        <section id="reproduce" class="glass-card reproduce-card">
-          <div class="reproduce-header">
-            <h3>Reproduce the result</h3>
-            <button
-              class="copy-button"
-              type="button"
-              data-copy="marginal killer-demo --output killer-demo-output"
-            >Copy command</button>
-          </div>
-          <code class="command">marginal killer-demo --output killer-demo-output</code>
-        </section>
-
-        <footer class="site-footer">
-          <span>© 2026 SignalLayer Labs</span>
-          <span class="footer-links">
-            <a href="https://github.com/SignalLayerLabs/Marginal/blob/main/LICENSE">Apache-2.0</a>
-            <a href="result.json">Structured result</a>
-            <a href="trace.jsonl">Decision trace</a>
-          </span>
-        </footer>
-      </main>
-    </div>
+      </footer>
+    </main>
   </div>
-
-  <script>
-    const copyButton = document.querySelector("[data-copy]");
-    if (copyButton) {
-      copyButton.addEventListener("click", async () => {
-        const command = copyButton.getAttribute("data-copy") || "";
-        try {
-          await navigator.clipboard.writeText(command);
-          const original = copyButton.textContent;
-          copyButton.textContent = "Copied";
-          window.setTimeout(() => { copyButton.textContent = original; }, 1400);
-        } catch (_error) {
-          window.prompt("Copy command", command);
-        }
-      });
-    }
-  </script>
+</div>
 </body>
 </html>
 """
     replacements = {
-        "{{MASCOT_URL}}": (
-            "https://raw.githubusercontent.com/SignalLayerLabs/Marginal/main/assets/"
-            "marginal-project-mark.png"
-        ),
-        "{{DISCLAIMER}}": html.escape(result["disclaimer"]),
-        "{{TOKEN_SAVINGS}}": f"{savings['tokens_percent']:.2f}",
+        "{{STRUCTURED_DATA}}": structured_json,
+        "{{PLAYBACK_DATA}}": playback_json,
+        "{{SCENARIO}}": html.escape(str(result["scenario"])),
+        "{{VERIFIER}}": html.escape(str(result["defect"]["verifier"])),
+        "{{DISCLAIMER}}": html.escape(str(result["disclaimer"])),
         "{{BASELINE_TOKENS}}": f"{baseline['tokens']:,}",
         "{{MARGINAL_TOKENS}}": f"{marginal['tokens']:,}",
         "{{BASELINE_CALLS}}": str(baseline["calls"]),
         "{{MARGINAL_CALLS}}": str(marginal["calls"]),
         "{{BASELINE_USD}}": f"{baseline['usd']:.3f}",
         "{{MARGINAL_USD}}": f"{marginal['usd']:.3f}",
-        "{{BASELINE_LATENCY}}": f"{baseline['latency_ms'] / 1000:.2f}",
-        "{{MARGINAL_LATENCY}}": f"{marginal['latency_ms'] / 1000:.2f}",
-        "{{BASELINE_STEPS}}": baseline_steps,
-        "{{MARGINAL_STEPS}}": marginal_steps,
-        "{{ALLOCATION_ROWS}}": allocation_rows,
-        "{{SCENARIO}}": html.escape(result["scenario"]),
-        "{{DEFECT_BEFORE}}": html.escape(result["defect"]["before"]),
-        "{{DEFECT_AFTER}}": html.escape(result["defect"]["after"]),
-        "{{VERIFIER}}": html.escape(result["defect"]["verifier"]),
+        "{{TOKEN_DELTA}}": f"{savings['tokens_percent']:.2f}",
     }
     for placeholder, value in replacements.items():
         page = page.replace(placeholder, value)
@@ -2345,6 +1714,14 @@ def _write_artifacts(
     )
     (output_dir / "index.html").write_text(
         render_killer_demo_html(result),
+        encoding="utf-8",
+    )
+    (output_dir / "demo.css").write_text(
+        render_killer_demo_css(),
+        encoding="utf-8",
+    )
+    (output_dir / "demo.js").write_text(
+        render_killer_demo_js(),
         encoding="utf-8",
     )
     (output_dir / "comparison.svg").write_text(

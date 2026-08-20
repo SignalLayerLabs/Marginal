@@ -1,14 +1,18 @@
-# MARGINAL Killer Demo
+# MARGINAL Demo 001
 
-**Fund only the next action worth taking.**
+**AI agents repeat work that changed nothing. MARGINAL catches it.**
+
+Observe first. Prove waste. Earn enforcement.
 
 > Deterministic functional demonstration using declared action-cost estimates; not provider telemetry, not a production benchmark, and not a claim about every agent workload.
 
+This deterministic artifact demonstrates MARGINAL's compute-selection discipline. The no-progress repetition sequence shown in the HTML is an explicitly labeled runtime-pattern illustration, not provider telemetry and not an enforcement benchmark.
+
 Scenario: **Fix a percentage-discount bug in a deterministic Python repository**
 
-![Baseline versus MARGINAL](comparison.svg)
+![Without MARGINAL versus MARGINAL](comparison.svg)
 
-## The defect
+## Deterministic allocation proof
 
 ```diff
 - return total - rate
@@ -19,7 +23,7 @@ Verifier: `apply_discount(100.0, 0.20) == 80.0`
 
 Initial verifier: **FAIL**
 
-| Metric | Baseline: run everything | MARGINAL | Savings |
+| Metric | Without MARGINAL | MARGINAL | Observed demo delta |
 |---|---:|---:|---:|
 | Declared tokens | 72,800 | 4,300 | **94.09%** |
 | Calls | 9 | 3 | **66.67%** |
@@ -31,38 +35,31 @@ Initial verifier: **FAIL**
 
 ### Diagnose
 
-Funded: **inspect the failing assertion** — approved: marginal ROI 7.166
+Selected: **inspect the failing assertion** — approved: marginal ROI 7.166
 
-| Candidate | Declared tokens | Expected gain | Score | Decision |
-|---|---:|---:|---:|---|
-| inspect the failing assertion | 1,200 | 0.220 | 0.189 | FUNDED: approved: marginal ROI 7.166 |
-| scan the entire repository | 9,000 | 0.050 | -0.179 | SKIPPED: rejected: marginal ROI 0.218 below 1.000 |
-| ask two parallel reviewers | 14,000 | 0.040 | -0.369 | SKIPPED: rejected: marginal ROI 0.098 below 1.000 |
+Declared cost: **1,200 tokens · $0.006**. Alternatives rejected: **2**.
 
 ### Fix
 
-Funded: **apply the targeted one-line patch** — approved: marginal ROI 7.418
+Selected: **apply the targeted one-line patch** — approved: marginal ROI 7.418
 
-| Candidate | Declared tokens | Expected gain | Score | Decision |
-|---|---:|---:|---:|---|
-| apply the targeted one-line patch | 2,400 | 0.500 | 0.433 | FUNDED: approved: marginal ROI 7.418 |
-| rewrite the complete pricing module | 12,000 | 0.200 | -0.156 | SKIPPED: rejected: marginal ROI 0.561 below 1.000 |
-| ask a frontier model for an alternative patch | 18,000 | 0.150 | -0.501 | SKIPPED: rejected: marginal ROI 0.230 below 1.000 |
+Declared cost: **2,400 tokens · $0.018**. Alternatives rejected: **2**.
 
 ### Verify
 
-Funded: **run the targeted verifier** — approved: marginal ROI 21.394
+Selected: **run the targeted verifier** — approved: marginal ROI 21.394
 
-| Candidate | Declared tokens | Expected gain | Score | Decision |
-|---|---:|---:|---:|---|
-| run the targeted verifier | 700 | 0.350 | 0.334 | FUNDED: approved: marginal ROI 21.394 |
-| run the full test suite | 4,500 | 0.080 | -0.025 | SKIPPED: rejected: marginal ROI 0.763 below 1.000 |
-| request a premium model audit | 11,000 | 0.050 | -0.348 | SKIPPED: rejected: marginal ROI 0.126 below 1.000 |
+Declared cost: **700 tokens · $0.002**. Alternatives rejected: **2**.
+
+## What this demo proves
+
+- The deterministic task starts in FAIL and both workflows finish in PASS.
+- The allocator can reject higher-cost actions while preserving the verifier outcome.
+- Costs are declared demo estimates, not provider billing or production telemetry.
+- The artifact is a mechanism demonstration, not a production benchmark.
 
 ## Reproduce
 
 ```bash
 marginal killer-demo --output killer-demo-output
 ```
-
-The command writes this report, a standalone HTML report, an SVG comparison, the JSON result, and the provider-neutral decision trace.

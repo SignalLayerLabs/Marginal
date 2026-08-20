@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+from contextlib import suppress
 from pathlib import Path
 
 from runtime_python import compatible_python
@@ -17,6 +18,10 @@ def main() -> int:
     runtime = Path(plugin_root).resolve() / "runtime" / "marginal_runtime.pyz"
     if not runtime.is_file():
         return 0
+
+    data = Path(plugin_data).resolve()
+    with suppress(OSError):
+        data.chmod(0o700)
     try:
         python = compatible_python()
     except RuntimeError:
@@ -26,7 +31,7 @@ def main() -> int:
         for name in ("PATH", "LANG", "LC_ALL", "SYSTEMROOT")
         if (value := os.environ.get(name)) is not None
     }
-    environment["PLUGIN_DATA"] = str(Path(plugin_data).resolve())
+    environment["PLUGIN_DATA"] = str(data)
     environment["PLUGIN_ROOT"] = str(Path(plugin_root).resolve())
     os.execve(python[0], [*python, str(runtime)], environment)
     return 0

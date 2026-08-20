@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>MARGINAL Research &amp; Engineering</title>
+  <id>https://signallayerlabs.github.io/Marginal/blog/</id>
+  <link href="https://signallayerlabs.github.io/Marginal/blog/"/>
+  <link href="https://signallayerlabs.github.io/Marginal/blog/feed.xml" rel="self" type="application/atom+xml"/>
+  <updated>2026-08-19T13:14:00+02:00</updated>
+  <author><name>SignalLayer Labs</name><uri>https://github.com/SignalLayerLabs</uri></author>
+  <subtitle>Evidence-first engineering notes on AI coding-agent no-progress detection and runtime governance.</subtitle>
+  <entry><title>Detecting No-Progress in AI Agents Without Reading Prompts</title><id>https://signallayerlabs.github.io/Marginal/blog/detecting-no-progress-without-reading-prompts/</id><link href="https://signallayerlabs.github.io/Marginal/blog/detecting-no-progress-without-reading-prompts/"/><published>2026-08-19T13:14:00+02:00</published><updated>2026-08-19T13:14:00+02:00</updated><summary>A technical model for detecting AI coding-agent no-progress loops from action identity, outcomes, state and evidence—without treating raw prompts as required telemetry.</summary><category term="AI agent observability"/></entry>
+  <entry><title>Why an AI Agent Governor Should Start Powerless</title><id>https://signallayerlabs.github.io/Marginal/blog/why-ai-agent-governor-should-start-powerless/</id><link href="https://signallayerlabs.github.io/Marginal/blog/why-ai-agent-governor-should-start-powerless/"/><published>2026-08-19T13:14:00+02:00</published><updated>2026-08-19T13:14:00+02:00</updated><summary>Installing an AI agent governor should not automatically grant blocking authority. A safer runtime model starts in Shadow Mode and earns narrow enforcement from local evidence.</summary><category term="Runtime governance"/></entry>
+</feed>

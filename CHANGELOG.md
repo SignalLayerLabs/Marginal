@@ -10,6 +10,20 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
   explicit Contributor upload through a recursively closed aggregate schema;
 - owner-only durable outbox retry, exact reviewed public-model attribution, verified cache fallback,
   and synthetic lifecycle-to-aggregate-to-next-session acceptance coverage.
+- a Claude Code plugin labeled **Observe**: it records normalized tool-call evidence and
+  repeated-work recommendations in a local Decision Ledger, declares no control capability, and never
+  blocks a tool call or returns hook output;
+- `marginal.integrations.hookkit`, the engine-independent parts of a hook integration: normalized
+  events, privacy-safe action normalization, conservative structured outcome classification,
+  workspace state evidence that fails open, and session correlation;
+- an OpenCode plugin labeled **Observe**, running inside the engine process and speaking
+  newline-delimited JSON to one bridge child process over pipes. Tool output never reaches MARGINAL:
+  the plugin forwards a digest plus an allowlist of outcome signals;
+- PrivacyCode as an OpenCode-compatible install target, governed by the same adapter and plugin. It
+  keeps a distinct engine label, plugin path, and ledger root, so one ledger never conflates two
+  engines;
+- `marginal install claude-code`, `marginal install opencode`, `marginal install privacycode`, and
+  their `uninstall` counterparts.
 
 ### Security
 
@@ -18,6 +32,12 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
   timestamps, free text, credentials, and persistent contributor identity;
 - Commons network and shared-state failures fail open; production contribution remains blocked on
   verified Wrangler authentication and a dedicated least-privilege GitHub service credential.
+
+### Changed
+
+- the authenticated loopback session transport moved from `marginal.integrations.codex.transport` to
+  `marginal.integrations.transport` so every hook adapter shares it. The old import path re-exports
+  it unchanged.
 
 ## [0.3.3] - 2026-08-13
 

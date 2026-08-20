@@ -1,25 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="720" height="230"
- viewBox="0 0 720 230" role="img"
- aria-label="Baseline versus MARGINAL token use">
-  <rect width="720" height="230" rx="20" fill="#0b1020"/>
-  <text x="40" y="42" fill="#ffffff"
- font-family="Arial, sans-serif" font-size="24" font-weight="700">
-Declared token cost for the same verified fix</text>
-  <text x="40" y="88" fill="#cbd5e1"
- font-family="Arial, sans-serif" font-size="16">Baseline</text>
-  <rect x="150" y="68" width="520" height="30"
- rx="8" fill="#ef4444"/>
-  <text x="680" y="89" text-anchor="end" fill="#ffffff"
- font-family="Arial, sans-serif" font-size="16">
-72,800</text>
-  <text x="40" y="148" fill="#cbd5e1"
- font-family="Arial, sans-serif" font-size="16">MARGINAL</text>
-  <rect x="150" y="128" width="31" height="30"
- rx="8" fill="#22c55e"/>
-  <text x="191" y="149" fill="#ffffff"
- font-family="Arial, sans-serif" font-size="16">
-4,300</text>
-  <text x="40" y="202" fill="#86efac"
- font-family="Arial, sans-serif" font-size="20" font-weight="700">
-94.09% fewer declared tokens · outcome preserved</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-label="Baseline versus MARGINAL deterministic token cost">
+<defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#91ff63"/><stop offset="1" stop-color="#58e6ff"/></linearGradient></defs>
+<rect width="1200" height="520" rx="34" fill="#070a0f"/>
+<text x="70" y="78" fill="#91ff63" font-family="Arial,sans-serif" font-size="18" font-weight="700">MARGINAL DEMO 002</text>
+<text x="70" y="135" fill="#f7fbff" font-family="Arial,sans-serif" font-size="36" font-weight="700">Same task. Same PASS. Less extra work.</text>
+<text x="70" y="180" fill="#9aa7b5" font-family="Arial,sans-serif" font-size="18">Deterministic action-cost replay — not provider telemetry.</text>
+<text x="70" y="255" fill="#f7fbff" font-family="Arial,sans-serif" font-size="18" font-weight="700">Baseline · execute every candidate</text>
+<rect x="330" y="230" width="760" height="40" rx="10" fill="#343b45"/>
+<text x="1110" y="257" text-anchor="end" fill="#f7fbff" font-family="Arial,sans-serif" font-size="18">72,800</text>
+<text x="70" y="335" fill="#f7fbff" font-family="Arial,sans-serif" font-size="18" font-weight="700">MARGINAL · decide before spend</text>
+<rect x="330" y="310" width="45" height="40" rx="10" fill="url(#g)"/>
+<text x="395" y="337" fill="#91ff63" font-family="Arial,sans-serif" font-size="18">4,300</text>
+<text x="70" y="430" fill="#91ff63" font-family="Arial,sans-serif" font-size="30" font-weight="700">94.09% fewer declared tokens</text>
+<text x="70" y="470" fill="#9aa7b5" font-family="Arial,sans-serif" font-size="16">PASS → PASS · deterministic mechanism demonstration</text>
 </svg>

@@ -1,0 +1,32 @@
+/* Reach Moat landing-page layer. Keeps the existing MARGINAL design tokens. */
+.reach-hero{padding:92px 0 68px;max-width:900px}
+.reach-hero h1{margin:0;font-size:clamp(3rem,7vw,6rem);line-height:.94;letter-spacing:-.055em}
+.reach-hero h1 span{display:block;color:var(--acid)}
+.reach-hero .hero-lead{max-width:780px}
+.reach-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.reach-card{padding:24px;border:1px solid var(--line);border-radius:16px;background:var(--panel)}
+.reach-card h3{margin:12px 0 8px;font-size:1.35rem}
+.reach-card p{margin:0;color:var(--muted)}
+.reach-card .mode{display:inline-flex;padding:4px 8px;border:1px solid var(--line);border-radius:999px;color:var(--acid);font:800 .68rem var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.reach-prose{max-width:850px}
+.reach-prose h2{margin:0 0 18px;font-size:clamp(2rem,4vw,3.7rem);line-height:1;letter-spacing:-.04em}
+.reach-prose h3{margin:34px 0 8px;font-size:1.35rem}
+.reach-prose p,.reach-prose li{color:var(--muted)}
+.reach-prose strong{color:var(--text)}
+.reach-code{margin:22px 0;padding:18px;border:1px solid rgba(168,255,99,.32);border-radius:14px;background:rgba(168,255,99,.04);overflow:auto}
+.reach-code code{color:#dfffd0;font:500 .84rem var(--mono);white-space:pre-wrap}
+.reach-compare{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.reach-compare article{padding:20px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.reach-compare b{display:block;color:var(--acid);font:800 .75rem var(--mono);text-transform:uppercase;letter-spacing:.08em}
+.reach-compare p{color:var(--muted);margin:10px 0 0}
+.reach-callout{padding:24px;border:1px solid rgba(168,255,99,.36);border-radius:16px;background:linear-gradient(145deg,rgba(168,255,99,.06),var(--panel))}
+.reach-callout h3{margin:0 0 8px}
+.reach-callout p{margin:0;color:var(--muted)}
+.breadcrumbs{padding-top:24px;color:var(--muted);font-size:.82rem}
+.breadcrumbs a{text-decoration:none}
+.guide-list{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.guide-list a{display:block;padding:24px;border:1px solid var(--line);border-radius:16px;background:var(--panel);text-decoration:none}
+.guide-list a:hover{border-color:rgba(168,255,99,.4)}
+.guide-list strong{display:block;font-size:1.25rem}
+.guide-list span{display:block;margin-top:7px;color:var(--muted)}
+@media(max-width:720px){.reach-grid,.reach-compare,.guide-list{grid-template-columns:1fr}.reach-hero{padding:64px 0 50px}}

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Repeated AI Agent Tool Calls — Detect Useful vs Waste</title>
+<meta name="description" content="Understand why AI coding agents repeat tool calls and how state-aware evidence can separate useful verification from no-progress repetition.">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+<link rel="canonical" href="https://signallayerlabs.github.io/Marginal/repeated-tool-calls/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MARGINAL">
+<meta property="og:title" content="Repeated AI Agent Tool Calls — Detect Useful vs Waste">
+<meta property="og:description" content="Understand why AI coding agents repeat tool calls and how state-aware evidence can separate useful verification from no-progress repetition.">
+<meta property="og:url" content="https://signallayerlabs.github.io/Marginal/repeated-tool-calls/">
+<meta property="og:image" content="https://signallayerlabs.github.io/Marginal/assets/marginal-social-card.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Repeated AI Agent Tool Calls — Detect Useful vs Waste">
+<meta name="twitter:description" content="Understand why AI coding agents repeat tool calls and how state-aware evidence can separate useful verification from no-progress repetition.">
+<meta name="twitter:image" content="https://signallayerlabs.github.io/Marginal/assets/marginal-social-card.png">
+<meta name="theme-color" content="#06080b">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="../reach.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Repeated AI Agent Tool Calls \u2014 Detect Useful vs Waste","description":"Understand why AI coding agents repeat tool calls and how state-aware evidence can separate useful verification from no-progress repetition.","url":"https://signallayerlabs.github.io/Marginal/repeated-tool-calls/","author":{"@type":"Organization","name":"SignalLayer Labs"},"publisher":{"@type":"Organization","name":"SignalLayer Labs"},"about":["AI coding agents","runtime governance","no-progress detection"]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"MARGINAL","item":"https://signallayerlabs.github.io/Marginal/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://signallayerlabs.github.io/Marginal/guides/"},{"@type":"ListItem","position":3,"name":"Repeated tool calls","item":"https://signallayerlabs.github.io/Marginal/repeated-tool-calls/"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why do AI coding agents repeat tool calls?","acceptedAnswer":{"@type":"Answer","text":"Retries can come from verification, uncertainty, changing state, tool failures or genuine no-progress loops. The same surface behavior can have different causes."}},{"@type":"Question","name":"Can repeated reads be useful?","acceptedAnswer":{"@type":"Answer","text":"Yes. A read after a write or a read that yields new evidence can be useful. MARGINAL is designed not to treat repetition alone as proof of waste."}},{"@type":"Question","name":"What does MARGINAL persist?","acceptedAnswer":{"@type":"Answer","text":"Its privacy model uses derived structured evidence; raw prompts, source, commands, outputs, transcripts and credentials are not default evidence fields."}}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header"><nav class="nav shell" aria-label="Main navigation">
+<a class="brand" href="../"><span class="brand-mark">M</span><span>MARGINAL</span></a>
+<div class="nav-links" style="display:flex">
+<a href="../demo/">Demo</a><a href="../guides/">Guides</a>
+<a class="button small" href="https://github.com/SignalLayerLabs/Marginal">Star on GitHub ↗</a>
+</div></nav></header>
+<main id="main">
+<div class="shell breadcrumbs"><a href="../">MARGINAL</a> / <a href="../guides/">Guides</a> / Repeated tool calls</div>
+<section class="shell reach-hero">
+<p class="eyebrow">Repeated tool calls</p>
+<h1>Same tool call.<span>Different value.</span></h1>
+<p class="hero-lead">Counting retries is easy. Deciding whether a retry produced progress requires state, outcomes and evidence.</p>
+<div class="hero-actions"><a class="button" href="../demo/">Watch the demo ↗</a><a class="button secondary" href="https://github.com/SignalLayerLabs/Marginal">View on GitHub ↗</a></div>
+<ul class="trust-row"><li>Open source</li><li>Local first</li><li>Shadow first</li><li>Fails open on ambiguity</li></ul>
+</section>
+
+<section class="section"><div class="shell reach-prose"><p class="eyebrow">Repeated tool calls</p><h2>The second read may be verification. The fourth identical read may not be.</h2>
+<p>Repeated tool calls are not inherently pathological. An agent may legitimately re-read a file after a write, rerun a test after changing code, or repeat a search because the environment changed. A useful detector therefore needs more than call counts.</p>
+<h3>Three questions before calling a repeat waste</h3>
+<ul><li><strong>Was the previous outcome proven?</strong> Unknown outcomes should not be promoted into evidence for blocking.</li>
+<li><strong>Did observable workspace state change?</strong> A changed repository state can make the same action valuable again.</li>
+<li><strong>Did the action add evidence?</strong> New evidence resets repetition pressure even when the tool name looks identical.</li></ul>
+<div class="reach-code"><code>read config.py → new evidence
+read config.py → verification
+read config.py → same state, no new evidence
+read config.py → no-progress candidate</code></div>
+<p>MARGINAL turns this into a provider-neutral evidence model. The model can stay purely observational, or—only where an adapter has real control and local evidence supports promotion—participate in narrow Tool Enforcement.</p>
+</div></section>
+<section class="section"><div class="shell"><div class="section-head"><p class="eyebrow">Design rule</p><h2>Useful retries must survive.</h2></div><div class="reach-grid">
+<article class="reach-card"><span class="mode">Allow pressure reset</span><h3>Changed state</h3><p>A write, checkout or other observable state change means an old repetition proof may no longer apply.</p></article>
+<article class="reach-card"><span class="mode">Fail open</span><h3>Unknown outcome</h3><p>If the runtime cannot prove success or failure, MARGINAL does not manufacture certainty.</p></article>
+<article class="reach-card"><span class="mode">Preserve correctness</span><h3>Verification</h3><p>Repeated work can be rational when it acquires or confirms evidence needed to complete the task safely.</p></article>
+<article class="reach-card"><span class="mode">Candidate</span><h3>Same action, same state</h3><p>Successful work with no observable progress is the narrow pattern worth escalating.</p></article>
+</div></div></section>
+
+<section class="section"><div class="shell"><div class="section-head"><p class="eyebrow">FAQ</p><h2>Fast answers.</h2></div><div class="faq"><details><summary>Why do AI coding agents repeat tool calls?</summary><p>Retries can come from verification, uncertainty, changing state, tool failures or genuine no-progress loops. The same surface behavior can have different causes.</p></details><details><summary>Can repeated reads be useful?</summary><p>Yes. A read after a write or a read that yields new evidence can be useful. MARGINAL is designed not to treat repetition alone as proof of waste.</p></details><details><summary>What does MARGINAL persist?</summary><p>Its privacy model uses derived structured evidence; raw prompts, source, commands, outputs, transcripts and credentials are not default evidence fields.</p></details></div></div></section>
+<section class="section cta"><div class="shell"><p class="eyebrow">Try it</p><h2>Observe first. Prove waste. Earn enforcement.</h2>
+<p>Install MARGINAL in Shadow Mode, inspect what your agent actually repeats, and contribute traces that make the governor harder to fool.</p>
+<div class="hero-actions" style="justify-content:center"><a class="button" href="https://github.com/SignalLayerLabs/Marginal">★ Star MARGINAL on GitHub</a><a class="button secondary" href="../guides/">Explore more guides</a></div>
+</div></section>
+<section class="section"><div class="shell reach-callout"><h3>Why duplicate calls are not enough</h3><p>Read the deeper model for action identity, outcome evidence, workspace state and useful verification.</p><div class="hero-actions"><a class="button secondary" href="../blog/detecting-no-progress-without-reading-prompts/">Read the technical article →</a></div></div></section></main>
+<footer class="footer"><div class="shell footer-grid"><span>MARGINAL · SignalLayer Labs</span><div class="footer-links"><a href="../">Home</a><a href="../guides/">Guides</a><a href="../privacy.html">Privacy</a><a href="https://github.com/SignalLayerLabs/Marginal">GitHub</a></div></div></footer>
+</body></html>

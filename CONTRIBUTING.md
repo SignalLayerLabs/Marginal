@@ -2,6 +2,9 @@
 
 Thank you for helping build open infrastructure for economically disciplined AI agents.
 
+New here? [First contribution in 5 minutes](docs/project/first-contribution.md) shows where a small,
+low-risk change can start and the shortest loop that validates it. The standards below still apply.
+
 ## Principles
 
 Contributions must preserve these properties:
@@ -61,6 +64,8 @@ An adapter must:
 - avoid logging prompts or source code by default.
 
 An adapter must not advertise Full Compute Enforcement unless the underlying engine exposes official controls for the relevant model turns, tool calls, retry loops, and stopping behavior.
+
+The [capability glossary](docs/reference/capability-glossary.md) defines Observe, Tool Enforcement, and Full Compute Enforcement, and gives the questions a reviewer uses to pick between them.
 
 ## Estimator contributions
 

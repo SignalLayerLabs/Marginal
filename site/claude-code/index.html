@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MARGINAL for Claude Code — Observe No-Progress Loops</title>
+<meta name="description" content="Observe repeated no-progress work in Claude Code with native hooks, engine-declared outcomes and a local Decision Ledger without blocking tool calls.">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+<link rel="canonical" href="https://signallayerlabs.github.io/Marginal/claude-code/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="MARGINAL">
+<meta property="og:title" content="MARGINAL for Claude Code — Observe No-Progress Loops">
+<meta property="og:description" content="Observe repeated no-progress work in Claude Code with native hooks, engine-declared outcomes and a local Decision Ledger without blocking tool calls.">
+<meta property="og:url" content="https://signallayerlabs.github.io/Marginal/claude-code/">
+<meta property="og:image" content="https://signallayerlabs.github.io/Marginal/assets/marginal-social-card.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="MARGINAL for Claude Code — Observe No-Progress Loops">
+<meta name="twitter:description" content="Observe repeated no-progress work in Claude Code with native hooks, engine-declared outcomes and a local Decision Ledger without blocking tool calls.">
+<meta name="twitter:image" content="https://signallayerlabs.github.io/Marginal/assets/marginal-social-card.png">
+<meta name="theme-color" content="#06080b">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="../reach.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"MARGINAL for Claude Code \u2014 Observe No-Progress Loops","description":"Observe repeated no-progress work in Claude Code with native hooks, engine-declared outcomes and a local Decision Ledger without blocking tool calls.","url":"https://signallayerlabs.github.io/Marginal/claude-code/","author":{"@type":"Organization","name":"SignalLayer Labs"},"publisher":{"@type":"Organization","name":"SignalLayer Labs"},"about":["AI coding agents","runtime governance","no-progress detection"]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"MARGINAL","item":"https://signallayerlabs.github.io/Marginal/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://signallayerlabs.github.io/Marginal/guides/"},{"@type":"ListItem","position":3,"name":"Claude Code","item":"https://signallayerlabs.github.io/Marginal/claude-code/"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does MARGINAL block Claude Code tool calls?","acceptedAnswer":{"@type":"Answer","text":"No. The current Claude Code adapter is Observe-only and declares no blocking capability."}},{"@type":"Question","name":"Can it still detect no-progress repetition?","acceptedAnswer":{"@type":"Answer","text":"Yes. It can normalize action, outcome and workspace-state evidence and record repeated-work recommendations in the Decision Ledger."}},{"@type":"Question","name":"Does it read Claude Code prompts or transcripts for evidence?","acceptedAnswer":{"@type":"Answer","text":"The integration is designed around structured derived signals rather than persisting raw prompts, command text, source paths or transcripts as governance evidence."}}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header"><nav class="nav shell" aria-label="Main navigation">
+<a class="brand" href="../"><span class="brand-mark">M</span><span>MARGINAL</span></a>
+<div class="nav-links" style="display:flex">
+<a href="../demo/">Demo</a><a href="../guides/">Guides</a>
+<a class="button small" href="https://github.com/SignalLayerLabs/Marginal">Star on GitHub ↗</a>
+</div></nav></header>
+<main id="main">
+<div class="shell breadcrumbs"><a href="../">MARGINAL</a> / <a href="../guides/">Guides</a> / Claude Code</div>
+<section class="shell reach-hero">
+<p class="eyebrow">Claude Code</p>
+<h1>See no-progress loops.<span>Do not pretend to control them.</span></h1>
+<p class="hero-lead">MARGINAL integrates with Claude Code in Observe-only mode: collect evidence, detect repetition and keep the execution path unchanged.</p>
+<div class="hero-actions"><a class="button" href="../demo/">Watch the demo ↗</a><a class="button secondary" href="https://github.com/SignalLayerLabs/Marginal">View on GitHub ↗</a></div>
+<ul class="trust-row"><li>Open source</li><li>Local first</li><li>Shadow first</li><li>Fails open on ambiguity</li></ul>
+</section>
+
+<section class="section"><div class="shell reach-prose"><p class="eyebrow">Claude Code integration</p><h2>Observe repeated work without changing Claude Code behavior.</h2>
+<p>MARGINAL's Claude Code integration is intentionally labeled <strong>Observe</strong>. Native hooks normalize lifecycle evidence into the same provider-neutral governance model, but the adapter declares no blocking capability and does not deny tool calls.</p>
+<div class="reach-code"><code>marginal install claude-code</code></div>
+<p>Claude Code exposes separate successful and failed post-tool events, so MARGINAL can record the outcome as an engine-declared fact instead of inferring it from response text. Per-tool token usage is not exposed through that hook surface and is reported as unavailable rather than zero.</p>
+<h3>Why Observe-only is a feature, not a missing disclaimer</h3><p>An integration should not claim authority it does not possess. MARGINAL can detect repeated-work recommendations and governance overhead while preserving Claude Code's next action. That evidence can inform future work without pretending enforcement already exists.</p>
+</div></section>
+<section class="section"><div class="shell"><div class="section-head"><p class="eyebrow">What it records</p><h2>Structured evidence, conservative outcomes.</h2></div><div class="reach-grid">
+<article class="reach-card"><span class="mode">Engine-declared</span><h3>Success / failure</h3><p>Separate hook events provide a stronger outcome signal than guessing from free text.</p></article>
+<article class="reach-card"><span class="mode">Local</span><h3>Decision Ledger</h3><p>Recommendations and evidence are recorded without turning the hook into an enforcement surface.</p></article>
+<article class="reach-card"><span class="mode">Unavailable ≠ zero</span><h3>Token usage</h3><p>If the hook surface does not expose per-tool tokens, MARGINAL reports that honestly.</p></article>
+<article class="reach-card"><span class="mode">Observe</span><h3>No blocking</h3><p>The adapter declares no control capability, so repeated-work candidates remain recommendations.</p></article>
+</div></div></section>
+
+<section class="section"><div class="shell"><div class="section-head"><p class="eyebrow">FAQ</p><h2>Fast answers.</h2></div><div class="faq"><details><summary>Does MARGINAL block Claude Code tool calls?</summary><p>No. The current Claude Code adapter is Observe-only and declares no blocking capability.</p></details><details><summary>Can it still detect no-progress repetition?</summary><p>Yes. It can normalize action, outcome and workspace-state evidence and record repeated-work recommendations in the Decision Ledger.</p></details><details><summary>Does it read Claude Code prompts or transcripts for evidence?</summary><p>The integration is designed around structured derived signals rather than persisting raw prompts, command text, source paths or transcripts as governance evidence.</p></details></div></div></section>
+<section class="section cta"><div class="shell"><p class="eyebrow">Try it</p><h2>Observe first. Prove waste. Earn enforcement.</h2>
+<p>Install MARGINAL in Shadow Mode, inspect what your agent actually repeats, and contribute traces that make the governor harder to fool.</p>
+<div class="hero-actions" style="justify-content:center"><a class="button" href="https://github.com/SignalLayerLabs/Marginal">★ Star MARGINAL on GitHub</a><a class="button secondary" href="../guides/">Explore more guides</a></div>
+</div></section>
+<section class="section"><div class="shell reach-callout"><h3>Observe-only is an explicit boundary</h3><p>The governance article explains why evidence and interception capability should determine authority rather than installation alone.</p><div class="hero-actions"><a class="button secondary" href="../blog/why-ai-agent-governor-should-start-powerless/">Read the governance argument →</a></div></div></section></main>
+<footer class="footer"><div class="shell footer-grid"><span>MARGINAL · SignalLayer Labs</span><div class="footer-links"><a href="../">Home</a><a href="../guides/">Guides</a><a href="../privacy.html">Privacy</a><a href="https://github.com/SignalLayerLabs/Marginal">GitHub</a></div></div></footer>
+</body></html>
