@@ -303,6 +303,135 @@ def test_cleanup_failure_does_not_replace_the_original_write_error(
         configure_commons_mode(tmp_path, mode=CommonsMode.READ_ONLY)
 
 
+def _open_descriptor_count() -> int:
+    for descriptor_directory in ("/proc/self/fd", "/dev/fd"):
+        if os.path.isdir(descriptor_directory):
+            return len(os.listdir(descriptor_directory))
+    pytest.skip("open descriptor enumeration is unavailable")
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX advisory locks are required")
+def test_write_failure_survives_unlock_failure_and_all_descriptors_are_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    configure_commons_mode(tmp_path, mode=CommonsMode.CONTRIBUTOR)
+    baseline_descriptors = _open_descriptor_count()
+    opened: dict[str, int] = {}
+    unlock_attempts: list[int] = []
+    close_attempts: list[int] = []
+    original_open_directory = commons_config._open_config_directory
+    original_open_lock = commons_config._open_config_lock
+    original_close = os.close
+
+    def tracked_open_directory(data_dir: str | Path, *, create: bool) -> int:
+        descriptor = original_open_directory(data_dir, create=create)
+        opened["directory"] = descriptor
+        return descriptor
+
+    def tracked_open_lock(directory_descriptor: int) -> int:
+        descriptor = original_open_lock(directory_descriptor)
+        opened["lock"] = descriptor
+        return descriptor
+
+    def fail_write(descriptor: int, data: bytes) -> int:
+        del descriptor, data
+        raise OSError("primary write failure")
+
+    def fail_unlock(descriptor: int) -> None:
+        unlock_attempts.append(descriptor)
+        raise OSError("secondary unlock failure")
+
+    def tracked_close(descriptor: int) -> None:
+        close_attempts.append(descriptor)
+        original_close(descriptor)
+
+    monkeypatch.setattr(commons_config, "_open_config_directory", tracked_open_directory)
+    monkeypatch.setattr(commons_config, "_open_config_lock", tracked_open_lock)
+    monkeypatch.setattr(commons_config.os, "write", fail_write)
+    monkeypatch.setattr(commons_config, "_unlock", fail_unlock)
+    monkeypatch.setattr(commons_config.os, "close", tracked_close)
+
+    with pytest.raises(OSError, match="primary write failure"):
+        configure_commons_mode(tmp_path, mode=CommonsMode.READ_ONLY)
+
+    assert unlock_attempts == [opened["lock"]]
+    assert opened["lock"] in close_attempts
+    assert opened["directory"] in close_attempts
+    assert _open_descriptor_count() == baseline_descriptors
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX advisory locks are required")
+def test_unlock_failure_after_success_closes_all_descriptors_then_surfaces(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    baseline_descriptors = _open_descriptor_count()
+    opened: dict[str, int] = {}
+    close_attempts: list[int] = []
+    original_open_directory = commons_config._open_config_directory
+    original_open_lock = commons_config._open_config_lock
+    original_close = os.close
+
+    def tracked_open_directory(data_dir: str | Path, *, create: bool) -> int:
+        descriptor = original_open_directory(data_dir, create=create)
+        opened["directory"] = descriptor
+        return descriptor
+
+    def tracked_open_lock(directory_descriptor: int) -> int:
+        descriptor = original_open_lock(directory_descriptor)
+        opened["lock"] = descriptor
+        return descriptor
+
+    def fail_unlock(descriptor: int) -> None:
+        assert descriptor == opened["lock"]
+        raise OSError("unlock failure after successful write")
+
+    def tracked_close(descriptor: int) -> None:
+        close_attempts.append(descriptor)
+        original_close(descriptor)
+
+    monkeypatch.setattr(commons_config, "_open_config_directory", tracked_open_directory)
+    monkeypatch.setattr(commons_config, "_open_config_lock", tracked_open_lock)
+    monkeypatch.setattr(commons_config, "_unlock", fail_unlock)
+    monkeypatch.setattr(commons_config.os, "close", tracked_close)
+
+    with pytest.raises(OSError, match="unlock failure after successful write"):
+        configure_commons_mode(tmp_path, mode=CommonsMode.CONTRIBUTOR)
+
+    assert opened["lock"] in close_attempts
+    assert opened["directory"] in close_attempts
+    assert _open_descriptor_count() == baseline_descriptors
+    assert load_commons_config(tmp_path).mode is CommonsMode.CONTRIBUTOR
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX descriptor cleanup is required")
+def test_open_lock_preserves_validation_failure_when_close_also_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    directory_descriptor = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    baseline_descriptors = _open_descriptor_count()
+    close_attempts: list[int] = []
+    original_close = os.close
+
+    def fail_metadata(descriptor: int) -> os.stat_result:
+        del descriptor
+        raise OSError("primary lock validation failure")
+
+    def close_then_fail(descriptor: int) -> None:
+        close_attempts.append(descriptor)
+        original_close(descriptor)
+        raise OSError("secondary lock close failure")
+
+    monkeypatch.setattr(commons_config.os, "fstat", fail_metadata)
+    monkeypatch.setattr(commons_config.os, "close", close_then_fail)
+    try:
+        with pytest.raises(OSError, match="primary lock validation failure"):
+            commons_config._open_config_lock(directory_descriptor)
+        assert len(close_attempts) == 1
+        assert _open_descriptor_count() == baseline_descriptors
+    finally:
+        original_close(directory_descriptor)
+
+
 def test_config_rejects_boolean_schema_versions_instead_of_treating_them_as_one(
     tmp_path: Path,
 ) -> None:

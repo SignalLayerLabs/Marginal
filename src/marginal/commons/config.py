@@ -183,7 +183,8 @@ def _open_config_lock(directory_descriptor: int) -> int:
             raise ValueError("user configuration lock must have owner-only permissions")
         return descriptor
     except BaseException:
-        os.close(descriptor)
+        with suppress(BaseException):
+            os.close(descriptor)
         raise
 
 
@@ -233,6 +234,7 @@ def _update_user_config(data_dir: str | Path, **changes: object) -> dict[str, An
     directory_descriptor = _open_config_directory(data_dir, create=True)
     lock_descriptor = -1
     locked = False
+    primary_error: BaseException | None = None
     try:
         if os.name == "posix":
             os.fchmod(directory_descriptor, 0o700)
@@ -245,12 +247,29 @@ def _update_user_config(data_dir: str | Path, **changes: object) -> dict[str, An
         payload.update(changes)
         _write_user_config_at(directory_descriptor, payload)
         return payload
+    except BaseException as exc:
+        primary_error = exc
+        raise
     finally:
+        cleanup_error: BaseException | None = None
         if locked:
-            _unlock(lock_descriptor)
+            try:
+                _unlock(lock_descriptor)
+            except BaseException as exc:
+                cleanup_error = exc
         if lock_descriptor >= 0:
-            os.close(lock_descriptor)
-        os.close(directory_descriptor)
+            try:
+                os.close(lock_descriptor)
+            except BaseException as exc:
+                if cleanup_error is None:
+                    cleanup_error = exc
+        try:
+            os.close(directory_descriptor)
+        except BaseException as exc:
+            if cleanup_error is None:
+                cleanup_error = exc
+        if primary_error is None and cleanup_error is not None:
+            raise cleanup_error
 
 
 def load_commons_config(data_dir: str | Path) -> CommonsConfig:
