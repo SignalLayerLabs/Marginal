@@ -134,7 +134,9 @@ def _write_commons_status(
         temporary.unlink(missing_ok=True)
 
 
-def _start_commons(data_root: Path, *, model: str) -> _CommonsSession:
+def _start_commons(
+    data_root: Path, *, model: str, evidence_store: EvidenceStore
+) -> _CommonsSession:
     try:
         config = load_commons_config(data_root)
     except Exception:
@@ -153,6 +155,7 @@ def _start_commons(data_root: Path, *, model: str) -> _CommonsSession:
         )
         commons.outbox = CommonsOutbox(data_root)
         commons.client = _commons_client()
+        _recover_export_cursor(evidence_store, identity, commons.outbox)
         result = synchronize_commons(
             config,
             cache=commons.cache,
@@ -232,9 +235,13 @@ def _end_commons(
         after_records=cursor[0],
         through_records=report.records,
     )
-    receipt = hashlib.sha256(
-        f"{commons.identity.namespace}:{cursor[0]}:{report.records}:{report.root_hash}".encode()
-    ).hexdigest()
+    receipt_payload = (
+        f"{commons.identity.namespace}:{cursor[0]}:{report.records}:{report.root_hash}"
+    )
+    receipt = (
+        f"v1.{cursor[0]}.{report.records}.{report.root_hash}."
+        f"{hashlib.sha256(receipt_payload.encode()).hexdigest()}"
+    )
     if evidence is not None:
         queued = commons.outbox.enqueue(batch=evidence, export_receipt=receipt)
         if queued is None:
@@ -315,6 +322,47 @@ def _write_export_cursor(
             temporary_prefix=".export-cursor-",
             label="Commons export cursor",
         )
+
+
+def _recover_export_cursor(
+    store: EvidenceStore,
+    identity: CanonicalModelIdentity,
+    outbox: CommonsOutbox,
+) -> None:
+    cursor = _read_export_cursor(store, identity)
+    if cursor is None:
+        return
+    entries = sorted(
+        outbox.pending(limit=100).entries,
+        key=lambda entry: entry.export_receipt or "",
+    )
+    advanced = True
+    while advanced:
+        advanced = False
+        for entry in entries:
+            receipt = entry.export_receipt
+            if receipt is None or entry.model_namespace != identity.namespace:
+                continue
+            parts = receipt.split(".")
+            if len(parts) != 5 or parts[0] != "v1":
+                continue
+            try:
+                after, through = int(parts[1]), int(parts[2])
+            except ValueError:
+                continue
+            root, digest = parts[3], parts[4]
+            payload = f"{identity.namespace}:{after}:{through}:{root}"
+            if (
+                after != cursor[0]
+                or through <= after
+                or hashlib.sha256(payload.encode()).hexdigest() != digest
+                or not store.verifies_governance_prefix(root_hash=root, records=through)
+            ):
+                continue
+            _write_export_cursor(store, identity, through, root)
+            cursor = (through, root)
+            advanced = True
+            break
 
 
 def _connection_path(data_root: Path, session_id: str) -> Path:
@@ -565,7 +613,7 @@ def _serve_bootstrap(path: Path) -> int:
     evidence_store.append(
         {"schema_version": 1, "event": "session_start", "session_hash": session_hash}
     )
-    commons = _start_commons(data_root, model=event.model)
+    commons = _start_commons(data_root, model=event.model, evidence_store=evidence_store)
     treasury = Treasury(BudgetLimits(), mode="shadow")
     universal = UniversalRuntime(
         treasury,
@@ -636,7 +684,7 @@ def start_session_service(
     evidence_store.append(
         {"schema_version": 1, "event": "session_start", "session_hash": session_hash}
     )
-    commons = _start_commons(root, model=event.model)
+    commons = _start_commons(root, model=event.model, evidence_store=evidence_store)
     treasury = Treasury(BudgetLimits(), mode="shadow")
     universal = UniversalRuntime(
         treasury,

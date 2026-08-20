@@ -29,6 +29,7 @@ _MAX_ATOMS = 1_000
 _TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{43}$")
 _ENTRY_NAME_PATTERN = re.compile(r"^queue-[0-9a-f]{32}\.json$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+_EXPORT_RECEIPT_PATTERN = re.compile(r"^v1\.[0-9]+\.[0-9]+\.[0-9a-f]{64}\.[0-9a-f]{64}$")
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -146,7 +147,8 @@ def _parse_queue_record(raw: bytes, *, name: str, device: int, inode: int) -> Ou
         raise ValueError("queued Commons retry token is invalid")
     export_receipt = payload.get("export_receipt")
     if export_receipt is not None and (
-        not isinstance(export_receipt, str) or _DIGEST_PATTERN.fullmatch(export_receipt) is None
+        not isinstance(export_receipt, str)
+        or _EXPORT_RECEIPT_PATTERN.fullmatch(export_receipt) is None
     ):
         raise ValueError("queued Commons export receipt is invalid")
     envelope = _validate_envelope(payload["envelope"])
@@ -227,7 +229,7 @@ class CommonsOutbox:
             return None
         if len(batch.atoms) > _MAX_ATOMS:
             return None
-        if export_receipt is not None and _DIGEST_PATTERN.fullmatch(export_receipt) is None:
+        if export_receipt is not None and _EXPORT_RECEIPT_PATTERN.fullmatch(export_receipt) is None:
             raise ValueError("Commons export receipt is invalid")
         envelope: dict[str, object] = {
             "schema_version": "1.0",

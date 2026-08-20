@@ -369,6 +369,54 @@ def test_contributor_exports_only_each_new_finalized_range(tmp_path: Path, monke
     assert exported_counts == [5, 5]
 
 
+def test_pending_export_receipt_recovers_cursor_after_enqueue_crash(
+    tmp_path: Path, monkeypatch
+) -> None:
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    _repository(workspace)
+    data = tmp_path / "data"
+    configure_commons_mode(data, mode=CommonsMode.CONTRIBUTOR)
+    monkeypatch.setattr(service_module, "_commons_client", _OfflineCommonsClient)
+    original_write = service_module._write_export_cursor
+    failed = False
+
+    def crash_once(*args, **kwargs):
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise OSError("crash after enqueue")
+        return original_write(*args, **kwargs)
+
+    monkeypatch.setattr(service_module, "_write_export_cursor", crash_once)
+    connection = start_session_service(_start(workspace), data_root=data)
+    for index in range(5):
+        pre = {
+            "session_id": "session-1",
+            "cwd": str(workspace),
+            "model": "gpt-5.6-sol",
+            "permission_mode": "default",
+            "turn_id": "turn",
+            "tool_name": "Read",
+            "tool_input": {"path": str(workspace / "tracked.txt")},
+            "hook_event_name": "PreToolUse",
+            "tool_use_id": f"call-{index}",
+        }
+        request_session(connection, operation="pre", payload=pre)
+        request_session(
+            connection,
+            operation="post",
+            payload={**pre, "hook_event_name": "PostToolUse", "tool_response": {"exit_code": 0}},
+        )
+    stop_session_service("session-1", data_root=data)
+    assert len(CommonsOutbox(data).pending(limit=8).entries) == 1
+
+    monkeypatch.setattr(service_module, "_write_export_cursor", original_write)
+    start_session_service(replace(_start(workspace), session_id="session-2"), data_root=data)
+    stop_session_service("session-2", data_root=data)
+    assert len(CommonsOutbox(data).pending(limit=8).entries) == 1
+
+
 def test_ambiguous_model_session_remains_local_and_never_queues(
     tmp_path: Path, monkeypatch
 ) -> None:
