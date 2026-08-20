@@ -61,6 +61,27 @@ marginal install codex --autopilot-consent
 Installation alone never enables enforcement. Earned Enforcement requires verified evidence and
 explicit promotion.
 
+### Optional Commons modes
+
+Commons is **Local Only by default** for new and existing installations. An explicit Python
+installer choice can enable one of two network postures:
+
+```bash
+marginal install codex --commons-mode read_only
+marginal install codex --commons-mode contributor
+```
+
+Read-Only downloads a bounded, verified model-specific aggregate pack. Contributor also sends only
+closed-schema aggregate counts for an exact reviewed public model; it sends no prompt, source,
+command, output, repository data, local hash, timestamp, or persistent contributor identity. A
+one-time retry token exists only in an HTTP header. Commons data is a prior only and cannot affect
+local trust, promotion, Autopilot, or Tool Enforcement. Network failures fail open.
+
+Contributor transport uses Cloudflare infrastructure, whose processing of network-layer metadata is
+outside MARGINAL's application boundary. The production contribution endpoint is not active until
+Wrangler authentication and a dedicated least-privilege GitHub service credential are both
+verified. See the [privacy model](docs/operations/privacy.md).
+
 ## How Autopilot works
 
 1. **Observe.** Hooks collect derived state, outcome, and coverage signals in Shadow Mode.
@@ -127,6 +148,8 @@ that did not run.
 - Integration errors demote enforcement and allow the requested tool action.
 - `SAFE_TELEMETRY` exports derived pseudonyms and approved measurements, never raw private payloads.
 - `AGGREGATE_EXPORT` publishes only grouped statistics that meet the configured minimum group size.
+- Optional Commons sharing remains Local Only unless the user explicitly selects Read-Only or
+  Contributor; shared Commons priors never grant enforcement authority.
 
 Read the [privacy model](docs/operations/privacy.md) and
 [governance evidence standard](docs/evaluation/governance-evidence.md).

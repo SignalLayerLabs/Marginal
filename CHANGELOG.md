@@ -4,6 +4,21 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
 
 ## [Unreleased]
 
+### Added
+
+- optional model-specific Commons modes: Local Only by default, bounded Read-Only pack refresh, and
+  explicit Contributor upload through a recursively closed aggregate schema;
+- owner-only durable outbox retry, exact reviewed public-model attribution, verified cache fallback,
+  and synthetic lifecycle-to-aggregate-to-next-session acceptance coverage.
+
+### Security
+
+- Commons priors remain outside all local trust, promotion, Autopilot, and Tool Enforcement inputs;
+- shared envelopes exclude prompts, source, commands, outputs, repository data, local hashes,
+  timestamps, free text, credentials, and persistent contributor identity;
+- Commons network and shared-state failures fail open; production contribution remains blocked on
+  verified Wrangler authentication and a dedicated least-privilege GitHub service credential.
+
 ## [0.3.3] - 2026-08-13
 
 ### Fixed

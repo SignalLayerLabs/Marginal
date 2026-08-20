@@ -6,6 +6,20 @@
 python -m pip install -e ".[dev]"
 ```
 
+For the native Codex plugin, Commons remains Local Only unless you explicitly choose otherwise:
+
+```bash
+marginal install codex                              # local_only; no Commons network calls
+marginal install codex --commons-mode read_only    # verified pack download only
+marginal install codex --commons-mode contributor  # download plus closed aggregate submission
+```
+
+Contributor mode sends no prompt, source, command, output, repository data, local hash, timestamp,
+free text, or persistent identity. Its Cloudflare transport is not an anonymity boundary, and
+Commons priors never affect local Tool Enforcement. Production contribution remains unavailable
+until both Wrangler authentication and a dedicated least-privilege GitHub service credential are
+verified.
+
 ## Shadow first
 
 ```python
