@@ -11,7 +11,6 @@ from jsonschema import Draft202012Validator, ValidationError
 
 from marginal.privacy import aggregate_ledger_records
 
-
 ROOT = Path(__file__).resolve().parents[1]
 NAMESPACES = (
     "openai/gpt-5.6-sol",
@@ -66,7 +65,11 @@ def test_envelope_accepts_unknown_action_kind_from_real_aggregate_outcome() -> N
         [{"event": "outcome", "outcome": {"resolved": True, "reward": 1.0}}],
         minimum_group_size=1,
     )
-    atom = {key: value for key, value in rows[0].items() if key not in {"schema_version", "privacy_profile"}}
+    atom = {
+        key: value
+        for key, value in rows[0].items()
+        if key not in {"schema_version", "privacy_profile"}
+    }
     assert atom["action_kind"] == "unknown"
     _validator("commons-evidence-envelope-v1.json").validate(
         {"schema_version": "1.0", "model_namespace": NAMESPACES[0], "atoms": [atom]}
@@ -141,9 +144,12 @@ def test_registry_contains_only_the_reviewed_exact_model_mapping() -> None:
 
 def test_contract_digest_fixtures_detect_schema_and_registry_drift() -> None:
     envelope_digest = (ROOT / "schemas" / "commons-evidence-envelope-v1.sha256").read_text().strip()
-    assert hashlib.sha256(
-        (ROOT / "schemas" / "commons-evidence-envelope-v1.json").read_bytes()
-    ).hexdigest() == envelope_digest
+    assert (
+        hashlib.sha256(
+            (ROOT / "schemas" / "commons-evidence-envelope-v1.json").read_bytes()
+        ).hexdigest()
+        == envelope_digest
+    )
     manifest = json.loads((ROOT / "schemas" / "commons-contract-v1.manifest.json").read_text())
     for name, expected in manifest["sha256"].items():
         base = ROOT / ("models" if name.startswith("canonical-model") else "schemas")

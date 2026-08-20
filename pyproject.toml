@@ -83,7 +83,7 @@ include-package-data = true
 where = ["src"]
 
 [tool.setuptools.package-data]
-marginal = ["py.typed", "schemas/*.json"]
+marginal = ["py.typed", "commons/*.json", "schemas/*.json"]
 
 [tool.pytest.ini_options]
 addopts = "-ra"

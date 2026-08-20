@@ -159,6 +159,11 @@ def _build_parser() -> argparse.ArgumentParser:
     install_parser.add_argument("--ref", default="main")
     install_parser.add_argument("--data-dir", type=Path)
     install_parser.add_argument("--autopilot-consent", action="store_true")
+    install_parser.add_argument(
+        "--commons-mode",
+        choices=["local_only", "read_only", "contributor"],
+        help="persist one explicit Commons network posture (default: local_only)",
+    )
     install_parser.add_argument("--json", action="store_true", dest="as_json")
 
     uninstall_parser = subparsers.add_parser("uninstall", help="remove a native integration")
@@ -208,6 +213,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ref=args.ref,
             data_dir=args.data_dir,
             autopilot_consent=args.autopilot_consent,
+            commons_mode=args.commons_mode,
         )
         payload = result.to_dict()
         if args.as_json:

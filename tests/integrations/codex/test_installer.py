@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from marginal.commons.config import CommonsMode, load_commons_config
 from marginal.integrations.codex.installer import (
     CommandResult,
     autopilot_consent_configured,
@@ -101,3 +102,25 @@ def test_install_can_persist_explicit_user_autopilot_consent(tmp_path) -> None:
     assert result.installed is True
     assert result.autopilot_consent is True
     assert autopilot_consent_configured(tmp_path) is True
+
+
+def test_install_persists_explicit_commons_choice_without_altering_autopilot(tmp_path) -> None:
+    result = install(
+        runner=RecordingRunner(),
+        data_dir=tmp_path,
+        autopilot_consent=True,
+        commons_mode=CommonsMode.READ_ONLY,
+    )
+
+    assert result.installed is True
+    assert result.commons_mode == "read_only"
+    assert load_commons_config(tmp_path).mode is CommonsMode.READ_ONLY
+    assert autopilot_consent_configured(tmp_path) is True
+
+
+def test_install_defaults_to_local_only_without_persisting_or_enabling_network(tmp_path) -> None:
+    result = install(runner=RecordingRunner(), data_dir=tmp_path)
+
+    assert result.commons_mode == "local_only"
+    assert load_commons_config(tmp_path).mode is CommonsMode.LOCAL_ONLY
+    assert not (tmp_path / "user-config.json").exists()

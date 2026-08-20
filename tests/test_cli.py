@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from marginal.cli import main
+from marginal.integrations.codex.installer import CodexInstallation
 
 
 def write_trace(path) -> None:
@@ -71,3 +72,32 @@ def test_codex_status_dispatches_without_importing_at_cli_module_load(tmp_path, 
 
     assert exit_code == 0
     assert json.loads(capsys.readouterr().out)["mode"] == "shadow"
+
+
+def test_install_cli_persists_only_an_explicit_closed_commons_choice(
+    tmp_path, capsys, monkeypatch
+) -> None:
+    captured = {}
+
+    def fake_install(**kwargs):
+        captured.update(kwargs)
+        return CodexInstallation(True, True, commons_mode="contributor")
+
+    monkeypatch.setattr("marginal.integrations.codex.installer.install", fake_install)
+
+    assert (
+        main(
+            [
+                "install",
+                "codex",
+                "--data-dir",
+                str(tmp_path),
+                "--commons-mode",
+                "contributor",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    assert captured["commons_mode"] == "contributor"
+    assert json.loads(capsys.readouterr().out)["commons_mode"] == "contributor"
