@@ -5,19 +5,44 @@ from __future__ import annotations
 import errno
 import os
 import stat
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from pathlib import Path
 from secrets import token_hex as _token_hex
 
 from marginal.governance_ledger import (
-    _lock_exclusive,
     _open_parent_directory,
     _unlock,
     _write_all,
 )
 
 _OWNER_ONLY_MASK = 0o077
+_LOCK_TIMEOUT_SECONDS = 0.2
+_LOCK_POLL_SECONDS = 0.01
+
+
+class CommonsStorageBusy(OSError):
+    """A closed bounded result for lock contention."""
+
+
+def _lock_exclusive_bounded(descriptor: int) -> None:
+    try:
+        import fcntl
+    except ImportError as exc:
+        raise OSError("OS-level file locking is unavailable") from exc
+    deadline = time.monotonic() + _LOCK_TIMEOUT_SECONDS
+    while True:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except OSError as exc:
+            if exc.errno not in {errno.EACCES, errno.EAGAIN}:
+                raise
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise CommonsStorageBusy("Commons storage is busy")
+        time.sleep(min(_LOCK_POLL_SECONDS, remaining))
 
 
 def _validate_directory(descriptor: int) -> None:
@@ -71,8 +96,15 @@ def locked_directory(path: Path, *, create: bool, lock_name: str) -> Iterator[in
     primary_error: BaseException | None = None
     try:
         _validate_directory(directory_descriptor)
-        lock_descriptor = _open_lock(directory_descriptor, lock_name)
-        _lock_exclusive(lock_descriptor)
+        for _ in range(16):
+            try:
+                lock_descriptor = _open_lock(directory_descriptor, lock_name)
+            except FileNotFoundError:
+                continue
+            break
+        if lock_descriptor < 0:
+            raise FileNotFoundError("unable to open concurrently created Commons lock")
+        _lock_exclusive_bounded(lock_descriptor)
         locked = True
         yield directory_descriptor
     except BaseException as exc:

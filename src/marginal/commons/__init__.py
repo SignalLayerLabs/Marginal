@@ -3,7 +3,7 @@
 from .cache import CommonsCache, CommonsLifecycle, CommonsPrior
 from .client import CommonsAck, CommonsClient
 from .config import CommonsConfig, CommonsMode, configure_commons_mode, load_commons_config
-from .evidence import CommonsEvidenceAtom, compile_verified_evidence
+from .evidence import CommonsEvidenceAtom, CommonsEvidenceBatch, compile_verified_evidence
 from .identity import (
     CanonicalModelIdentity,
     resolve_canonical_model,
@@ -19,6 +19,7 @@ __all__ = [
     "CommonsClient",
     "CommonsConfig",
     "CommonsEvidenceAtom",
+    "CommonsEvidenceBatch",
     "CommonsLifecycle",
     "CommonsMode",
     "CommonsOutbox",

@@ -85,6 +85,18 @@ def is_canonical_namespace(namespace: object) -> bool:
     return namespace in models.values()
 
 
+def resolve_canonical_namespace(namespace: object) -> CanonicalModelIdentity | None:
+    """Resolve one exact reviewed namespace back to its canonical identity."""
+
+    if not isinstance(namespace, str):
+        return None
+    version, models = _registry()
+    for model, registered_namespace in models.items():
+        if namespace == registered_namespace:
+            return CanonicalModelIdentity("openai", model, namespace, version)
+    return None
+
+
 def identity_is_canonical(identity: object) -> bool:
     """Reject forged value objects that were not derived from the exact registry mapping."""
 

@@ -21,11 +21,13 @@ from marginal.commons.evidence import (
     ActionKind,
     AggregateReasonCode,
     CommonsEvidenceAtom,
+    CommonsEvidenceBatch,
     DecisionClass,
     OutcomeClass,
     RecordType,
     ValueBucket,
 )
+from marginal.commons.identity import resolve_canonical_model
 from marginal.commons.outbox import CommonsOutbox, OutboxEntry
 
 
@@ -34,6 +36,20 @@ class _Handler(BaseHTTPRequestHandler):
     response_status: ClassVar[int] = 200
     response_body: ClassVar[bytes] = b"{}"
     response_delay: ClassVar[float] = 0.0
+    trickle_delay: ClassVar[float] = 0.0
+
+    def _write_body(self) -> None:
+        time.sleep(type(self).response_delay)
+        try:
+            if type(self).trickle_delay:
+                for byte in type(self).response_body:
+                    time.sleep(type(self).trickle_delay)
+                    self.wfile.write(bytes([byte]))
+                    self.wfile.flush()
+            else:
+                self.wfile.write(type(self).response_body)
+        except (BrokenPipeError, ConnectionResetError):
+            return
 
     def do_GET(self) -> None:
         type(self).requests.append(
@@ -42,11 +58,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_response(type(self).response_status)
         self.send_header("Content-Length", str(len(type(self).response_body)))
         self.end_headers()
-        time.sleep(type(self).response_delay)
-        try:
-            self.wfile.write(type(self).response_body)
-        except BrokenPipeError:
-            return
+        self._write_body()
 
     def do_POST(self) -> None:
         length = int(self.headers.get("Content-Length", "0"))
@@ -57,22 +69,25 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_response(type(self).response_status)
         self.send_header("Content-Length", str(len(type(self).response_body)))
         self.end_headers()
-        time.sleep(type(self).response_delay)
-        try:
-            self.wfile.write(type(self).response_body)
-        except BrokenPipeError:
-            return
+        self._write_body()
 
     def log_message(self, _format: str, *_args: object) -> None:
         return
 
 
 @contextmanager
-def _server(*, status: int = 200, body: bytes = b"{}", delay: float = 0.0) -> Iterator[str]:
+def _server(
+    *,
+    status: int = 200,
+    body: bytes = b"{}",
+    delay: float = 0.0,
+    trickle_delay: float = 0.0,
+) -> Iterator[str]:
     _Handler.requests = []
     _Handler.response_status = status
     _Handler.response_body = body
     _Handler.response_delay = delay
+    _Handler.trickle_delay = trickle_delay
     server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -86,7 +101,10 @@ def _server(*, status: int = 200, body: bytes = b"{}", delay: float = 0.0) -> It
 
 
 def _entry(tmp_path: Path) -> OutboxEntry:
+    identity = resolve_canonical_model(provider="openai", model="gpt-5.6-sol")
+    assert identity is not None
     atom = CommonsEvidenceAtom(
+        model_identity=identity,
         record_type=RecordType.DECISION,
         action_kind=ActionKind.TEST,
         cost_bucket=ValueBucket.LOW,
@@ -98,7 +116,9 @@ def _entry(tmp_path: Path) -> OutboxEntry:
         count=7,
         minimum_group_size=5,
     )
-    entry = CommonsOutbox(tmp_path).enqueue(model_namespace="openai/gpt-5.6-sol", atoms=(atom,))
+    entry = CommonsOutbox(tmp_path).enqueue(
+        batch=CommonsEvidenceBatch(identity=identity, atoms=(atom,))
+    )
     assert entry is not None
     return entry
 
@@ -139,6 +159,7 @@ def test_submit_sends_only_the_closed_envelope_and_retry_header(tmp_path: Path) 
         b'{"accepted":true}',
         b'{"accepted":true,"duplicate":false,"extra":true}',
         b'{"accepted":1,"duplicate":false}',
+        b'{"accepted":true,"duplicate":true,"duplicate":false}',
     ],
 )
 def test_submit_requires_the_exact_ack_shape(tmp_path: Path, body: bytes) -> None:
@@ -160,6 +181,15 @@ def test_invalid_response_errors_do_not_retain_raw_body_details(tmp_path: Path) 
     assert captured.value.__cause__ is None
 
 
+def test_recursive_ack_is_a_redacted_protocol_failure(tmp_path: Path) -> None:
+    body = ("[" * 2_000 + "]" * 2_000).encode()
+    with (
+        _server(body=body) as origin,
+        pytest.raises(CommonsProtocolError, match="invalid Commons response"),
+    ):
+        CommonsClient(pack_origin=origin, ingress_origin=origin).submit(_entry(tmp_path))
+
+
 def test_read_timeout_is_separate_and_redacted() -> None:
     with (
         _server(body=b"late", delay=0.1) as origin,
@@ -173,6 +203,39 @@ def test_read_timeout_is_separate_and_redacted() -> None:
         ).download()
 
     assert "timed out" not in str(captured.value).lower()
+
+
+def test_slow_trickle_hits_one_monotonic_request_deadline() -> None:
+    with _server(body=b"slow-body", trickle_delay=0.04) as origin:
+        started = time.monotonic()
+        with pytest.raises(CommonsTransportError, match="Commons transport failed"):
+            CommonsClient(
+                pack_origin=origin,
+                ingress_origin=origin,
+                connect_timeout=1.0,
+                read_timeout=0.2,
+                request_timeout=0.12,
+            ).download()
+        elapsed = time.monotonic() - started
+
+    assert elapsed < 0.3
+
+
+@pytest.mark.parametrize("status", [422, 503])
+def test_non_2xx_status_is_classified_before_oversized_body_validation(
+    tmp_path: Path, status: int
+) -> None:
+    with (
+        _server(status=status, body=b"x" * 65) as origin,
+        pytest.raises(CommonsHTTPError) as captured,
+    ):
+        CommonsClient(
+            pack_origin=origin,
+            ingress_origin=origin,
+            max_response_bytes=64,
+        ).submit(_entry(tmp_path))
+
+    assert captured.value.status == status
 
 
 def test_client_bounds_response_bytes_and_reports_only_status_category(tmp_path: Path) -> None:

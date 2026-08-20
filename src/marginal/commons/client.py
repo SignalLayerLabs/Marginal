@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import http.client
 import json
+import socket
+import threading
+import time
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Protocol
 from urllib.parse import SplitResult, urlsplit
 
-from .outbox import _TOKEN_PATTERN, OutboxEntry, _validate_envelope
+from .outbox import OutboxEntry, _entry_boundary_valid, _reject_duplicate_keys
 
 _PACK_PATH = "/dist/commons-pack-v1.json"
 _EVIDENCE_PATH = "/v1/evidence"
@@ -39,6 +43,10 @@ class CommonsAck:
 
     accepted: bool
     duplicate: bool
+
+    def __post_init__(self) -> None:
+        if self.accepted is not True or type(self.duplicate) is not bool:
+            raise ValueError("invalid Commons ACK")
 
 
 class CommonsClientProtocol(Protocol):
@@ -86,7 +94,13 @@ def _positive_timeout(value: float, *, label: str) -> float:
 
 
 class CommonsClient:
-    """Issue only fixed-path GET and POST requests with strict resource limits."""
+    """Issue fixed-path bounded requests.
+
+    The monotonic request deadline covers socket connect, request send, headers, and body once
+    ``getaddrinfo`` returns. Python's synchronous stdlib resolver cannot preempt a blocked DNS
+    lookup without a helper thread, so DNS delay is checked and failed open immediately after
+    resolution rather than claimed as a hard cancellable deadline.
+    """
 
     def __init__(
         self,
@@ -95,12 +109,14 @@ class CommonsClient:
         ingress_origin: str,
         connect_timeout: float = 2.0,
         read_timeout: float = 3.0,
+        request_timeout: float = 5.0,
         max_response_bytes: int = _DEFAULT_MAX_RESPONSE_BYTES,
     ) -> None:
         self._pack_origin = _parse_origin(pack_origin)
         self._ingress_origin = _parse_origin(ingress_origin)
         self._connect_timeout = _positive_timeout(connect_timeout, label="connect")
         self._read_timeout = _positive_timeout(read_timeout, label="read")
+        self._request_timeout = _positive_timeout(request_timeout, label="request")
         if (
             isinstance(max_response_bytes, bool)
             or not isinstance(max_response_bytes, int)
@@ -109,12 +125,68 @@ class CommonsClient:
             raise ValueError("Commons response byte limit is invalid")
         self._max_response_bytes = max_response_bytes
 
-    def _connection(self, origin: _Origin) -> http.client.HTTPConnection:
+    def _connection(self, origin: _Origin, *, timeout: float) -> http.client.HTTPConnection:
         connection_type: type[http.client.HTTPConnection]
         connection_type = (
             http.client.HTTPSConnection if origin.scheme == "https" else http.client.HTTPConnection
         )
-        return connection_type(origin.host, port=origin.port, timeout=self._connect_timeout)
+        return connection_type(origin.host, port=origin.port, timeout=timeout)
+
+    @staticmethod
+    def _abort_socket(socket_holder: list[socket.socket | None]) -> None:
+        sock = socket_holder[0]
+        if sock is None:
+            return
+        with suppress(OSError):
+            sock.shutdown(socket.SHUT_RDWR)
+        with suppress(OSError):
+            sock.close()
+
+    @staticmethod
+    def _remaining(deadline: float, *, cap: float | None = None) -> float:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise CommonsTransportError("Commons transport failed")
+        return min(remaining, cap) if cap is not None else remaining
+
+    def _set_read_timeout(self, connection: http.client.HTTPConnection, *, deadline: float) -> None:
+        if connection.sock is not None:
+            connection.sock.settimeout(self._remaining(deadline, cap=self._read_timeout))
+
+    def _read_bounded_response(
+        self,
+        response: http.client.HTTPResponse,
+        connection: http.client.HTTPConnection,
+        *,
+        deadline: float,
+        validate_length: bool,
+    ) -> bytes:
+        declared_size: int | None = None
+        if validate_length:
+            declared = response.getheader("Content-Length")
+            if declared is not None:
+                try:
+                    declared_size = int(declared)
+                except ValueError:
+                    raise CommonsProtocolError("invalid Commons response") from None
+                if declared_size < 0 or declared_size > self._max_response_bytes:
+                    raise CommonsProtocolError("invalid Commons response")
+        chunks: list[bytes] = []
+        remaining_bytes = self._max_response_bytes + 1
+        while remaining_bytes > 0:
+            self._set_read_timeout(connection, deadline=deadline)
+            chunk = response.read1(min(64 * 1024, remaining_bytes))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining_bytes -= len(chunk)
+        raw = b"".join(chunks)
+        self._remaining(deadline)
+        if validate_length and len(raw) > self._max_response_bytes:
+            raise CommonsProtocolError("invalid Commons response")
+        if validate_length and declared_size is not None and len(raw) != declared_size:
+            raise CommonsProtocolError("invalid Commons response")
+        return raw
 
     def _request(
         self,
@@ -124,59 +196,77 @@ class CommonsClient:
         path: str,
         body: bytes | None = None,
         headers: dict[str, str] | None = None,
-    ) -> tuple[int, bytes]:
-        connection = self._connection(origin)
+        success_status: object,
+    ) -> bytes:
+        deadline = time.monotonic() + self._request_timeout
+        connection = self._connection(
+            origin,
+            timeout=self._remaining(deadline, cap=self._connect_timeout),
+        )
+        socket_holder: list[socket.socket | None] = [None]
+        deadline_guard = threading.Timer(
+            self._request_timeout,
+            self._abort_socket,
+            args=(socket_holder,),
+        )
+        deadline_guard.daemon = True
+        deadline_guard.start()
         try:
-            connection.request(method, path, body=body, headers=headers or {})
+            connection.connect()
+            socket_holder[0] = connection.sock
             if connection.sock is not None:
-                connection.sock.settimeout(self._read_timeout)
+                connection.sock.settimeout(self._remaining(deadline))
+            connection.request(method, path, body=body, headers=headers or {})
+            self._set_read_timeout(connection, deadline=deadline)
             response = connection.getresponse()
-            declared = response.getheader("Content-Length")
-            if declared is not None:
-                try:
-                    declared_size = int(declared)
-                except ValueError:
-                    raise CommonsProtocolError("invalid Commons response") from None
-                if declared_size < 0:
-                    raise CommonsProtocolError("invalid Commons response")
-            raw = response.read(self._max_response_bytes + 1)
-            if len(raw) > self._max_response_bytes:
-                raise CommonsProtocolError("invalid Commons response")
-            return response.status, raw
-        except CommonsProtocolError:
+            status_is_success = (
+                response.status == success_status
+                if isinstance(success_status, int)
+                else 200 <= response.status < 300
+            )
+            if not status_is_success:
+                with suppress(CommonsTransportError, OSError, http.client.HTTPException):
+                    self._read_bounded_response(
+                        response,
+                        connection,
+                        deadline=deadline,
+                        validate_length=False,
+                    )
+                raise CommonsHTTPError(status=response.status)
+            return self._read_bounded_response(
+                response,
+                connection,
+                deadline=deadline,
+                validate_length=True,
+            )
+        except (CommonsProtocolError, CommonsHTTPError):
             raise
         except (TimeoutError, OSError, http.client.HTTPException):
             raise CommonsTransportError("Commons transport failed") from None
         finally:
+            deadline_guard.cancel()
             connection.close()
 
     def download(self) -> bytes:
         """Download the pack from its fixed public path."""
 
-        status, raw = self._request(
+        return self._request(
             self._pack_origin,
             method="GET",
             path=_PACK_PATH,
             headers={"Accept": "application/json"},
+            success_status=200,
         )
-        if status != 200:
-            raise CommonsHTTPError(status=status)
-        return raw
 
     def submit(self, entry: OutboxEntry) -> CommonsAck:
         """Submit one validated envelope with retry identity only in its header."""
 
-        if not isinstance(entry, OutboxEntry):
-            raise TypeError("Commons submission requires an outbox entry")
-        if _TOKEN_PATTERN.fullmatch(entry.retry_token) is None:
-            raise ValueError("Commons retry token is invalid")
-        envelope = _validate_envelope(entry.envelope)
-        body = (
-            json.dumps(envelope, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
-        ).encode("utf-8")
+        if not _entry_boundary_valid(entry):
+            raise ValueError("Commons submission requires a valid outbox entry")
+        body = entry.body_bytes
         if len(body) > _MAX_REQUEST_BYTES:
             raise ValueError("Commons evidence envelope is too large")
-        status, raw = self._request(
+        raw = self._request(
             self._ingress_origin,
             method="POST",
             path=_EVIDENCE_PATH,
@@ -186,12 +276,18 @@ class CommonsClient:
                 "Content-Type": "application/json",
                 "Idempotency-Key": entry.retry_token,
             },
+            success_status=range(200, 300),
         )
-        if not 200 <= status < 300:
-            raise CommonsHTTPError(status=status)
         try:
-            payload = json.loads(raw.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
+            payload = json.loads(raw.decode("utf-8"), object_pairs_hook=_reject_duplicate_keys)
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            ValueError,
+            RecursionError,
+            MemoryError,
+            OverflowError,
+        ):
             raise CommonsProtocolError("invalid Commons response") from None
         if (
             not isinstance(payload, dict)

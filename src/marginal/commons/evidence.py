@@ -81,6 +81,7 @@ class OutcomeClass(str, Enum):
 class CommonsEvidenceAtom:
     """One immutable atom containing only frozen aggregate dimensions and bounded counts."""
 
+    model_identity: CanonicalModelIdentity
     record_type: RecordType
     action_kind: ActionKind
     cost_bucket: ValueBucket
@@ -93,6 +94,8 @@ class CommonsEvidenceAtom:
     minimum_group_size: int
 
     def __post_init__(self) -> None:
+        if not identity_is_canonical(self.model_identity):
+            raise ValueError("model_identity must be one exact canonical model")
         if not isinstance(self.record_type, RecordType):
             raise TypeError("record_type must be a typed Commons enum")
         if not isinstance(self.action_kind, ActionKind):
@@ -131,6 +134,30 @@ class CommonsEvidenceAtom:
             "count": self.count,
             "minimum_group_size": self.minimum_group_size,
         }
+
+
+@dataclass(frozen=True, slots=True)
+class CommonsEvidenceBatch:
+    """Immutable compiled atoms bound to one exact canonical model identity."""
+
+    identity: CanonicalModelIdentity
+    atoms: tuple[CommonsEvidenceAtom, ...]
+
+    def __post_init__(self) -> None:
+        if not identity_is_canonical(self.identity):
+            raise ValueError("Commons evidence batch requires a canonical model identity")
+        if not isinstance(self.atoms, tuple) or not all(
+            isinstance(atom, CommonsEvidenceAtom) for atom in self.atoms
+        ):
+            raise TypeError("Commons evidence batch atoms must be an immutable typed tuple")
+        if any(atom.model_identity != self.identity for atom in self.atoms):
+            raise ValueError("Commons evidence batch atoms must use the same canonical model")
+
+    @property
+    def model_namespace(self) -> str:
+        """Return the namespace inseparably carried by the compiled batch."""
+
+        return self.identity.namespace
 
 
 _EnumT = TypeVar("_EnumT", bound=Enum)
@@ -208,7 +235,7 @@ def compile_verified_evidence(
     *,
     model_identity: CanonicalModelIdentity | None,
     minimum_group_size: int = 5,
-) -> tuple[CommonsEvidenceAtom, ...]:
+) -> CommonsEvidenceBatch | None:
     """Compile a verified local chain; arbitrary caller rows are never accepted."""
 
     if isinstance(minimum_group_size, bool) or not isinstance(minimum_group_size, int):
@@ -218,20 +245,20 @@ def compile_verified_evidence(
     if not isinstance(evidence_store, EvidenceStore):
         raise TypeError("evidence_store must be an EvidenceStore")
     if model_identity is None or not identity_is_canonical(model_identity):
-        return ()
+        return None
     try:
         records, verification = evidence_store.verified_records()
     except (OSError, ValueError):
-        return ()
+        return None
     if not verification.valid:
-        return ()
+        return None
     attributed_namespaces = {
         namespace
         for record in records
         if isinstance((namespace := record.get("model_namespace")), str)
     }
     if attributed_namespaces != {model_identity.namespace}:
-        return ()
+        return None
 
     counter: Counter[_DimensionKey] = Counter()
     for record in records:
@@ -250,6 +277,7 @@ def compile_verified_evidence(
             continue
         atoms.append(
             CommonsEvidenceAtom(
+                model_identity=model_identity,
                 record_type=key[0],
                 action_kind=key[1],
                 cost_bucket=key[2],
@@ -262,4 +290,6 @@ def compile_verified_evidence(
                 minimum_group_size=minimum_group_size,
             )
         )
-    return tuple(atoms)
+    if not atoms:
+        return None
+    return CommonsEvidenceBatch(identity=model_identity, atoms=tuple(atoms))

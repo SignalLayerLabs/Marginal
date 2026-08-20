@@ -212,10 +212,32 @@ class CommonsCache:
         if not isinstance(raw, bytes) or len(raw) > self.max_pack_bytes:
             return False
         try:
-            _parse_pack(raw, expected_source_commit=self.expected_source_commit)
+            candidate = _parse_pack(raw, expected_source_commit=self.expected_source_commit)
             with locked_directory(
                 self.path.parent, create=True, lock_name=".cache.lock"
             ) as directory:
+                try:
+                    existing_raw, _ = read_bounded_at(
+                        directory,
+                        _PACK_NAME,
+                        maximum_bytes=self.max_pack_bytes,
+                        label="Commons cache",
+                    )
+                except FileNotFoundError:
+                    existing = None
+                else:
+                    try:
+                        existing = _parse_pack(
+                            existing_raw,
+                            expected_source_commit=self.expected_source_commit,
+                        )
+                    except (ValueError, RecursionError, MemoryError, OverflowError):
+                        existing = None
+                if (
+                    existing is not None
+                    and candidate["commons_revision"] < existing["commons_revision"]
+                ):
+                    return False
                 atomic_replace_at(
                     directory,
                     _PACK_NAME,
@@ -223,7 +245,7 @@ class CommonsCache:
                     temporary_prefix=".commons-pack-",
                     label="Commons cache",
                 )
-        except (OSError, ValueError):
+        except (OSError, ValueError, RecursionError, MemoryError, OverflowError):
             return False
         return True
 
@@ -239,7 +261,14 @@ class CommonsCache:
                     label="Commons cache",
                 )
             return _parse_pack(raw, expected_source_commit=self.expected_source_commit)
-        except (FileNotFoundError, OSError, ValueError):
+        except (
+            FileNotFoundError,
+            OSError,
+            ValueError,
+            RecursionError,
+            MemoryError,
+            OverflowError,
+        ):
             return None
 
     def load_prior(self) -> tuple[CommonsPrior, ...]:

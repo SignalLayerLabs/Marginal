@@ -4,6 +4,8 @@ import hashlib
 import json
 import os
 import stat
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -127,6 +129,50 @@ def test_refresh_rejects_oversized_and_cross_model_or_incomplete_packs(tmp_path:
 
     assert cache.refresh(json.dumps(missing_model).encode()) is False
     assert cache.refresh(b"{" + b" " * (cache.max_pack_bytes + 1)) is False
+
+
+def test_refresh_rejects_recursive_json_as_a_bounded_parser_failure(tmp_path: Path) -> None:
+    cache = _cache(tmp_path)
+
+    assert cache.refresh(("[" * 2_000 + "]" * 2_000).encode()) is False
+    assert cache.load_prior() == ()
+
+
+def test_refresh_rejects_revision_rollback_under_the_cache_lock(tmp_path: Path) -> None:
+    cache = _cache(tmp_path)
+    assert cache.refresh(_pack_bytes(count=8, revision=2)) is True
+    before = cache.path.read_bytes()
+
+    assert cache.refresh(_pack_bytes(count=7, revision=1)) is False
+
+    assert cache.path.read_bytes() == before
+    assert cache.revision == 2
+    assert [prior.count for prior in cache.load_prior()] == [8]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX advisory locks are required")
+def test_cache_lock_contention_returns_fail_open_within_a_bound(tmp_path: Path) -> None:
+    import fcntl
+
+    cache = _cache(tmp_path)
+    assert cache.refresh(_pack_bytes()) is True
+    lock = (cache.path.parent / ".cache.lock").open("r+b")
+    fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+
+    def release_later() -> None:
+        time.sleep(0.5)
+        fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    release = threading.Thread(target=release_later, daemon=True)
+    release.start()
+    started = time.monotonic()
+    refreshed = cache.refresh(_pack_bytes(count=8, revision=2))
+    elapsed = time.monotonic() - started
+    release.join(timeout=1)
+    lock.close()
+
+    assert refreshed is False
+    assert elapsed < 0.4
 
 
 def test_cache_rejects_symlink_leaf_without_touching_its_target(tmp_path: Path) -> None:

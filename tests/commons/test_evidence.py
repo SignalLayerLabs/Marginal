@@ -6,7 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from marginal.commons.evidence import CommonsEvidenceAtom, compile_verified_evidence
+from marginal.commons.evidence import (
+    CommonsEvidenceAtom,
+    compile_verified_evidence,
+)
 from marginal.commons.identity import resolve_canonical_model
 from marginal.governance_ledger import GovernanceLedger
 from marginal.integrations.codex.evidence import EvidenceStore
@@ -66,9 +69,14 @@ def test_compiler_reads_real_verified_records_and_emits_only_closed_atoms(tmp_pa
     store.append(_decision(identity.namespace))
     store.append(_outcome(identity.namespace))
 
-    atoms = compile_verified_evidence(store, model_identity=identity, minimum_group_size=1)
+    batch = compile_verified_evidence(store, model_identity=identity, minimum_group_size=1)
 
-    assert [atom.to_dict() for atom in atoms] == [
+    assert batch is not None
+    assert batch.identity == identity
+    assert batch.model_namespace == identity.namespace
+    with pytest.raises(ValueError, match="same canonical model"):
+        dataclasses.replace(batch, identity=_identity("gpt-5.6-terra"))
+    assert [atom.to_dict() for atom in batch.atoms] == [
         {
             "record_type": "decision",
             "action_kind": "tool",
@@ -94,7 +102,7 @@ def test_compiler_reads_real_verified_records_and_emits_only_closed_atoms(tmp_pa
             "minimum_group_size": 1,
         },
     ]
-    serialized = json.dumps([atom.to_dict() for atom in atoms], sort_keys=True)
+    serialized = json.dumps([atom.to_dict() for atom in batch.atoms], sort_keys=True)
     assert CANARY not in serialized
     for forbidden in (
         "hash",
@@ -121,12 +129,15 @@ def test_atoms_are_immutable_and_counts_are_bounded(tmp_path: Path) -> None:
         record["action_hash"] = f"action-{index}"
         store.append(record)
 
-    atoms = compile_verified_evidence(store, model_identity=identity, minimum_group_size=1)
+    batch = compile_verified_evidence(store, model_identity=identity, minimum_group_size=1)
 
-    assert len(atoms) == 1
-    assert atoms[0].count == 1_000
+    assert batch is not None
+    assert len(batch.atoms) == 1
+    assert batch.atoms[0].count == 1_000
     with pytest.raises(dataclasses.FrozenInstanceError):
-        atoms[0].count = 2  # type: ignore[misc]
+        batch.atoms[0].count = 2  # type: ignore[misc]
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        batch.identity = _identity("gpt-5.6-terra")  # type: ignore[misc]
 
 
 def test_compiler_rejects_arbitrary_caller_mappings_and_unverified_chains(tmp_path: Path) -> None:
@@ -139,7 +150,7 @@ def test_compiler_rejects_arbitrary_caller_mappings_and_unverified_chains(tmp_pa
     ledger = store.governance_ledger_path
     tampered = ledger.read_text(encoding="utf-8").replace("APPROVED", "DENIED")
     ledger.write_text(tampered, encoding="utf-8")
-    assert compile_verified_evidence(store, model_identity=identity, minimum_group_size=1) == ()
+    assert compile_verified_evidence(store, model_identity=identity, minimum_group_size=1) is None
 
 
 def test_compiler_fails_closed_on_a_verified_non_record_payload(tmp_path: Path) -> None:
@@ -149,7 +160,7 @@ def test_compiler_fails_closed_on_a_verified_non_record_payload(tmp_path: Path) 
         {"event": "codex_evidence", "evidence": [CANARY, {"nested": CANARY}]}
     )
 
-    assert compile_verified_evidence(store, model_identity=identity, minimum_group_size=1) == ()
+    assert compile_verified_evidence(store, model_identity=identity, minimum_group_size=1) is None
 
 
 def test_conflicting_or_wrong_model_attribution_compiles_nothing(tmp_path: Path) -> None:
@@ -159,12 +170,12 @@ def test_conflicting_or_wrong_model_attribution_compiles_nothing(tmp_path: Path)
     store.append(_decision(sol.namespace))
     store.append(_decision(terra.namespace))
 
-    assert compile_verified_evidence(store, model_identity=sol, minimum_group_size=1) == ()
-    assert compile_verified_evidence(store, model_identity=None, minimum_group_size=1) == ()
+    assert compile_verified_evidence(store, model_identity=sol, minimum_group_size=1) is None
+    assert compile_verified_evidence(store, model_identity=None, minimum_group_size=1) is None
 
     isolated = EvidenceStore(tmp_path / "isolated")
     isolated.append(_decision(sol.namespace))
-    assert compile_verified_evidence(isolated, model_identity=terra, minimum_group_size=1) == ()
+    assert compile_verified_evidence(isolated, model_identity=terra, minimum_group_size=1) is None
 
 
 def test_small_groups_are_suppressed_and_boundaries_are_validated(tmp_path: Path) -> None:
@@ -172,7 +183,7 @@ def test_small_groups_are_suppressed_and_boundaries_are_validated(tmp_path: Path
     store = EvidenceStore(tmp_path)
     store.append(_decision(identity.namespace))
 
-    assert compile_verified_evidence(store, model_identity=identity) == ()
+    assert compile_verified_evidence(store, model_identity=identity) is None
     with pytest.raises(TypeError, match="minimum_group_size"):
         compile_verified_evidence(store, model_identity=identity, minimum_group_size=True)
     with pytest.raises(ValueError, match="between 1 and 1000"):
@@ -193,6 +204,7 @@ def test_local_evidence_rejects_nested_or_unbounded_commons_values(tmp_path: Pat
 def test_atom_constructor_accepts_typed_fields_not_arbitrary_nested_values() -> None:
     with pytest.raises(TypeError, match="record_type"):
         CommonsEvidenceAtom(  # type: ignore[arg-type]
+            model_identity=_identity(),
             record_type={"canary": CANARY},
             action_kind="tool",
             cost_bucket="low",

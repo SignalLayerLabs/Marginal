@@ -2,29 +2,33 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import secrets
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ._storage import atomic_create_at, locked_directory, read_bounded_at
 from .evidence import (
     ActionKind,
     AggregateReasonCode,
     CommonsEvidenceAtom,
+    CommonsEvidenceBatch,
     DecisionClass,
     OutcomeClass,
     RecordType,
     ValueBucket,
 )
-from .identity import is_canonical_namespace
+from .identity import is_canonical_namespace, resolve_canonical_namespace
 
 _MAX_QUEUE_BYTES = 512 * 1024
 _MAX_ATOMS = 1_000
 _TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{43}$")
+_ENTRY_NAME_PATTERN = re.compile(r"^queue-[0-9a-f]{32}\.json$")
+_DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -42,17 +46,28 @@ class OutboxEntry:
 
     name: str
     retry_token: str
-    envelope: dict[str, object]
+    body_bytes: bytes
+    canonical_record: bytes
+    record_sha256: str
     device: int
     inode: int
 
     def body(self) -> bytes:
         """Serialize only the closed wire envelope, excluding local metadata."""
 
-        return (
-            json.dumps(self.envelope, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-            + "\n"
-        ).encode("utf-8")
+        return self.body_bytes
+
+    @property
+    def envelope(self) -> dict[str, object]:
+        """Return a fresh mapping decoded from immutable canonical body bytes."""
+
+        return cast(dict[str, object], json.loads(self.body_bytes.decode("utf-8")))
+
+    @property
+    def model_namespace(self) -> str:
+        """Return the exact model namespace bound into canonical body bytes."""
+
+        return cast(str, self.envelope["model_namespace"])
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +78,7 @@ class OutboxScan:
     quarantined: int = 0
 
 
-def _atom_from_mapping(raw: object) -> CommonsEvidenceAtom:
+def _atom_from_mapping(raw: object, *, model_namespace: str) -> CommonsEvidenceAtom:
     expected = {
         "record_type",
         "action_kind",
@@ -78,8 +93,12 @@ def _atom_from_mapping(raw: object) -> CommonsEvidenceAtom:
     }
     if not isinstance(raw, dict) or set(raw) != expected:
         raise ValueError("queued Commons atom has an invalid shape")
+    identity = resolve_canonical_namespace(model_namespace)
+    if identity is None:
+        raise ValueError("queued Commons atom has an invalid model")
     try:
         return CommonsEvidenceAtom(
+            model_identity=identity,
             record_type=RecordType(raw["record_type"]),
             action_kind=ActionKind(raw["action_kind"]),
             cost_bucket=ValueBucket(raw["cost_bucket"]),
@@ -104,11 +123,14 @@ def _validate_envelope(raw: object) -> dict[str, object]:
         raise ValueError("queued Commons envelope is incompatible")
     if not isinstance(atoms, list) or not 1 <= len(atoms) <= _MAX_ATOMS:
         raise ValueError("queued Commons envelope must contain bounded evidence")
-    parsed = [_atom_from_mapping(atom).to_dict() for atom in atoms]
+    assert isinstance(namespace, str)
+    parsed = [_atom_from_mapping(atom, model_namespace=namespace).to_dict() for atom in atoms]
     return {"schema_version": "1.0", "model_namespace": namespace, "atoms": parsed}
 
 
 def _parse_queue_record(raw: bytes, *, name: str, device: int, inode: int) -> OutboxEntry:
+    if _ENTRY_NAME_PATTERN.fullmatch(name) is None:
+        raise ValueError("queued Commons record name is invalid")
     try:
         payload: Any = json.loads(raw.decode("utf-8"), object_pairs_hook=_reject_duplicate_keys)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -119,7 +141,52 @@ def _parse_queue_record(raw: bytes, *, name: str, device: int, inode: int) -> Ou
     if not isinstance(retry_token, str) or _TOKEN_PATTERN.fullmatch(retry_token) is None:
         raise ValueError("queued Commons retry token is invalid")
     envelope = _validate_envelope(payload["envelope"])
-    return OutboxEntry(name, retry_token, envelope, device, inode)
+    body_bytes = (
+        json.dumps(envelope, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
+    ).encode("utf-8")
+    canonical_record = (
+        json.dumps(
+            {"envelope": envelope, "retry_token": retry_token},
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+        + "\n"
+    ).encode("utf-8")
+    return OutboxEntry(
+        name=name,
+        retry_token=retry_token,
+        body_bytes=body_bytes,
+        canonical_record=canonical_record,
+        record_sha256=hashlib.sha256(canonical_record).hexdigest(),
+        device=device,
+        inode=inode,
+    )
+
+
+def _entry_boundary_valid(entry: object) -> bool:
+    if not isinstance(entry, OutboxEntry):
+        return False
+    if (
+        _ENTRY_NAME_PATTERN.fullmatch(entry.name) is None
+        or _TOKEN_PATTERN.fullmatch(entry.retry_token) is None
+        or not isinstance(entry.body_bytes, bytes)
+        or not isinstance(entry.canonical_record, bytes)
+        or _DIGEST_PATTERN.fullmatch(entry.record_sha256) is None
+        or hashlib.sha256(entry.canonical_record).hexdigest() != entry.record_sha256
+        or len(entry.canonical_record) > _MAX_QUEUE_BYTES
+    ):
+        return False
+    try:
+        rebound = _parse_queue_record(
+            entry.canonical_record,
+            name=entry.name,
+            device=entry.device,
+            inode=entry.inode,
+        )
+    except (UnicodeDecodeError, ValueError, RecursionError, MemoryError, OverflowError):
+        return False
+    return rebound == entry
 
 
 class CommonsOutbox:
@@ -137,26 +204,28 @@ class CommonsOutbox:
     def enqueue(
         self,
         *,
-        model_namespace: str,
-        atoms: tuple[CommonsEvidenceAtom, ...],
+        batch: CommonsEvidenceBatch,
     ) -> OutboxEntry | None:
         """Atomically queue nonempty typed evidence with one random retry token."""
 
-        if not is_canonical_namespace(model_namespace) or not atoms:
+        if not isinstance(batch, CommonsEvidenceBatch) or not batch.atoms:
             return None
-        if len(atoms) > _MAX_ATOMS or not all(
-            isinstance(atom, CommonsEvidenceAtom) for atom in atoms
-        ):
+        if len(batch.atoms) > _MAX_ATOMS:
             return None
         envelope: dict[str, object] = {
             "schema_version": "1.0",
-            "model_namespace": model_namespace,
-            "atoms": [atom.to_dict() for atom in atoms],
+            "model_namespace": batch.model_namespace,
+            "atoms": [atom.to_dict() for atom in batch.atoms],
         }
         retry_token = secrets.token_urlsafe(32)
-        record = {"envelope": envelope, "retry_token": retry_token}
         encoded = (
-            json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
+            json.dumps(
+                {"envelope": envelope, "retry_token": retry_token},
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+            + "\n"
         ).encode("utf-8")
         if len(encoded) > _MAX_QUEUE_BYTES:
             return None
@@ -173,10 +242,9 @@ class CommonsOutbox:
                     )
                 except FileExistsError:
                     continue
-                return OutboxEntry(
+                return _parse_queue_record(
+                    encoded,
                     name=name,
-                    retry_token=retry_token,
-                    envelope=envelope,
                     device=metadata.st_dev,
                     inode=metadata.st_ino,
                 )
@@ -234,7 +302,7 @@ class CommonsOutbox:
                         entry = _parse_queue_record(
                             raw, name=name, device=metadata.st_dev, inode=metadata.st_ino
                         )
-                    except (OSError, ValueError):
+                    except (OSError, ValueError, RecursionError, MemoryError, OverflowError):
                         quarantined += int(self._quarantine_name(directory, name))
                         continue
                     if len(entries) < limit:
@@ -244,21 +312,36 @@ class CommonsOutbox:
             return OutboxScan(())
 
     def _matches(self, directory: int, entry: OutboxEntry) -> bool:
+        if not _entry_boundary_valid(entry):
+            return False
         try:
-            _, metadata = read_bounded_at(
+            raw, metadata = read_bounded_at(
                 directory,
                 entry.name,
                 maximum_bytes=_MAX_QUEUE_BYTES,
                 label="Commons outbox entry",
             )
-        except (FileNotFoundError, OSError, ValueError):
+            rebound = _parse_queue_record(
+                raw,
+                name=entry.name,
+                device=metadata.st_dev,
+                inode=metadata.st_ino,
+            )
+        except (
+            FileNotFoundError,
+            OSError,
+            ValueError,
+            RecursionError,
+            MemoryError,
+            OverflowError,
+        ):
             return False
-        return (metadata.st_dev, metadata.st_ino) == (entry.device, entry.inode)
+        return rebound == entry
 
     def ack(self, entry: OutboxEntry) -> bool:
         """Delete only the exact inode whose valid envelope received an ACK."""
 
-        if not isinstance(entry, OutboxEntry):
+        if not _entry_boundary_valid(entry):
             return False
         try:
             with locked_directory(
@@ -275,7 +358,7 @@ class CommonsOutbox:
     def quarantine(self, entry: OutboxEntry) -> bool:
         """Move only the exact inode to the owner-only quarantine directory."""
 
-        if not isinstance(entry, OutboxEntry):
+        if not _entry_boundary_valid(entry):
             return False
         try:
             with locked_directory(

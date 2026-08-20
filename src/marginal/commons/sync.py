@@ -7,13 +7,14 @@ from enum import Enum
 
 from .cache import CommonsCache
 from .client import (
+    CommonsAck,
     CommonsClientProtocol,
     CommonsHTTPError,
     CommonsProtocolError,
     CommonsTransportError,
 )
 from .config import CommonsConfig, CommonsMode
-from .evidence import CommonsEvidenceAtom
+from .evidence import CommonsEvidenceBatch
 from .outbox import CommonsOutbox
 
 
@@ -29,6 +30,7 @@ class SyncFailure(str, Enum):
     SUBMIT_PROTOCOL = "submit_protocol"
     SUBMIT_TRANSPORT = "submit_transport"
     OUTBOX_TRANSITION = "outbox_transition"
+    EVIDENCE_MODEL_MISMATCH = "evidence_model_mismatch"
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,8 +52,7 @@ def synchronize_commons(
     cache: CommonsCache,
     outbox: CommonsOutbox,
     client: CommonsClientProtocol,
-    model_namespace: str | None = None,
-    atoms: tuple[CommonsEvidenceAtom, ...] = (),
+    evidence: CommonsEvidenceBatch | None = None,
     max_submissions: int = 8,
 ) -> CommonsSyncResult:
     """Download and optionally contribute without allowing any failure to block local work."""
@@ -99,9 +100,16 @@ def synchronize_commons(
             failures=tuple(failures),
         )
 
-    if model_namespace is not None and atoms:
+    if (
+        evidence is not None
+        and evidence.atoms
+        and evidence.model_namespace != cache.model_namespace
+    ):
+        failures.append(SyncFailure.EVIDENCE_MODEL_MISMATCH)
+        evidence = None
+    if evidence is not None and evidence.atoms:
         try:
-            outbox.enqueue(model_namespace=model_namespace, atoms=atoms)
+            outbox.enqueue(batch=evidence)
         except Exception:
             failures.append(SyncFailure.OUTBOX_WRITE)
 
@@ -117,10 +125,14 @@ def synchronize_commons(
     quarantined += scan.quarantined
 
     for entry in scan.entries:
+        if entry.model_namespace != cache.model_namespace:
+            retained += 1
+            failures.append(SyncFailure.EVIDENCE_MODEL_MISMATCH)
+            continue
         network_calls += 1
         submitted += 1
         try:
-            client.submit(entry)
+            ack = client.submit(entry)
         except CommonsHTTPError as exc:
             if 400 <= exc.status < 500:
                 try:
@@ -144,6 +156,14 @@ def synchronize_commons(
             retained += 1
             failures.append(SyncFailure.SUBMIT_TRANSPORT)
         else:
+            if (
+                not isinstance(ack, CommonsAck)
+                or ack.accepted is not True
+                or type(ack.duplicate) is not bool
+            ):
+                retained += 1
+                failures.append(SyncFailure.SUBMIT_PROTOCOL)
+                continue
             try:
                 deleted = outbox.ack(entry)
             except Exception:
