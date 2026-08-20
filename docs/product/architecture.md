@@ -74,3 +74,22 @@ protection.
 
 Keys remain local and are not part of a trace transaction. Losing a key prevents future stable
 correlation but does not make existing pseudonyms anonymous.
+
+## Commons boundary
+
+The optional Commons loop is separate from the authority path:
+
+```text
+verified local finalization → closed aggregate compiler → owner-only outbox
+    → Ingress-compatible boundary → aggregate-only Commons pack → same-model prior
+```
+
+`local_only` is the default and performs no Commons network calls. `read_only` downloads a bounded,
+digest-verified pack. `contributor` additionally submits only closed atoms for an exact reviewed
+public-model namespace. It carries a one-time retry token in an HTTP header and no persistent
+client identity. Cloudflare remains an external network processor; the application cannot promise
+anonymity at that layer.
+
+Downloaded priors enter a separate read-only diagnostic path. They are not inputs to coverage,
+trust, promotion, Autopilot, Decision Ledger hashes, or enforcement eligibility, and local evidence
+takes precedence. Shared failures fail open without changing the local mode.

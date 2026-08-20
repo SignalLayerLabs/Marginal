@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SignalLayerLabs/Marginal-Commons/schemas/commons-pack-v1.json",
+  "title": "MARGINAL Commons Pack v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "source_commit",
+    "commons_revision",
+    "compatibility",
+    "models",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "commons_revision": {"type": "integer", "minimum": 1},
+    "compatibility": {
+      "type": "object",
+      "required": ["evidence_envelope_schema_version"],
+      "properties": {"evidence_envelope_schema_version": {"const": "1.0"}},
+      "additionalProperties": false,
+      "unevaluatedProperties": false
+    },
+    "models": {
+      "type": "object",
+      "required": [
+        "openai/gpt-5.6-sol",
+        "openai/gpt-5.6-terra",
+        "openai/gpt-5.6-luna"
+      ],
+      "properties": {
+        "openai/gpt-5.6-sol": {"$ref": "#/$defs/model"},
+        "openai/gpt-5.6-terra": {"$ref": "#/$defs/model"},
+        "openai/gpt-5.6-luna": {"$ref": "#/$defs/model"}
+      },
+      "additionalProperties": false,
+      "unevaluatedProperties": false
+    },
+    "integrity": {
+      "type": "object",
+      "required": ["sha256"],
+      "properties": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+      "additionalProperties": false,
+      "unevaluatedProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "unevaluatedProperties": false,
+  "$defs": {
+    "model": {
+      "type": "object",
+      "required": ["aggregates"],
+      "properties": {
+        "aggregates": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/aggregate"}
+        }
+      },
+      "additionalProperties": false,
+      "unevaluatedProperties": false
+    },
+    "aggregate": {
+      "type": "object",
+      "required": [
+        "record_type",
+        "action_kind",
+        "cost_bucket",
+        "gain_bucket",
+        "recommendation",
+        "applied_decision",
+        "reason_code",
+        "outcome_class",
+        "count",
+        "minimum_group_size",
+        "lifecycle"
+      ],
+      "properties": {
+        "record_type": {"enum": ["decision", "outcome"]},
+        "action_kind": {
+          "enum": [
+            "command",
+            "file_read",
+            "file_write",
+            "generation",
+            "llm",
+            "model_call",
+            "reasoning",
+            "research",
+            "review",
+            "search",
+            "subagent",
+            "test",
+            "tool",
+            "verification",
+            "unknown",
+            "other"
+          ]
+        },
+        "cost_bucket": {"enum": ["low", "medium", "high", "unknown"]},
+        "gain_bucket": {"enum": ["low", "medium", "high", "unknown"]},
+        "recommendation": {"enum": ["allow", "deny", "unknown", "not_applicable"]},
+        "applied_decision": {"enum": ["allow", "deny", "unknown", "not_applicable"]},
+        "reason_code": {
+          "enum": [
+            "APPROVED",
+            "BUDGET_REJECTED",
+            "DENY",
+            "DUPLICATE_ACTION",
+            "DUPLICATE_PENDING",
+            "EXPECTED_GAIN_REJECTED",
+            "FUNDED",
+            "MARGINAL_ROI_REJECTED",
+            "OTHER",
+            "PARENT_BUDGET_REJECTED",
+            "RECOMMEND_OVERRIDE",
+            "SHADOW_OVERRIDE",
+            "TARGET_REACHED",
+            "UNSPECIFIED",
+            "not_applicable"
+          ]
+        },
+        "outcome_class": {
+          "enum": [
+            "verified_success",
+            "verified_failure",
+            "positive_reward",
+            "non_positive_reward",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "count": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "minimum_group_size": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "lifecycle": {"enum": ["candidate", "supported", "validated", "promoted"]}
+      },
+      "additionalProperties": false,
+      "unevaluatedProperties": false
+    }
+  }
+}

@@ -24,6 +24,26 @@ An installed Python package can perform the same native transaction:
 marginal install codex
 ```
 
+## Commons network posture
+
+The plugin defaults to `local_only`, including upgrades of existing installations. The optional
+Python installer records a different posture only when explicitly requested:
+
+```bash
+marginal install codex --commons-mode read_only
+marginal install codex --commons-mode contributor
+```
+
+Read-Only downloads a bounded verified pack. Contributor also queues and submits recursively closed
+aggregate counts for an exact reviewed public model. It sends no prompt, source, command, output,
+path, repository data, local hash, timestamp, free text, credential, or persistent identity. The
+one-time retry token remains an HTTP header and queued local metadata, never shared evidence.
+
+Commons priors are diagnostics only and cannot enable Tool Enforcement. All shared failures fail
+open. Contributor transport depends on Cloudflare network infrastructure, so MARGINAL does not make
+an anonymity claim. Production contribution is blocked until Wrangler authentication and a
+dedicated least-privilege GitHub Commons write credential are both verified.
+
 ## Remove
 
 ```bash

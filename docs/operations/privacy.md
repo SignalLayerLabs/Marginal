@@ -189,3 +189,30 @@ explicitly allowlists them.
 
 Use `load_schema("safe-telemetry-v1.json")` and
 `load_schema("aggregate-export-v1.json")` to validate shareable outputs from an installed wheel.
+
+## Optional Commons sharing
+
+Commons has three persistent modes, independent of Shadow or Enforce Mode:
+
+- `local_only` is the default for new and existing installations and performs zero Commons network
+  calls;
+- `read_only` downloads only a bounded, digest-verified, model-specific aggregate pack;
+- `contributor` also submits verified local aggregate counts through a recursively closed envelope.
+
+The envelope contains only schema version `1.0`, one exact namespace from the reviewed public-model
+registry, and closed aggregate atoms. It contains no prompt, source, command, output, path,
+repository data, local pseudonym or hash, timestamp, free text, credential, or persistent identity.
+The one-time random retry token is an `Idempotency-Key` header only; it is not written into the
+envelope, response, Commons aggregate, or pack.
+
+Contributor transport crosses Cloudflare infrastructure. Network-layer metadata processing by
+Cloudflare, including source IP addresses, is outside MARGINAL's application boundary, so this is
+not an anonymity guarantee. Worker observability and invocation logs are disabled at the
+application configuration boundary, and request-derived metadata is not persisted by the service.
+Production contribution remains inactive until Wrangler authentication and a dedicated
+least-privilege GitHub Commons write credential are both verified.
+
+Every Commons lifecycle state is a prior only. Candidate, supported, validated, and promoted shared
+aggregates have zero authority over local coverage, trust, promotion, Autopilot, or Tool
+Enforcement. Network, schema, filesystem, DNS, TLS, GitHub, and Cloudflare failures fail open and do
+not change local enforcement state.

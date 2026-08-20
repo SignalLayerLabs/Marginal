@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SignalLayerLabs/Marginal-Commons/schemas/commons-evidence-envelope-v1.json",
+  "title": "MARGINAL Commons Evidence Envelope v1",
+  "type": "object",
+  "required": ["schema_version", "model_namespace", "atoms"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "model_namespace": {
+      "enum": [
+        "openai/gpt-5.6-sol",
+        "openai/gpt-5.6-terra",
+        "openai/gpt-5.6-luna"
+      ]
+    },
+    "atoms": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/atom"}
+    }
+  },
+  "additionalProperties": false,
+  "unevaluatedProperties": false,
+  "$defs": {
+    "atom": {
+      "type": "object",
+      "required": [
+        "record_type",
+        "action_kind",
+        "cost_bucket",
+        "gain_bucket",
+        "recommendation",
+        "applied_decision",
+        "reason_code",
+        "outcome_class",
+        "count",
+        "minimum_group_size"
+      ],
+      "properties": {
+        "record_type": {"enum": ["decision", "outcome"]},
+        "action_kind": {
+          "enum": [
+            "command",
+            "file_read",
+            "file_write",
+            "generation",
+            "llm",
+            "model_call",
+            "reasoning",
+            "research",
+            "review",
+            "search",
+            "subagent",
+            "test",
+            "tool",
+            "verification",
+            "unknown",
+            "other"
+          ]
+        },
+        "cost_bucket": {"enum": ["low", "medium", "high", "unknown"]},
+        "gain_bucket": {"enum": ["low", "medium", "high", "unknown"]},
+        "recommendation": {"enum": ["allow", "deny", "unknown", "not_applicable"]},
+        "applied_decision": {"enum": ["allow", "deny", "unknown", "not_applicable"]},
+        "reason_code": {
+          "enum": [
+            "APPROVED",
+            "BUDGET_REJECTED",
+            "DENY",
+            "DUPLICATE_ACTION",
+            "DUPLICATE_PENDING",
+            "EXPECTED_GAIN_REJECTED",
+            "FUNDED",
+            "MARGINAL_ROI_REJECTED",
+            "OTHER",
+            "PARENT_BUDGET_REJECTED",
+            "RECOMMEND_OVERRIDE",
+            "SHADOW_OVERRIDE",
+            "TARGET_REACHED",
+            "UNSPECIFIED",
+            "not_applicable"
+          ]
+        },
+        "outcome_class": {
+          "enum": [
+            "verified_success",
+            "verified_failure",
+            "positive_reward",
+            "non_positive_reward",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "count": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "minimum_group_size": {"type": "integer", "minimum": 1, "maximum": 1000}
+      },
+      "additionalProperties": false,
+      "unevaluatedProperties": false
+    }
+  }
+}

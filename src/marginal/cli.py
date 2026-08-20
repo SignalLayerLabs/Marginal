@@ -161,6 +161,11 @@ def _build_parser() -> argparse.ArgumentParser:
     install_parser.add_argument("--ref", default="main")
     install_parser.add_argument("--data-dir", type=Path)
     install_parser.add_argument("--autopilot-consent", action="store_true")
+    install_parser.add_argument(
+        "--commons-mode",
+        choices=["local_only", "read_only", "contributor"],
+        help="persist one explicit Commons network posture (default: local_only)",
+    )
     install_parser.add_argument("--json", action="store_true", dest="as_json")
 
     uninstall_parser = subparsers.add_parser("uninstall", help="remove a native integration")
@@ -196,6 +201,7 @@ def _build_parser() -> argparse.ArgumentParser:
     privacy = subparsers.add_parser("privacy", help="inspect local persistence categories")
     privacy_commands = privacy.add_subparsers(dest="privacy_command", required=True)
     privacy_inspect = privacy_commands.add_parser("inspect", help="show persisted data categories")
+    privacy_inspect.add_argument("--data-dir", type=Path)
     privacy_inspect.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
@@ -240,6 +246,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ref=args.ref,
             data_dir=args.data_dir,
             autopilot_consent=args.autopilot_consent,
+            commons_mode=args.commons_mode,
         )
         payload = result.to_dict()
         if args.as_json:
@@ -321,7 +328,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ).to_dict()
             exit_code = 0 if payload["found"] is True else 1
         else:
-            payload = inspect_privacy().to_dict()
+            payload = inspect_privacy(data_root=data_dir).to_dict()
             exit_code = 0
         if args.as_json:
             print(json.dumps(payload, sort_keys=True))

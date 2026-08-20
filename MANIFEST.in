@@ -8,6 +8,7 @@ recursive-include .github *.yml *.md
 
 include ROADMAP.md
 recursive-include schemas *.json
+recursive-include contracts *.json
 recursive-include demos *.md *.json *.html *.svg *.jsonl
 
 recursive-include assets *.png

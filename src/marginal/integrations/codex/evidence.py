@@ -32,6 +32,12 @@ _ALLOWED_EVIDENCE_FIELDS = {
     "integration_failure",
     "pending",
     "timestamp",
+    "model_namespace",
+    "action_kind",
+    "cost_bucket",
+    "gain_bucket",
+    "recommendation",
+    "applied_decision",
 }
 _FORBIDDEN_FIELDS = {
     "auth",
@@ -44,6 +50,45 @@ _FORBIDDEN_FIELDS = {
     "tool_response",
     "transcript",
 }
+
+_COMMONS_FIELD_VALUES = {
+    "action_kind": {
+        "command",
+        "file_read",
+        "file_write",
+        "generation",
+        "llm",
+        "model_call",
+        "reasoning",
+        "research",
+        "review",
+        "search",
+        "subagent",
+        "test",
+        "tool",
+        "verification",
+        "unknown",
+        "other",
+    },
+    "cost_bucket": {"low", "medium", "high", "unknown"},
+    "gain_bucket": {"low", "medium", "high", "unknown"},
+    "recommendation": {"allow", "deny", "unknown", "not_applicable"},
+    "applied_decision": {"allow", "deny", "unknown", "not_applicable"},
+    "outcome": {"success", "failure", "unknown"},
+}
+
+
+def _validate_commons_fields(record: Mapping[str, Any]) -> None:
+    for field, allowed in _COMMONS_FIELD_VALUES.items():
+        if field in record:
+            value = record[field]
+            if not isinstance(value, str) or value not in allowed:
+                raise ValueError(f"invalid Commons evidence {field}")
+    if "model_namespace" in record:
+        from marginal.commons.identity import is_canonical_namespace
+
+        if not is_canonical_namespace(record["model_namespace"]):
+            raise ValueError("invalid Commons evidence model_namespace")
 
 
 def _canonical_bytes(payload: Mapping[str, Any]) -> bytes:
@@ -87,6 +132,7 @@ class EvidenceStore:
         unsupported = fields - _ALLOWED_EVIDENCE_FIELDS
         if unsupported:
             raise ValueError(f"unsupported evidence field: {sorted(unsupported)[0]}")
+        _validate_commons_fields(record)
         serialized = _canonical_bytes(record)
         if len(serialized) > self.max_record_bytes:
             raise ValueError("evidence record is too large")

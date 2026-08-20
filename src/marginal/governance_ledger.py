@@ -492,7 +492,10 @@ def _read_descriptor(descriptor: int) -> bytes:
 def _write_all(descriptor: int, data: bytes) -> None:
     offset = 0
     while offset < len(data):
-        offset += os.write(descriptor, data[offset:])
+        written = os.write(descriptor, data[offset:])
+        if written <= 0:
+            raise OSError("write made no progress")
+        offset += written
 
 
 def _write_owner_only_at(directory_descriptor: int, name: str, data: bytes) -> None:

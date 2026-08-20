@@ -11,6 +11,8 @@ EXPECTED = {
     "agent-capabilities-v1.json",
     "agent-decision-v1.json",
     "agent-event-v1.json",
+    "commons-evidence-envelope-v1.json",
+    "commons-pack-v1.json",
     "decision-ledger-v2.json",
     "decision-receipt-v1.json",
     "governance-ledger-v3.json",

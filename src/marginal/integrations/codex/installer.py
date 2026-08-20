@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import re
 import shutil
@@ -10,6 +9,13 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
+
+from marginal.commons.config import (
+    CommonsMode,
+    _update_user_config,
+    configure_commons_mode,
+    load_commons_config,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +89,7 @@ class CodexInstallation:
     error_code: str = ""
     message: str = ""
     autopilot_consent: bool = False
+    commons_mode: str = CommonsMode.LOCAL_ONLY.value
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -92,6 +99,7 @@ class CodexInstallation:
             "error_code": self.error_code,
             "message": self.message,
             "autopilot_consent": self.autopilot_consent,
+            "commons_mode": self.commons_mode,
         }
 
 
@@ -133,9 +141,16 @@ def install(
     ref: str = "main",
     data_dir: str | Path | None = None,
     autopilot_consent: bool = False,
+    commons_mode: CommonsMode | str | None = None,
 ) -> CodexInstallation:
     if not isinstance(autopilot_consent, bool):
         raise TypeError("autopilot_consent must be a bool")
+    if commons_mode is None:
+        selected_commons_mode = (
+            CommonsMode.LOCAL_ONLY if data_dir is None else load_commons_config(data_dir).mode
+        )
+    else:
+        selected_commons_mode = CommonsMode.parse(commons_mode)
     selected = runner or SubprocessRunner()
     report = inspect_codex(runner=selected)
     if report.capability_level != "tool_enforcement":
@@ -144,6 +159,7 @@ def install(
             False,
             error_code="CODEX_CAPABILITIES_UNAVAILABLE",
             message=", ".join(report.blocking_reasons),
+            commons_mode=selected_commons_mode.value,
         )
     marketplace = selected.run(
         [
@@ -163,6 +179,7 @@ def install(
             False,
             error_code="MARKETPLACE_ADD_FAILED",
             message=marketplace.stderr.strip(),
+            commons_mode=selected_commons_mode.value,
         )
     plugin = selected.run(["codex", "plugin", "add", "marginal@marginal", "--json"])
     if plugin.returncode != 0 and "already" not in plugin.stderr.casefold():
@@ -171,6 +188,7 @@ def install(
             False,
             error_code="PLUGIN_ADD_FAILED",
             message=plugin.stderr.strip(),
+            commons_mode=selected_commons_mode.value,
         )
     if autopilot_consent:
         if data_dir is None:
@@ -179,13 +197,25 @@ def install(
                 True,
                 error_code="AUTOPILOT_CONSENT_DATA_DIR_REQUIRED",
                 message="installed in Shadow Mode; Autopilot consent was not persisted",
+                commons_mode=selected_commons_mode.value,
             )
         configure_autopilot_consent(data_dir, granted=True)
+    if commons_mode is not None:
+        if data_dir is None:
+            return CodexInstallation(
+                True,
+                True,
+                error_code="COMMONS_MODE_DATA_DIR_REQUIRED",
+                message="installed in Shadow Mode; Commons choice was not persisted",
+                commons_mode=CommonsMode.LOCAL_ONLY.value,
+            )
+        configure_commons_mode(data_dir, mode=selected_commons_mode)
     return CodexInstallation(
         True,
         True,
         message="installed in Shadow Mode",
         autopilot_consent=autopilot_consent,
+        commons_mode=selected_commons_mode.value,
     )
 
 
@@ -202,10 +232,6 @@ def uninstall(*, runner: CommandRunner | None = None) -> CodexInstallation:
     return CodexInstallation(False, True, message="plugin removed; local evidence preserved")
 
 
-def _user_config_path(data_dir: str | Path) -> Path:
-    return Path(data_dir).resolve() / "user-config.json"
-
-
 def configure_autopilot_consent(data_dir: str | Path, *, granted: bool) -> None:
     """Persist an explicit user-level Autopilot choice outside every repository.
 
@@ -215,33 +241,16 @@ def configure_autopilot_consent(data_dir: str | Path, *, granted: bool) -> None:
 
     if not isinstance(granted, bool):
         raise TypeError("granted must be a bool")
-    path = _user_config_path(data_dir)
-    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if os.name == "posix":
-        path.parent.chmod(0o700)
-    temporary = path.with_suffix(".tmp")
-    descriptor = os.open(temporary, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
-    try:
-        os.write(
-            descriptor,
-            (
-                json.dumps({"schema_version": 1, "autopilot_consent": granted}, sort_keys=True)
-                + "\n"
-            ).encode(),
-        )
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
-    os.replace(temporary, path)
-    if os.name == "posix":
-        path.chmod(0o600)
+    _update_user_config(data_dir, autopilot_consent=granted)
 
 
 def autopilot_consent_configured(data_dir: str | Path) -> bool:
     """Return only a valid, explicit consent bit from the user-owned config."""
 
     try:
-        value = json.loads(_user_config_path(data_dir).read_text(encoding="utf-8"))
-    except (OSError, ValueError, json.JSONDecodeError):
+        from marginal.commons.config import _read_user_config
+
+        value = _read_user_config(data_dir)
+    except (OSError, ValueError):
         return False
     return bool(isinstance(value, dict) and value.get("autopilot_consent") is True)

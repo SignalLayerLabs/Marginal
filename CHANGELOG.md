@@ -6,6 +6,10 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
 
 ### Added
 
+- optional model-specific Commons modes: Local Only by default, bounded Read-Only pack refresh, and
+  explicit Contributor upload through a recursively closed aggregate schema;
+- owner-only durable outbox retry, exact reviewed public-model attribution, verified cache fallback,
+  and synthetic lifecycle-to-aggregate-to-next-session acceptance coverage.
 - a Claude Code plugin labeled **Observe**: it records normalized tool-call evidence and
   repeated-work recommendations in a local Decision Ledger, declares no control capability, and never
   blocks a tool call or returns hook output;
@@ -20,6 +24,14 @@ All notable changes to MARGINAL are documented here. The project follows Semanti
   engines;
 - `marginal install claude-code`, `marginal install opencode`, `marginal install privacycode`, and
   their `uninstall` counterparts.
+
+### Security
+
+- Commons priors remain outside all local trust, promotion, Autopilot, and Tool Enforcement inputs;
+- shared envelopes exclude prompts, source, commands, outputs, repository data, local hashes,
+  timestamps, free text, credentials, and persistent contributor identity;
+- Commons network and shared-state failures fail open; production contribution remains blocked on
+  verified Wrangler authentication and a dedicated least-privilege GitHub service credential.
 
 ### Changed
 

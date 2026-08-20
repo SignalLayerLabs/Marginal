@@ -5,7 +5,11 @@ import subprocess
 from dataclasses import asdict, replace
 from pathlib import Path
 
+import pytest
+
 import marginal.integrations.codex.service as service_module
+from marginal.commons.config import CommonsMode, configure_commons_mode
+from marginal.commons.outbox import CommonsOutbox
 from marginal.integrations.codex.events import SessionEvent
 from marginal.integrations.codex.evidence import (
     EvidenceStore,
@@ -28,7 +32,7 @@ from marginal.integrations.codex.service import (
     start_session_service,
     stop_session_service,
 )
-from marginal.integrations.codex.transport import connection_filename
+from marginal.integrations.codex.transport import connection_filename, request_session
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -226,6 +230,210 @@ def test_session_start_and_end_are_complete_hook_lifecycle(tmp_path: Path) -> No
     assert start_result.exit_code == 0
     assert end_result.exit_code == 0
     assert not (data / "sessions" / connection_filename("session-1")).exists()
+
+
+class _OfflineCommonsClient:
+    def __init__(self) -> None:
+        self.downloads = 0
+        self.submissions = 0
+
+    def download(self) -> bytes:
+        self.downloads += 1
+        raise TimeoutError("private network detail")
+
+    def submit(self, _entry) -> object:
+        self.submissions += 1
+        raise TimeoutError("private network detail")
+
+
+@pytest.mark.parametrize(
+    "mode,expected_downloads",
+    [
+        (CommonsMode.LOCAL_ONLY, 0),
+        (CommonsMode.READ_ONLY, 1),
+        (CommonsMode.CONTRIBUTOR, 2),
+    ],
+)
+def test_session_lifecycle_finalizes_locally_in_every_commons_mode_and_fails_open(
+    tmp_path: Path, monkeypatch, mode: CommonsMode, expected_downloads: int
+) -> None:
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    _repository(workspace)
+    data = tmp_path / "data"
+    configure_commons_mode(data, mode=mode)
+    client = _OfflineCommonsClient()
+    monkeypatch.setattr(service_module, "_commons_client", lambda: client)
+
+    connection = start_session_service(_start(workspace), data_root=data)
+    stop_session_service("session-1", data_root=data)
+    stop_session_service("session-1", data_root=data)
+
+    identity = current_promotion_identity(workspace)
+    store = EvidenceStore(data / "evidence" / identity.repository_hash)
+    records = store.read_all()
+    assert sum(record.get("event") == "session_end" for record in records) == 1
+    checkpoint = store.read_checkpoint()
+    assert checkpoint is not None
+    ledger = store.verified_governance_root()
+    assert checkpoint == {
+        "schema_version": 1,
+        "event": "session_finalized",
+        "session_hash": service_module._session_hash("session-1"),
+        "ledger_root": ledger.root_hash,
+        "ledger_records": ledger.records,
+    }
+    assert client.downloads == expected_downloads
+    assert connection.connection_file.exists() is False
+
+
+def test_contributor_session_end_queues_model_bound_evidence_for_offline_retry(
+    tmp_path: Path, monkeypatch
+) -> None:
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    _repository(workspace)
+    data = tmp_path / "data"
+    configure_commons_mode(data, mode=CommonsMode.CONTRIBUTOR)
+    client = _OfflineCommonsClient()
+    monkeypatch.setattr(service_module, "_commons_client", lambda: client)
+    connection = start_session_service(_start(workspace), data_root=data)
+    common = {
+        "session_id": "session-1",
+        "cwd": str(workspace),
+        "model": "gpt-5.6-sol",
+        "permission_mode": "default",
+        "turn_id": "turn-1",
+        "tool_name": "Read",
+        "tool_input": {"path": str(workspace / "tracked.txt")},
+    }
+    for index in range(5):
+        pre = {**common, "hook_event_name": "PreToolUse", "tool_use_id": f"call-{index}"}
+        post = {**pre, "hook_event_name": "PostToolUse", "tool_response": {"exit_code": 0}}
+        assert request_session(connection, operation="pre", payload=pre)["ok"] is True
+        assert request_session(connection, operation="post", payload=post)["ok"] is True
+
+    stop_session_service("session-1", data_root=data)
+
+    queued = CommonsOutbox(data).pending(limit=8).entries
+    assert len(queued) == 1
+    assert queued[0].model_namespace == "openai/gpt-5.6-sol"
+    assert client.submissions == 1
+    identity = current_promotion_identity(workspace)
+    records = EvidenceStore(data / "evidence" / identity.repository_hash).read_all()
+    dimensions = [record for record in records if record.get("event") == "decision"]
+    assert {record.get("model_namespace") for record in dimensions} == {"openai/gpt-5.6-sol"}
+    assert {record.get("action_kind") for record in dimensions} == {"file_read"}
+
+
+def test_contributor_exports_only_each_new_finalized_range(tmp_path: Path, monkeypatch) -> None:
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    _repository(workspace)
+    data = tmp_path / "data"
+    configure_commons_mode(data, mode=CommonsMode.CONTRIBUTOR)
+    client = _OfflineCommonsClient()
+    monkeypatch.setattr(service_module, "_commons_client", lambda: client)
+
+    def run_session(session_id: str, actions: int) -> None:
+        connection = start_session_service(
+            replace(_start(workspace), session_id=session_id), data_root=data
+        )
+        for index in range(actions):
+            pre = {
+                "session_id": session_id,
+                "cwd": str(workspace),
+                "model": "gpt-5.6-sol",
+                "permission_mode": "default",
+                "turn_id": "turn-1",
+                "tool_name": "Read",
+                "tool_input": {"path": str(workspace / "tracked.txt")},
+                "hook_event_name": "PreToolUse",
+                "tool_use_id": f"{session_id}-call-{index}",
+            }
+            post = {**pre, "hook_event_name": "PostToolUse", "tool_response": {"exit_code": 0}}
+            request_session(connection, operation="pre", payload=pre)
+            request_session(connection, operation="post", payload=post)
+        stop_session_service(session_id, data_root=data)
+
+    run_session("session-1", 5)
+    first = CommonsOutbox(data).pending(limit=8).entries
+    assert len(first) == 1
+    run_session("session-empty", 0)
+    assert [entry.name for entry in CommonsOutbox(data).pending(limit=8).entries] == [first[0].name]
+    run_session("session-2", 5)
+
+    queued = CommonsOutbox(data).pending(limit=8).entries
+    assert len(queued) == 2
+    exported_counts = sorted(atom["count"] for entry in queued for atom in entry.envelope["atoms"])
+    assert exported_counts == [5, 5]
+
+
+def test_pending_export_receipt_recovers_cursor_after_enqueue_crash(
+    tmp_path: Path, monkeypatch
+) -> None:
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    _repository(workspace)
+    data = tmp_path / "data"
+    configure_commons_mode(data, mode=CommonsMode.CONTRIBUTOR)
+    monkeypatch.setattr(service_module, "_commons_client", _OfflineCommonsClient)
+    original_write = service_module._write_export_cursor
+    failed = False
+
+    def crash_once(*args, **kwargs):
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise OSError("crash after enqueue")
+        return original_write(*args, **kwargs)
+
+    monkeypatch.setattr(service_module, "_write_export_cursor", crash_once)
+    connection = start_session_service(_start(workspace), data_root=data)
+    for index in range(5):
+        pre = {
+            "session_id": "session-1",
+            "cwd": str(workspace),
+            "model": "gpt-5.6-sol",
+            "permission_mode": "default",
+            "turn_id": "turn",
+            "tool_name": "Read",
+            "tool_input": {"path": str(workspace / "tracked.txt")},
+            "hook_event_name": "PreToolUse",
+            "tool_use_id": f"call-{index}",
+        }
+        request_session(connection, operation="pre", payload=pre)
+        request_session(
+            connection,
+            operation="post",
+            payload={**pre, "hook_event_name": "PostToolUse", "tool_response": {"exit_code": 0}},
+        )
+    stop_session_service("session-1", data_root=data)
+    assert len(CommonsOutbox(data).pending(limit=8).entries) == 1
+
+    monkeypatch.setattr(service_module, "_write_export_cursor", original_write)
+    start_session_service(replace(_start(workspace), session_id="session-2"), data_root=data)
+    stop_session_service("session-2", data_root=data)
+    assert len(CommonsOutbox(data).pending(limit=8).entries) == 1
+
+
+def test_ambiguous_model_session_remains_local_and_never_queues(
+    tmp_path: Path, monkeypatch
+) -> None:
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    _repository(workspace)
+    data = tmp_path / "data"
+    configure_commons_mode(data, mode=CommonsMode.CONTRIBUTOR)
+    client = _OfflineCommonsClient()
+    monkeypatch.setattr(service_module, "_commons_client", lambda: client)
+    event = replace(_start(workspace), model="private/fine-tune")
+
+    start_session_service(event, data_root=data)
+    stop_session_service("session-1", data_root=data)
+
+    assert CommonsOutbox(data).pending(limit=8).entries == ()
+    assert client.submissions == 0
 
 
 def test_user_prompt_submit_reaches_only_the_authenticated_session_and_is_not_persisted(
