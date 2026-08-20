@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import http.client
 import json
+import queue
 import socket
 import threading
 import time
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol, cast
 from urllib.parse import SplitResult, urlsplit
 
 from .outbox import OutboxEntry, _entry_boundary_valid, _reject_duplicate_keys
@@ -35,6 +36,69 @@ class CommonsHTTPError(Exception):
         self.status = status
         category = "client" if 400 <= status < 500 else "server"
         super().__init__(f"Commons request failed ({category} response)")
+
+
+_AddressInfo = tuple[Any, Any, int, str, Any]
+_ResolveResult = tuple[tuple[_AddressInfo, ...] | None, Exception | None]
+
+
+@dataclass(slots=True)
+class _ResolveRequest:
+    host: str
+    port: int
+    result: queue.Queue[_ResolveResult]
+    canceled: threading.Event
+
+
+class _SharedResolver:
+    """One daemon resolver so stalled DNS never creates retry-proportional threads."""
+
+    def __init__(self) -> None:
+        self._requests: queue.Queue[_ResolveRequest] = queue.Queue(maxsize=1)
+        self._thread = threading.Thread(
+            target=self._run,
+            name="marginal-commons-resolver",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def _run(self) -> None:
+        while True:
+            request = self._requests.get()
+            if request.canceled.is_set():
+                continue
+            try:
+                addresses = cast(
+                    list[_AddressInfo],
+                    socket.getaddrinfo(request.host, request.port, type=socket.SOCK_STREAM),
+                )
+                result: _ResolveResult = (tuple(addresses), None)
+            except Exception as exc:
+                result = (None, exc)
+            if not request.canceled.is_set():
+                with suppress(queue.Full):
+                    request.result.put_nowait(result)
+
+    def resolve(self, host: str, port: int, *, deadline: float) -> tuple[_AddressInfo, ...]:
+        request = _ResolveRequest(host, port, queue.Queue(maxsize=1), threading.Event())
+        try:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise queue.Full
+            self._requests.put(request, timeout=remaining)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise queue.Empty
+            addresses, error = request.result.get(timeout=remaining)
+        except (queue.Empty, queue.Full):
+            request.canceled.set()
+            raise CommonsTransportError("Commons transport failed") from None
+        if error is not None or not addresses or time.monotonic() >= deadline:
+            raise CommonsTransportError("Commons transport failed") from None
+        return addresses
+
+
+_SHARED_RESOLVER = _SharedResolver()
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,10 +160,9 @@ def _positive_timeout(value: float, *, label: str) -> float:
 class CommonsClient:
     """Issue fixed-path bounded requests.
 
-    The monotonic request deadline covers socket connect, request send, headers, and body once
-    ``getaddrinfo`` returns. Python's synchronous stdlib resolver cannot preempt a blocked DNS
-    lookup without a helper thread, so DNS delay is checked and failed open immediately after
-    resolution rather than claimed as a hard cancellable deadline.
+    The monotonic request deadline covers queued resolution, connect, request send, headers, and
+    body. Resolution runs on one shared daemon worker, so a stalled resolver cannot block callers
+    or create retry-proportional threads; later calls fail within their remaining budget.
     """
 
     def __init__(
@@ -199,13 +262,38 @@ class CommonsClient:
         success_status: object,
     ) -> bytes:
         deadline = time.monotonic() + self._request_timeout
+        port = origin.port or (443 if origin.scheme == "https" else 80)
+        addresses = _SHARED_RESOLVER.resolve(origin.host, port, deadline=deadline)
         connection = self._connection(
             origin,
             timeout=self._remaining(deadline, cap=self._connect_timeout),
         )
+
+        def connect_resolved(*args: Any, **kwargs: Any) -> socket.socket:
+            source_address = cast(
+                tuple[str, int] | None,
+                args[2] if len(args) > 2 else kwargs.get("source_address"),
+            )
+            last_error: OSError | None = None
+            for family, socktype, proto, _canonical_name, sockaddr in addresses:
+                sock = socket.socket(family, socktype, proto)
+                try:
+                    sock.settimeout(self._remaining(deadline, cap=self._connect_timeout))
+                    if source_address is not None:
+                        sock.bind(source_address)
+                    sock.connect(sockaddr)
+                    return sock
+                except OSError as exc:
+                    last_error = exc
+                    sock.close()
+            if last_error is not None:
+                raise last_error
+            raise OSError("Commons connection failed")
+
+        connection._create_connection = connect_resolved  # type: ignore[attr-defined]
         socket_holder: list[socket.socket | None] = [None]
         deadline_guard = threading.Timer(
-            self._request_timeout,
+            self._remaining(deadline),
             self._abort_socket,
             args=(socket_holder,),
         )

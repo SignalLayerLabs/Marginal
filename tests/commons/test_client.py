@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import socket
 import threading
 import time
 from collections.abc import Iterator
@@ -219,6 +220,45 @@ def test_slow_trickle_hits_one_monotonic_request_deadline() -> None:
         elapsed = time.monotonic() - started
 
     assert elapsed < 0.3
+
+
+def test_stalled_dns_is_bounded_and_retries_do_not_grow_threads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    release = threading.Event()
+    entered = threading.Event()
+
+    def stalled_getaddrinfo(*_args: object, **_kwargs: object) -> object:
+        entered.set()
+        release.wait(timeout=2)
+        raise OSError("synthetic stalled resolver")
+
+    monkeypatch.setattr(socket, "getaddrinfo", stalled_getaddrinfo)
+    client = CommonsClient(
+        pack_origin="https://stalled.example",
+        ingress_origin="https://stalled.example",
+        connect_timeout=1.0,
+        read_timeout=1.0,
+        request_timeout=0.08,
+    )
+    resolver_threads_before = [
+        thread for thread in threading.enumerate() if thread.name == "marginal-commons-resolver"
+    ]
+    started = time.monotonic()
+    try:
+        for _ in range(3):
+            with pytest.raises(CommonsTransportError, match="Commons transport failed"):
+                client.download()
+        elapsed = time.monotonic() - started
+        assert entered.wait(timeout=0.2)
+        resolver_threads_after = [
+            thread for thread in threading.enumerate() if thread.name == "marginal-commons-resolver"
+        ]
+        assert len(resolver_threads_before) == 1
+        assert resolver_threads_after == resolver_threads_before
+        assert elapsed < 0.4
+    finally:
+        release.set()
 
 
 @pytest.mark.parametrize("status", [422, 503])
