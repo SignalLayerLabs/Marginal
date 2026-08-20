@@ -51,6 +51,7 @@ class OutboxEntry:
     record_sha256: str
     device: int
     inode: int
+    export_receipt: str | None = None
 
     def body(self) -> bytes:
         """Serialize only the closed wire envelope, excluding local metadata."""
@@ -135,18 +136,30 @@ def _parse_queue_record(raw: bytes, *, name: str, device: int, inode: int) -> Ou
         payload: Any = json.loads(raw.decode("utf-8"), object_pairs_hook=_reject_duplicate_keys)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError("queued Commons record is malformed") from exc
-    if not isinstance(payload, dict) or set(payload) != {"retry_token", "envelope"}:
+    if not isinstance(payload, dict) or set(payload) not in (
+        {"retry_token", "envelope"},
+        {"retry_token", "envelope", "export_receipt"},
+    ):
         raise ValueError("queued Commons record has an invalid shape")
     retry_token = payload["retry_token"]
     if not isinstance(retry_token, str) or _TOKEN_PATTERN.fullmatch(retry_token) is None:
         raise ValueError("queued Commons retry token is invalid")
+    export_receipt = payload.get("export_receipt")
+    if export_receipt is not None and (
+        not isinstance(export_receipt, str) or _DIGEST_PATTERN.fullmatch(export_receipt) is None
+    ):
+        raise ValueError("queued Commons export receipt is invalid")
     envelope = _validate_envelope(payload["envelope"])
     body_bytes = (
         json.dumps(envelope, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
     ).encode("utf-8")
     canonical_record = (
         json.dumps(
-            {"envelope": envelope, "retry_token": retry_token},
+            {
+                "envelope": envelope,
+                "retry_token": retry_token,
+                **({"export_receipt": export_receipt} if export_receipt is not None else {}),
+            },
             sort_keys=True,
             separators=(",", ":"),
             ensure_ascii=False,
@@ -161,6 +174,7 @@ def _parse_queue_record(raw: bytes, *, name: str, device: int, inode: int) -> Ou
         record_sha256=hashlib.sha256(canonical_record).hexdigest(),
         device=device,
         inode=inode,
+        export_receipt=export_receipt,
     )
 
 
@@ -205,6 +219,7 @@ class CommonsOutbox:
         self,
         *,
         batch: CommonsEvidenceBatch,
+        export_receipt: str | None = None,
     ) -> OutboxEntry | None:
         """Atomically queue nonempty typed evidence with one random retry token."""
 
@@ -212,6 +227,8 @@ class CommonsOutbox:
             return None
         if len(batch.atoms) > _MAX_ATOMS:
             return None
+        if export_receipt is not None and _DIGEST_PATTERN.fullmatch(export_receipt) is None:
+            raise ValueError("Commons export receipt is invalid")
         envelope: dict[str, object] = {
             "schema_version": "1.0",
             "model_namespace": batch.model_namespace,
@@ -220,7 +237,11 @@ class CommonsOutbox:
         retry_token = secrets.token_urlsafe(32)
         encoded = (
             json.dumps(
-                {"envelope": envelope, "retry_token": retry_token},
+                {
+                    "envelope": envelope,
+                    "retry_token": retry_token,
+                    **({"export_receipt": export_receipt} if export_receipt is not None else {}),
+                },
                 sort_keys=True,
                 separators=(",", ":"),
                 ensure_ascii=False,
@@ -230,6 +251,27 @@ class CommonsOutbox:
         if len(encoded) > _MAX_QUEUE_BYTES:
             return None
         with locked_directory(self.queue_path, create=True, lock_name=".outbox.lock") as directory:
+            if export_receipt is not None:
+                for existing_name in os.listdir(directory):
+                    if existing_name.startswith("."):
+                        continue
+                    try:
+                        raw, metadata = read_bounded_at(
+                            directory,
+                            existing_name,
+                            maximum_bytes=_MAX_QUEUE_BYTES,
+                            label="Commons outbox entry",
+                        )
+                        existing = _parse_queue_record(
+                            raw,
+                            name=existing_name,
+                            device=metadata.st_dev,
+                            inode=metadata.st_ino,
+                        )
+                    except (OSError, ValueError):
+                        continue
+                    if existing.export_receipt == export_receipt:
+                        return existing
             for _ in range(16):
                 name = f"queue-{secrets.token_hex(16)}.json"
                 try:

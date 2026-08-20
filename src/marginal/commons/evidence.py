@@ -235,6 +235,8 @@ def compile_verified_evidence(
     *,
     model_identity: CanonicalModelIdentity | None,
     minimum_group_size: int = 5,
+    after_records: int = 0,
+    through_records: int | None = None,
 ) -> CommonsEvidenceBatch | None:
     """Compile a verified local chain; arbitrary caller rows are never accepted."""
 
@@ -244,6 +246,8 @@ def compile_verified_evidence(
         raise ValueError("minimum_group_size must be between 1 and 1000")
     if not isinstance(evidence_store, EvidenceStore):
         raise TypeError("evidence_store must be an EvidenceStore")
+    if isinstance(after_records, bool) or not isinstance(after_records, int) or after_records < 0:
+        raise ValueError("after_records must be a non-negative integer")
     if model_identity is None or not identity_is_canonical(model_identity):
         return None
     try:
@@ -252,6 +256,20 @@ def compile_verified_evidence(
         return None
     if not verification.valid:
         return None
+    end = verification.records if through_records is None else through_records
+    if (
+        isinstance(end, bool)
+        or not isinstance(end, int)
+        or not after_records <= end <= len(records)
+    ):
+        return None
+    records = records[after_records:end]
+    if after_records != 0 or through_records is not None:
+        records = [
+            record
+            for record in records
+            if record.get("model_namespace") == model_identity.namespace
+        ]
     attributed_namespaces = {
         namespace
         for record in records

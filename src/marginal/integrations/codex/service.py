@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from marginal import BudgetLimits, Treasury
+from marginal.commons._storage import atomic_replace_at, locked_directory, read_bounded_at
 from marginal.commons.cache import CommonsCache, CommonsPrior
 from marginal.commons.client import CommonsClient, CommonsClientProtocol
 from marginal.commons.config import CommonsConfig, CommonsMode, load_commons_config
@@ -219,15 +220,101 @@ def _end_commons(
         or commons.client is None
     ):
         return
-    evidence = compile_verified_evidence(evidence_store, model_identity=commons.identity)
+    cursor = _read_export_cursor(evidence_store, commons.identity)
+    if cursor is None:
+        return
+    report = evidence_store.verified_governance_root()
+    if not report.valid or report.root_hash is None or report.records <= cursor[0]:
+        return
+    evidence = compile_verified_evidence(
+        evidence_store,
+        model_identity=commons.identity,
+        after_records=cursor[0],
+        through_records=report.records,
+    )
+    receipt = hashlib.sha256(
+        f"{commons.identity.namespace}:{cursor[0]}:{report.records}:{report.root_hash}".encode()
+    ).hexdigest()
+    if evidence is not None:
+        queued = commons.outbox.enqueue(batch=evidence, export_receipt=receipt)
+        if queued is None:
+            return
+    _write_export_cursor(evidence_store, commons.identity, report.records, report.root_hash)
     result = synchronize_commons(
         commons.config,
         cache=commons.cache,
         outbox=commons.outbox,
         client=commons.client,
-        evidence=evidence,
     )
     _write_commons_status(data_root, commons, result)
+
+
+def _export_cursor_name(identity: CanonicalModelIdentity) -> str:
+    return f"{identity.model}.json"
+
+
+def _read_export_cursor(
+    store: EvidenceStore, identity: CanonicalModelIdentity
+) -> tuple[int, str] | None:
+    directory_path = store.root / "commons-export"
+    try:
+        with locked_directory(directory_path, create=False, lock_name=".export.lock") as directory:
+            raw, _ = read_bounded_at(
+                directory,
+                _export_cursor_name(identity),
+                maximum_bytes=4096,
+                label="Commons export cursor",
+            )
+    except FileNotFoundError:
+        return (0, "")
+    except OSError:
+        return None
+    try:
+        payload = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if (
+        not isinstance(payload, dict)
+        or set(payload) != {"schema_version", "model_namespace", "ledger_records", "ledger_root"}
+        or payload.get("schema_version") != 1
+        or payload.get("model_namespace") != identity.namespace
+        or isinstance(payload.get("ledger_records"), bool)
+        or not isinstance(payload.get("ledger_records"), int)
+        or not isinstance(payload.get("ledger_root"), str)
+    ):
+        return None
+    records = payload["ledger_records"]
+    root = payload["ledger_root"]
+    if records < 0 or (
+        records and not store.verifies_governance_prefix(root_hash=root, records=records)
+    ):
+        return None
+    return records, root
+
+
+def _write_export_cursor(
+    store: EvidenceStore,
+    identity: CanonicalModelIdentity,
+    records: int,
+    root: str,
+) -> None:
+    payload = {
+        "schema_version": 1,
+        "model_namespace": identity.namespace,
+        "ledger_records": records,
+        "ledger_root": root,
+    }
+    encoded = (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    with locked_directory(
+        store.root / "commons-export", create=True, lock_name=".export.lock"
+    ) as directory:
+        atomic_replace_at(
+            directory,
+            _export_cursor_name(identity),
+            encoded,
+            temporary_prefix=".export-cursor-",
+            label="Commons export cursor",
+        )
 
 
 def _connection_path(data_root: Path, session_id: str) -> Path:

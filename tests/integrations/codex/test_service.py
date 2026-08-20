@@ -326,6 +326,49 @@ def test_contributor_session_end_queues_model_bound_evidence_for_offline_retry(
     assert {record.get("action_kind") for record in dimensions} == {"file_read"}
 
 
+def test_contributor_exports_only_each_new_finalized_range(tmp_path: Path, monkeypatch) -> None:
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    _repository(workspace)
+    data = tmp_path / "data"
+    configure_commons_mode(data, mode=CommonsMode.CONTRIBUTOR)
+    client = _OfflineCommonsClient()
+    monkeypatch.setattr(service_module, "_commons_client", lambda: client)
+
+    def run_session(session_id: str, actions: int) -> None:
+        connection = start_session_service(
+            replace(_start(workspace), session_id=session_id), data_root=data
+        )
+        for index in range(actions):
+            pre = {
+                "session_id": session_id,
+                "cwd": str(workspace),
+                "model": "gpt-5.6-sol",
+                "permission_mode": "default",
+                "turn_id": "turn-1",
+                "tool_name": "Read",
+                "tool_input": {"path": str(workspace / "tracked.txt")},
+                "hook_event_name": "PreToolUse",
+                "tool_use_id": f"{session_id}-call-{index}",
+            }
+            post = {**pre, "hook_event_name": "PostToolUse", "tool_response": {"exit_code": 0}}
+            request_session(connection, operation="pre", payload=pre)
+            request_session(connection, operation="post", payload=post)
+        stop_session_service(session_id, data_root=data)
+
+    run_session("session-1", 5)
+    first = CommonsOutbox(data).pending(limit=8).entries
+    assert len(first) == 1
+    run_session("session-empty", 0)
+    assert [entry.name for entry in CommonsOutbox(data).pending(limit=8).entries] == [first[0].name]
+    run_session("session-2", 5)
+
+    queued = CommonsOutbox(data).pending(limit=8).entries
+    assert len(queued) == 2
+    exported_counts = sorted(atom["count"] for entry in queued for atom in entry.envelope["atoms"])
+    assert exported_counts == [5, 5]
+
+
 def test_ambiguous_model_session_remains_local_and_never_queues(
     tmp_path: Path, monkeypatch
 ) -> None:
