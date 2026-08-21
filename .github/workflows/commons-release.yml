@@ -89,7 +89,7 @@ jobs:
               curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
                 --connect-timeout 10 --max-time 30 --max-filesize 1048576 \
                 --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-                "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/marginal-commons/deployments?env=production&per_page=100&page=${deployment_page}" \
+                "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/marginal-commons/deployments?env=production&per_page=25&page=${deployment_page}" \
                 --output current/deployments.json
               total_pages="$(DEPLOYMENT_PAGE="${deployment_page}" python - <<'PY'
           import json
