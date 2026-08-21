@@ -1,0 +1,167 @@
+name: Signed Commons release
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/10 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: commons-production-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'SignalLayerLabs/Marginal' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: commons-production
+    timeout-minutes: 10
+    steps:
+      - name: Checkout trusted MARGINAL
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          path: marginal
+          persist-credentials: false
+
+      - name: Checkout Commons as data
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: SignalLayerLabs/Marginal-Commons
+          ref: main
+          fetch-depth: 0
+          path: commons-data
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.13.7"
+
+      - name: Install trusted release dependencies
+        working-directory: marginal
+        run: >-
+          python -m pip install
+          --disable-pip-version-check
+          --only-binary=:all:
+          --require-hashes
+          --no-cache-dir
+          --requirement requirements/commons-release.txt
+
+      - name: Build signed candidate
+        env:
+          COMMONS_RELEASE_PRIVATE_KEY_B64URL: ${{ secrets.COMMONS_RELEASE_PRIVATE_KEY_B64URL }}
+        run: >-
+          python marginal/scripts/build_commons_release.py
+          --commons-repo commons-data
+          --revision HEAD
+          --output-dir candidate/dist
+
+      - name: Independently verify candidate
+        run: >-
+          python marginal/scripts/build_commons_release.py
+          --verify-pack candidate/dist/commons-pack-v1.json
+          --verify-signature candidate/dist/commons-pack-v1.sig.json
+
+      - name: Compare current signed production state
+        id: production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p current/dist
+          pack_status="$(curl --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --connect-timeout 10 --max-time 30 --max-filesize 3145728 \
+            --output current/dist/commons-pack-v1.json --write-out '%{http_code}' \
+            https://marginal-commons.pages.dev/dist/commons-pack-v1.json)"
+          signature_status="$(curl --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --connect-timeout 10 --max-time 30 --max-filesize 1048576 \
+            --output current/dist/commons-pack-v1.sig.json --write-out '%{http_code}' \
+            https://marginal-commons.pages.dev/dist/commons-pack-v1.sig.json)"
+          if [ "${signature_status}" = "404" ]; then
+            test "${pack_status}" = "200"
+            deployment_page=1
+            : > current/deployment-urls.txt
+            while :; do
+              curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+                --connect-timeout 10 --max-time 30 --max-filesize 1048576 \
+                --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+                "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/marginal-commons/deployments?env=production&per_page=100&page=${deployment_page}" \
+                --output current/deployments.json
+              total_pages="$(DEPLOYMENT_PAGE="${deployment_page}" python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          payload = json.loads(Path("current/deployments.json").read_text(encoding="utf-8"))
+          if not isinstance(payload, dict) or payload.get("success") is not True:
+              raise SystemExit("Cloudflare deployment history is invalid")
+          deployments = payload.get("result")
+          result_info = payload.get("result_info")
+          if not isinstance(deployments, list) or not isinstance(result_info, dict):
+              raise SystemExit("Cloudflare deployment history is invalid")
+          current_page = result_info.get("page")
+          total_pages = result_info.get("total_pages")
+          expected_page = int(os.environ["DEPLOYMENT_PAGE"])
+          if (
+              isinstance(current_page, bool)
+              or not isinstance(current_page, int)
+              or current_page != expected_page
+              or isinstance(total_pages, bool)
+              or not isinstance(total_pages, int)
+              or not expected_page <= total_pages <= 10_000
+          ):
+              raise SystemExit("Cloudflare deployment pagination is invalid")
+          pattern = re.compile(r"https://[a-z0-9-]+\.marginal-commons\.pages\.dev\Z")
+          with Path("current/deployment-urls.txt").open("a", encoding="utf-8") as output:
+              for deployment in deployments:
+                  url = deployment.get("url") if isinstance(deployment, dict) else None
+                  if not isinstance(url, str) or pattern.fullmatch(url) is None:
+                      raise SystemExit("Cloudflare deployment history contains an invalid URL")
+                  print(url, file=output)
+          print(total_pages)
+          PY
+              )"
+              if [ "${deployment_page}" -ge "${total_pages}" ]; then
+                break
+              fi
+              deployment_page=$((deployment_page + 1))
+            done
+            while IFS= read -r deployment_url; do
+              historical_status="$(curl --silent --show-error --proto '=https' --tlsv1.2 \
+                --connect-timeout 10 --max-time 30 --max-filesize 1048576 \
+                --output /dev/null --write-out '%{http_code}' \
+                "${deployment_url}/dist/commons-pack-v1.sig.json")"
+              if [ "${historical_status}" = "200" ]; then
+                echo "A signed production deployment already exists; missing current signature fails closed."
+                exit 1
+              fi
+              test "${historical_status}" = "404"
+            done < current/deployment-urls.txt
+            echo "deploy=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          test "${signature_status}" = "200"
+          test "${pack_status}" = "200"
+          python marginal/scripts/build_commons_release.py \
+            --verify-pack current/dist/commons-pack-v1.json \
+            --verify-signature current/dist/commons-pack-v1.sig.json
+          python marginal/scripts/build_commons_release.py \
+            --verify-pack candidate/dist/commons-pack-v1.json \
+            --verify-signature candidate/dist/commons-pack-v1.sig.json \
+            --current-pack current/dist/commons-pack-v1.json \
+            --current-signature current/dist/commons-pack-v1.sig.json \
+            >> "${GITHUB_OUTPUT}"
+
+      - name: Deploy signed release
+        if: steps.production.outputs.deploy == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          npx wrangler@4.124.0 pages deploy candidate
+          --project-name marginal-commons

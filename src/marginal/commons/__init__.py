@@ -1,7 +1,7 @@
 """Privacy-preserving, model-specific MARGINAL Commons primitives."""
 
 from .cache import CommonsCache, CommonsLifecycle, CommonsPrior
-from .client import CommonsAck, CommonsClient
+from .client import CommonsAck, CommonsClient, CommonsPackDownload
 from .config import CommonsConfig, CommonsMode, configure_commons_mode, load_commons_config
 from .evidence import CommonsEvidenceAtom, CommonsEvidenceBatch, compile_verified_evidence
 from .identity import (
@@ -23,6 +23,7 @@ __all__ = [
     "CommonsLifecycle",
     "CommonsMode",
     "CommonsOutbox",
+    "CommonsPackDownload",
     "CommonsPrior",
     "CommonsSyncResult",
     "OutboxEntry",

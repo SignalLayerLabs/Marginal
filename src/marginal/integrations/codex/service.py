@@ -48,7 +48,6 @@ from .transport import ConnectionInfo, SessionServer, connection_filename, reque
 _SERVERS: dict[tuple[Path, str], tuple[SessionServer, CodexSessionRuntime]] = {}
 _COMMONS_PACK_ORIGIN = "https://marginal-commons.pages.dev"
 _COMMONS_INGRESS_ORIGIN = "https://marginal-ingress.signallayerlabs.workers.dev"
-_COMMONS_SOURCE_COMMIT = "7347a1b4024329780139d17494430f2ccac94fec"
 
 
 @dataclass(slots=True)
@@ -151,7 +150,6 @@ def _start_commons(
         commons.cache = CommonsCache(
             data_root,
             model_namespace=identity.namespace,
-            expected_source_commit=_COMMONS_SOURCE_COMMIT,
         )
         commons.outbox = CommonsOutbox(data_root)
         commons.client = _commons_client()

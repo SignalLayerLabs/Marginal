@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 import marginal.integrations.codex.service as service_module
+from marginal.commons.client import CommonsPackDownload
 from marginal.commons.config import CommonsMode, configure_commons_mode
 from marginal.commons.outbox import CommonsOutbox
 from marginal.integrations.codex.events import SessionEvent
@@ -237,7 +238,7 @@ class _OfflineCommonsClient:
         self.downloads = 0
         self.submissions = 0
 
-    def download(self) -> bytes:
+    def download(self) -> CommonsPackDownload:
         self.downloads += 1
         raise TimeoutError("private network detail")
 

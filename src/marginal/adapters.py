@@ -243,7 +243,8 @@ def extract_common_token_usage(result: Any) -> TokenUsage:
                 raise TypeError("usage token fields must be integers")
             if value < 0:
                 raise ValueError("usage token fields must be non-negative")
-            return value
+            normalized_value: int = value
+            return normalized_value
         return None
 
     raw_input = read("input_tokens", "prompt_tokens") or 0
@@ -349,7 +350,8 @@ def extract_common_llm_usage(result: Any, estimated_cost: Cost) -> Cost:
                 raise TypeError("usage token fields must be integers")
             if value < 0:
                 raise ValueError("usage token fields must be non-negative")
-            return value
+            normalized_value: int = value
+            return normalized_value
         return None
 
     total = read("total_tokens")

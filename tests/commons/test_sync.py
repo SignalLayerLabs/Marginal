@@ -8,10 +8,17 @@ import time
 from pathlib import Path
 
 import pytest
+from tests.commons_signing import root_document, signed_download
 
 import marginal.commons as commons
+from marginal.commons import cache as cache_module
 from marginal.commons.cache import CommonsCache
-from marginal.commons.client import CommonsAck, CommonsHTTPError, CommonsProtocolError
+from marginal.commons.client import (
+    CommonsAck,
+    CommonsHTTPError,
+    CommonsPackDownload,
+    CommonsProtocolError,
+)
 from marginal.commons.config import CommonsConfig, CommonsMode
 from marginal.commons.evidence import (
     ActionKind,
@@ -26,6 +33,7 @@ from marginal.commons.evidence import (
 from marginal.commons.identity import resolve_canonical_model
 from marginal.commons.outbox import CommonsOutbox, OutboxEntry
 from marginal.commons.sync import SyncFailure, synchronize_commons
+from marginal.commons.trust import verify_signed_pack_with_root
 
 MODEL_NAMESPACE = "openai/gpt-5.6-sol"
 SOURCE_COMMIT = "a" * 40
@@ -49,13 +57,15 @@ def _pack_bytes() -> bytes:
 
 
 class _RecordingClient:
-    def __init__(self, *, pack: bytes | Exception, submit: CommonsAck | Exception) -> None:
+    def __init__(
+        self, *, pack: CommonsPackDownload | Exception, submit: CommonsAck | Exception
+    ) -> None:
         self.pack = pack
         self.submit_result = submit
         self.download_calls = 0
         self.submitted: list[OutboxEntry] = []
 
-    def download(self) -> bytes:
+    def download(self) -> CommonsPackDownload:
         self.download_calls += 1
         if isinstance(self.pack, Exception):
             raise self.pack
@@ -94,13 +104,22 @@ def _batch(model: str = "gpt-5.6-sol") -> CommonsEvidenceBatch:
 
 def _components(tmp_path: Path) -> tuple[CommonsCache, CommonsOutbox]:
     return (
-        CommonsCache(
-            tmp_path,
-            model_namespace=MODEL_NAMESPACE,
-            expected_source_commit=SOURCE_COMMIT,
-        ),
+        CommonsCache(tmp_path, model_namespace=MODEL_NAMESPACE),
         CommonsOutbox(tmp_path),
     )
+
+
+@pytest.fixture(autouse=True)
+def _use_test_root(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        cache_module,
+        "verify_signed_pack",
+        lambda pack, signature: verify_signed_pack_with_root(pack, signature, root_document()),
+    )
+
+
+def _download() -> CommonsPackDownload:
+    return signed_download(_pack_bytes())
 
 
 def test_task_five_interfaces_are_available_from_the_commons_package() -> None:
@@ -133,7 +152,7 @@ def test_local_only_makes_zero_network_calls_and_does_not_enqueue(tmp_path: Path
 
 def test_read_only_downloads_but_never_enqueues_or_submits(tmp_path: Path) -> None:
     cache, outbox = _components(tmp_path)
-    client = _RecordingClient(pack=_pack_bytes(), submit=AssertionError("submit must not run"))
+    client = _RecordingClient(pack=_download(), submit=AssertionError("submit must not run"))
 
     result = synchronize_commons(
         CommonsConfig(CommonsMode.READ_ONLY),
@@ -151,7 +170,7 @@ def test_read_only_downloads_but_never_enqueues_or_submits(tmp_path: Path) -> No
 
 def test_contributor_without_new_or_queued_evidence_only_downloads(tmp_path: Path) -> None:
     cache, outbox = _components(tmp_path)
-    client = _RecordingClient(pack=_pack_bytes(), submit=AssertionError("submit must not run"))
+    client = _RecordingClient(pack=_download(), submit=AssertionError("submit must not run"))
 
     result = synchronize_commons(
         CommonsConfig(CommonsMode.CONTRIBUTOR),
@@ -168,7 +187,7 @@ def test_contributor_without_new_or_queued_evidence_only_downloads(tmp_path: Pat
 
 def test_contributor_cannot_relabel_a_model_bound_batch_for_another_cache(tmp_path: Path) -> None:
     cache, outbox = _components(tmp_path)
-    client = _RecordingClient(pack=_pack_bytes(), submit=AssertionError("submit must not run"))
+    client = _RecordingClient(pack=_download(), submit=AssertionError("submit must not run"))
 
     result = synchronize_commons(
         CommonsConfig(CommonsMode.CONTRIBUTOR),
@@ -187,7 +206,7 @@ def test_sync_does_not_submit_a_queued_envelope_for_another_cache_model(tmp_path
     cache, outbox = _components(tmp_path)
     queued = outbox.enqueue(batch=_batch("gpt-5.6-terra"))
     assert queued is not None
-    client = _RecordingClient(pack=_pack_bytes(), submit=AssertionError("submit must not run"))
+    client = _RecordingClient(pack=_download(), submit=AssertionError("submit must not run"))
 
     result = synchronize_commons(
         CommonsConfig(CommonsMode.CONTRIBUTOR),
@@ -204,7 +223,7 @@ def test_sync_does_not_submit_a_queued_envelope_for_another_cache_model(tmp_path
 
 def test_contributor_ack_deletes_queued_evidence(tmp_path: Path) -> None:
     cache, outbox = _components(tmp_path)
-    client = _RecordingClient(pack=_pack_bytes(), submit=CommonsAck(True, False))
+    client = _RecordingClient(pack=_download(), submit=CommonsAck(True, False))
 
     result = synchronize_commons(
         CommonsConfig(CommonsMode.CONTRIBUTOR),
@@ -224,7 +243,7 @@ def test_4xx_quarantines_but_5xx_and_protocol_failures_retain_for_retry(tmp_path
         case = tmp_path / str(status)
         cache, outbox = _components(case)
         outbox.enqueue(batch=_batch())
-        client = _RecordingClient(pack=_pack_bytes(), submit=CommonsHTTPError(status=status))
+        client = _RecordingClient(pack=_download(), submit=CommonsHTTPError(status=status))
 
         result = synchronize_commons(
             CommonsConfig(CommonsMode.CONTRIBUTOR),
@@ -245,7 +264,7 @@ def test_4xx_quarantines_but_5xx_and_protocol_failures_retain_for_retry(tmp_path
         cache=cache,
         outbox=outbox,
         client=_RecordingClient(
-            pack=_pack_bytes(), submit=CommonsProtocolError("invalid Commons response")
+            pack=_download(), submit=CommonsProtocolError("invalid Commons response")
         ),
     )
     assert result.retained == 1
@@ -256,7 +275,7 @@ def test_unvalidated_ack_object_never_deletes_queued_evidence(tmp_path: Path) ->
     cache, outbox = _components(tmp_path)
     queued = outbox.enqueue(batch=_batch())
     assert queued is not None
-    client = _RecordingClient(pack=_pack_bytes(), submit=object())  # type: ignore[arg-type]
+    client = _RecordingClient(pack=_download(), submit=object())  # type: ignore[arg-type]
 
     result = synchronize_commons(
         CommonsConfig(CommonsMode.CONTRIBUTOR),
@@ -295,6 +314,27 @@ def test_sync_is_bounded_and_download_failure_does_not_block_outbox_retry(tmp_pa
     assert "privacy-canary" not in repr(result)
 
 
+def test_contributor_submission_proceeds_after_pack_verification_failure(tmp_path: Path) -> None:
+    cache, outbox = _components(tmp_path)
+    queued = outbox.enqueue(batch=_batch())
+    assert queued is not None
+    valid = _download()
+    tampered = CommonsPackDownload(pack=valid.pack + b" ", signature=valid.signature)
+    client = _RecordingClient(pack=tampered, submit=CommonsAck(True, False))
+
+    result = synchronize_commons(
+        CommonsConfig(CommonsMode.CONTRIBUTOR),
+        cache=cache,
+        outbox=outbox,
+        client=client,
+    )
+
+    assert result.cache_refreshed is False
+    assert result.acked == 1
+    assert result.submitted == 1
+    assert result.failures == (SyncFailure.CACHE_REJECTED,)
+
+
 @pytest.mark.skipif(os.name == "nt", reason="POSIX advisory locks are required")
 def test_outbox_lock_contention_returns_a_closed_fail_open_sync_result(tmp_path: Path) -> None:
     import fcntl
@@ -316,7 +356,7 @@ def test_outbox_lock_contention_returns_a_closed_fail_open_sync_result(tmp_path:
         CommonsConfig(CommonsMode.CONTRIBUTOR),
         cache=cache,
         outbox=outbox,
-        client=_RecordingClient(pack=_pack_bytes(), submit=CommonsAck(True, False)),
+        client=_RecordingClient(pack=_download(), submit=CommonsAck(True, False)),
     )
     elapsed = time.monotonic() - started
     release.join(timeout=1)

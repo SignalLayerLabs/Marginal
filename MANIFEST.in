@@ -10,5 +10,8 @@ include ROADMAP.md
 recursive-include schemas *.json
 recursive-include contracts *.json
 recursive-include demos *.md *.json *.html *.svg *.jsonl
+include scripts/build_commons_release.py
+include models/canonical-model-registry-v1.json
+include requirements/commons-release.txt
 
 recursive-include assets *.png

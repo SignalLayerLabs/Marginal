@@ -6,10 +6,14 @@ import subprocess
 from dataclasses import replace
 from pathlib import Path
 
+from tests.commons_signing import root_document, signed_download
+
 import marginal.integrations.codex.service as service_module
-from marginal.commons.client import CommonsAck
+from marginal.commons import cache as cache_module
+from marginal.commons.client import CommonsAck, CommonsPackDownload
 from marginal.commons.config import CommonsMode, configure_commons_mode
 from marginal.commons.outbox import CommonsOutbox, OutboxEntry
+from marginal.commons.trust import verify_signed_pack_with_root
 from marginal.integrations.codex.events import SessionEvent
 from marginal.integrations.codex.identity import current_promotion_identity
 from marginal.integrations.codex.service import (
@@ -61,8 +65,8 @@ class _LocalIngressCommonsAdapter:
         self.root.mkdir(parents=True, exist_ok=True)
         (self.root / "commons-pack-v1.json").write_bytes(_pack(self.models, revision=self.revision))
 
-    def download(self) -> bytes:
-        return (self.root / "commons-pack-v1.json").read_bytes()
+    def download(self) -> CommonsPackDownload:
+        return signed_download((self.root / "commons-pack-v1.json").read_bytes())
 
     def submit(self, entry: OutboxEntry) -> CommonsAck:
         envelope = json.loads(entry.body_bytes)
@@ -103,6 +107,11 @@ def test_local_lifecycle_round_trip_is_model_isolated_private_and_non_authoritat
 
     data = tmp_path / "plugin-data"
     boundary = _LocalIngressCommonsAdapter(tmp_path / "local-boundary")
+    monkeypatch.setattr(
+        cache_module,
+        "verify_signed_pack",
+        lambda pack, signature: verify_signed_pack_with_root(pack, signature, root_document()),
+    )
     configure_commons_mode(data, mode=CommonsMode.CONTRIBUTOR)
     monkeypatch.setattr(service_module, "_commons_client", lambda: boundary)
     start = SessionEvent(
