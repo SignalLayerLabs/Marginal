@@ -99,5 +99,7 @@ def test_unsigned_bootstrap_checks_all_production_deployment_pages() -> None:
     )
     command = compare["run"]
     assert "page=${deployment_page}" in command
+    assert "per_page=25" in command
+    assert "per_page=100" not in command
     assert "total_pages" in command
     assert "deployment_page=$((deployment_page + 1))" in command
