@@ -165,4 +165,3 @@ jobs:
         run: >-
           npx wrangler@4.124.0 pages deploy candidate
           --project-name marginal-commons
-          --branch main

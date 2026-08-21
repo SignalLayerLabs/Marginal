@@ -50,7 +50,7 @@ def test_release_workflow_verifies_current_state_and_pins_pages_deploy() -> None
     assert "--current-pack" in combined
     assert "npx wrangler@4.124.0 pages deploy" in combined
     assert "--project-name marginal-commons" in combined
-    assert "--branch main" in combined
+    assert "--branch main" not in combined
     deploy = next(step for step in steps if step.get("name") == "Deploy signed release")
     assert deploy["env"] == {
         "CLOUDFLARE_API_TOKEN": "${{ secrets.CLOUDFLARE_API_TOKEN }}",
