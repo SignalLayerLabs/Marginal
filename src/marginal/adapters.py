@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
-from typing import Any, Generic, NoReturn, ParamSpec, TypeVar
+from typing import Any, Generic, NoReturn, ParamSpec, TypeVar, cast
 
 from .fingerprint import fingerprint_call
 from .models import Action, Allocation, Cost, Decision, TokenUsage
@@ -243,7 +243,7 @@ def extract_common_token_usage(result: Any) -> TokenUsage:
                 raise TypeError("usage token fields must be integers")
             if value < 0:
                 raise ValueError("usage token fields must be non-negative")
-            return value
+            return cast(int, value)
         return None
 
     raw_input = read("input_tokens", "prompt_tokens") or 0
@@ -349,7 +349,7 @@ def extract_common_llm_usage(result: Any, estimated_cost: Cost) -> Cost:
                 raise TypeError("usage token fields must be integers")
             if value < 0:
                 raise ValueError("usage token fields must be non-negative")
-            return value
+            return cast(int, value)
         return None
 
     total = read("total_tokens")

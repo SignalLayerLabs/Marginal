@@ -76,7 +76,7 @@ def synchronize_commons(
     retained = 0
     failures: list[SyncFailure] = []
     try:
-        pack = client.download()
+        download = client.download()
     except CommonsHTTPError:
         failures.append(SyncFailure.DOWNLOAD_HTTP)
     except CommonsProtocolError:
@@ -87,7 +87,7 @@ def synchronize_commons(
         failures.append(SyncFailure.DOWNLOAD_TRANSPORT)
     else:
         try:
-            cache_refreshed = cache.refresh(pack)
+            cache_refreshed = cache.refresh(download)
         except Exception:
             cache_refreshed = False
         if not cache_refreshed:

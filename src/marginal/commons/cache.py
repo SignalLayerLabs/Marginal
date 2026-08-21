@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from ._storage import atomic_replace_at, locked_directory, read_bounded_at
+from .client import CommonsPackDownload
 from .evidence import (
     ActionKind,
     AggregateReasonCode,
@@ -19,14 +23,17 @@ from .evidence import (
     ValueBucket,
 )
 from .identity import is_canonical_namespace
+from .trust import verify_signed_pack
 
-_PACK_NAME = "commons-pack-v1.json"
+_CACHE_NAME = "commons-signed-cache-v1.json"
 _MODEL_NAMESPACES = {
     "openai/gpt-5.6-sol",
     "openai/gpt-5.6-terra",
     "openai/gpt-5.6-luna",
 }
 _MAX_PACK_BYTES = 2 * 1024 * 1024
+_MAX_SIGNATURE_BYTES = 64 * 1024
+_BASE64URL = re.compile(r"[A-Za-z0-9_-]+\Z")
 
 
 class CommonsLifecycle(str, Enum):
@@ -113,9 +120,17 @@ def _parse_aggregate(namespace: str, raw: object) -> CommonsPrior:
         raise ValueError("Commons aggregate contains an invalid value") from exc
 
 
-def _parse_pack(raw: bytes, *, expected_source_commit: str) -> dict[str, Any]:
+def _reject_constant(_value: str) -> None:
+    raise ValueError("Commons pack contains a non-finite number")
+
+
+def _parse_pack(raw: bytes) -> dict[str, Any]:
     try:
-        payload: Any = json.loads(raw.decode("utf-8"), object_pairs_hook=_reject_duplicate_keys)
+        payload: Any = json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_keys,
+            parse_constant=_reject_constant,
+        )
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError("Commons pack is not valid JSON") from exc
     expected = {
@@ -132,7 +147,9 @@ def _parse_pack(raw: bytes, *, expected_source_commit: str) -> dict[str, Any]:
     revision = payload["commons_revision"]
     if (
         payload["schema_version"] != "1.0"
-        or payload["source_commit"] != expected_source_commit
+        or not isinstance(payload["source_commit"], str)
+        or len(payload["source_commit"]) != 40
+        or any(character not in "0123456789abcdef" for character in payload["source_commit"])
         or isinstance(revision, bool)
         or not isinstance(revision, int)
         or revision < 1
@@ -164,10 +181,81 @@ def _parse_pack(raw: bytes, *, expected_source_commit: str) -> dict[str, Any]:
         raise ValueError("Commons pack integrity is invalid")
     canonical_payload = {key: value for key, value in payload.items() if key != "integrity"}
     canonical = json.dumps(
-        canonical_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        canonical_payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
     ).encode("utf-8")
     if not hashlib.sha256(canonical).hexdigest() == digest:
         raise ValueError("Commons pack integrity mismatch")
+    return payload
+
+
+def _encode_base64url(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def _decode_base64url(value: object, *, maximum_bytes: int) -> bytes:
+    if (
+        not isinstance(value, str)
+        or not value
+        or not _BASE64URL.fullmatch(value)
+        or len(value) % 4 == 1
+    ):
+        raise ValueError("Commons signed cache is invalid")
+    try:
+        decoded = base64.b64decode(value + "=" * ((-len(value)) % 4), altchars=b"-_", validate=True)
+    except (ValueError, binascii.Error):
+        raise ValueError("Commons signed cache is invalid") from None
+    if len(decoded) > maximum_bytes or _encode_base64url(decoded) != value:
+        raise ValueError("Commons signed cache is invalid")
+    return decoded
+
+
+def _cache_bytes(download: CommonsPackDownload) -> bytes:
+    return (
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "pack": _encode_base64url(download.pack),
+                "signature": _encode_base64url(download.signature),
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        )
+        + "\n"
+    ).encode("ascii")
+
+
+def _parse_cache(raw: bytes) -> CommonsPackDownload:
+    try:
+        payload: Any = json.loads(
+            raw.decode("ascii"),
+            object_pairs_hook=_reject_duplicate_keys,
+            parse_constant=_reject_constant,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("Commons signed cache is invalid") from exc
+    if not _exact_keys(payload, {"schema_version", "pack", "signature"}):
+        raise ValueError("Commons signed cache is invalid")
+    assert isinstance(payload, dict)
+    if payload["schema_version"] != "1.0":
+        raise ValueError("Commons signed cache is invalid")
+    return CommonsPackDownload(
+        pack=_decode_base64url(payload["pack"], maximum_bytes=_MAX_PACK_BYTES),
+        signature=_decode_base64url(payload["signature"], maximum_bytes=_MAX_SIGNATURE_BYTES),
+    )
+
+
+def _verified_download(download: CommonsPackDownload) -> dict[str, Any]:
+    certificate = verify_signed_pack(download.pack, download.signature)
+    payload = _parse_pack(download.pack)
+    revision = payload["commons_revision"]
+    if not certificate.not_before_revision <= revision <= certificate.not_after_revision:
+        raise ValueError("Commons pack revision is outside its certificate")
     return payload
 
 
@@ -179,17 +267,10 @@ class CommonsCache:
         data_dir: str | Path,
         *,
         model_namespace: str,
-        expected_source_commit: str,
         max_pack_bytes: int = _MAX_PACK_BYTES,
     ) -> None:
         if not is_canonical_namespace(model_namespace):
             raise ValueError("Commons cache requires a canonical model namespace")
-        if (
-            not isinstance(expected_source_commit, str)
-            or len(expected_source_commit) != 40
-            or any(character not in "0123456789abcdef" for character in expected_source_commit)
-        ):
-            raise ValueError("Commons cache requires an exact source commit")
         if (
             isinstance(max_pack_bytes, bool)
             or not isinstance(max_pack_bytes, int)
@@ -200,48 +281,57 @@ class CommonsCache:
         if ".." in root.parts:
             raise ValueError("Commons cache path must not contain traversal")
         self.model_namespace = model_namespace
-        self.expected_source_commit = expected_source_commit
         self.max_pack_bytes = max_pack_bytes
         self.path = (
-            (root if root.is_absolute() else Path.cwd() / root) / "commons" / "cache" / _PACK_NAME
+            (root if root.is_absolute() else Path.cwd() / root) / "commons" / "cache" / _CACHE_NAME
         )
 
-    def refresh(self, raw: bytes) -> bool:
+    def refresh(self, download: CommonsPackDownload) -> bool:
         """Atomically replace the cache only when every frozen-pack check succeeds."""
 
-        if not isinstance(raw, bytes) or len(raw) > self.max_pack_bytes:
+        if (
+            not isinstance(download, CommonsPackDownload)
+            or len(download.pack) > self.max_pack_bytes
+            or len(download.signature) > _MAX_SIGNATURE_BYTES
+        ):
             return False
         try:
-            candidate = _parse_pack(raw, expected_source_commit=self.expected_source_commit)
+            candidate = _verified_download(download)
+            candidate_cache = _cache_bytes(download)
             with locked_directory(
                 self.path.parent, create=True, lock_name=".cache.lock"
             ) as directory:
                 try:
-                    existing_raw, _ = read_bounded_at(
+                    existing_cache, _ = read_bounded_at(
                         directory,
-                        _PACK_NAME,
-                        maximum_bytes=self.max_pack_bytes,
+                        _CACHE_NAME,
+                        maximum_bytes=(self.max_pack_bytes * 2) + _MAX_SIGNATURE_BYTES,
                         label="Commons cache",
                     )
                 except FileNotFoundError:
                     existing = None
+                    existing_download = None
                 else:
                     try:
-                        existing = _parse_pack(
-                            existing_raw,
-                            expected_source_commit=self.expected_source_commit,
-                        )
+                        existing_download = _parse_cache(existing_cache)
+                        existing = _verified_download(existing_download)
                     except (ValueError, RecursionError, MemoryError, OverflowError):
                         existing = None
+                        existing_download = None
                 if (
                     existing is not None
                     and candidate["commons_revision"] < existing["commons_revision"]
                 ):
                     return False
+                if (
+                    existing is not None
+                    and candidate["commons_revision"] == existing["commons_revision"]
+                ):
+                    return existing_download == download
                 atomic_replace_at(
                     directory,
-                    _PACK_NAME,
-                    raw,
+                    _CACHE_NAME,
+                    candidate_cache,
                     temporary_prefix=".commons-pack-",
                     label="Commons cache",
                 )
@@ -256,11 +346,11 @@ class CommonsCache:
             ) as directory:
                 raw, _ = read_bounded_at(
                     directory,
-                    _PACK_NAME,
-                    maximum_bytes=self.max_pack_bytes,
+                    _CACHE_NAME,
+                    maximum_bytes=(self.max_pack_bytes * 2) + _MAX_SIGNATURE_BYTES,
                     label="Commons cache",
                 )
-            return _parse_pack(raw, expected_source_commit=self.expected_source_commit)
+            return _verified_download(_parse_cache(raw))
         except (
             FileNotFoundError,
             OSError,

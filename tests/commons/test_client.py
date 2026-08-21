@@ -15,6 +15,7 @@ import pytest
 from marginal.commons.client import (
     CommonsClient,
     CommonsHTTPError,
+    CommonsPackDownload,
     CommonsProtocolError,
     CommonsTransportError,
 )
@@ -38,17 +39,19 @@ class _Handler(BaseHTTPRequestHandler):
     response_body: ClassVar[bytes] = b"{}"
     response_delay: ClassVar[float] = 0.0
     trickle_delay: ClassVar[float] = 0.0
+    bodies_by_path: ClassVar[dict[str, bytes]] = {}
+    statuses_by_path: ClassVar[dict[str, int]] = {}
 
-    def _write_body(self) -> None:
+    def _write_body(self, body: bytes) -> None:
         time.sleep(type(self).response_delay)
         try:
             if type(self).trickle_delay:
-                for byte in type(self).response_body:
+                for byte in body:
                     time.sleep(type(self).trickle_delay)
                     self.wfile.write(bytes([byte]))
                     self.wfile.flush()
             else:
-                self.wfile.write(type(self).response_body)
+                self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError):
             return
 
@@ -56,10 +59,12 @@ class _Handler(BaseHTTPRequestHandler):
         type(self).requests.append(
             {"method": "GET", "path": self.path, "headers": dict(self.headers)}
         )
-        self.send_response(type(self).response_status)
-        self.send_header("Content-Length", str(len(type(self).response_body)))
+        body = type(self).bodies_by_path.get(self.path, type(self).response_body)
+        status = type(self).statuses_by_path.get(self.path, type(self).response_status)
+        self.send_response(status)
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self._write_body()
+        self._write_body(body)
 
     def do_POST(self) -> None:
         length = int(self.headers.get("Content-Length", "0"))
@@ -70,7 +75,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_response(type(self).response_status)
         self.send_header("Content-Length", str(len(type(self).response_body)))
         self.end_headers()
-        self._write_body()
+        self._write_body(type(self).response_body)
 
     def log_message(self, _format: str, *_args: object) -> None:
         return
@@ -83,12 +88,16 @@ def _server(
     body: bytes = b"{}",
     delay: float = 0.0,
     trickle_delay: float = 0.0,
+    bodies_by_path: dict[str, bytes] | None = None,
+    statuses_by_path: dict[str, int] | None = None,
 ) -> Iterator[str]:
     _Handler.requests = []
     _Handler.response_status = status
     _Handler.response_body = body
     _Handler.response_delay = delay
     _Handler.trickle_delay = trickle_delay
+    _Handler.bodies_by_path = bodies_by_path or {}
+    _Handler.statuses_by_path = statuses_by_path or {}
     server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -124,18 +133,43 @@ def _entry(tmp_path: Path) -> OutboxEntry:
     return entry
 
 
-def test_download_uses_only_the_fixed_pack_path_without_query_or_tracking_headers() -> None:
-    with _server(body=b"pack") as origin:
+def test_download_uses_only_fixed_pack_and_signature_paths_without_tracking_headers() -> None:
+    with _server(
+        bodies_by_path={
+            "/dist/commons-pack-v1.json": b"pack",
+            "/dist/commons-pack-v1.sig.json": b"signature",
+        }
+    ) as origin:
         client = CommonsClient(pack_origin=origin, ingress_origin=origin)
 
-        assert client.download() == b"pack"
+        assert client.download() == CommonsPackDownload(pack=b"pack", signature=b"signature")
 
-    request = _Handler.requests[0]
-    assert request["path"] == "/dist/commons-pack-v1.json"
-    headers = {key.lower(): value for key, value in request["headers"].items()}
-    assert "cookie" not in headers
-    assert "referer" not in headers
-    assert "x-request-id" not in headers
+    assert [request["path"] for request in _Handler.requests] == [
+        "/dist/commons-pack-v1.json",
+        "/dist/commons-pack-v1.sig.json",
+    ]
+    for request in _Handler.requests:
+        headers = {key.lower(): value for key, value in request["headers"].items()}
+        assert "cookie" not in headers
+        assert "referer" not in headers
+        assert "x-request-id" not in headers
+
+
+def test_missing_signature_is_a_redacted_fixed_path_http_failure() -> None:
+    with (
+        _server(
+            bodies_by_path={"/dist/commons-pack-v1.json": b"pack"},
+            statuses_by_path={"/dist/commons-pack-v1.sig.json": 404},
+        ) as origin,
+        pytest.raises(CommonsHTTPError) as captured,
+    ):
+        CommonsClient(pack_origin=origin, ingress_origin=origin).download()
+
+    assert captured.value.status == 404
+    assert [request["path"] for request in _Handler.requests] == [
+        "/dist/commons-pack-v1.json",
+        "/dist/commons-pack-v1.sig.json",
+    ]
 
 
 def test_submit_sends_only_the_closed_envelope_and_retry_header(tmp_path: Path) -> None:

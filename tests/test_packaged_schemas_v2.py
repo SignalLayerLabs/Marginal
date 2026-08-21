@@ -40,3 +40,19 @@ def test_schema_api_rejects_unknown_or_unsafe_names() -> None:
             pass
         else:
             raise AssertionError(f"expected schema lookup to reject {name!r}")
+
+
+def test_runtime_packages_only_the_public_root_trust_anchor() -> None:
+    packaged = ROOT / "src" / "marginal" / "commons"
+    assert (packaged / "commons-root-key-v1.json").read_bytes() == (
+        ROOT / "contracts" / "commons-root-key-v1.json"
+    ).read_bytes()
+    assert not (packaged / "commons-release-key-v1.json").exists()
+    assert not (packaged / "commons-release-key-v1.sig.json").exists()
+
+
+def test_source_distribution_includes_trusted_release_tooling_inputs() -> None:
+    manifest = (ROOT / "MANIFEST.in").read_text(encoding="utf-8").splitlines()
+    assert "include scripts/build_commons_release.py" in manifest
+    assert "include models/canonical-model-registry-v1.json" in manifest
+    assert "include requirements/commons-release.txt" in manifest

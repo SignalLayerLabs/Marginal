@@ -16,6 +16,7 @@ from urllib.parse import SplitResult, urlsplit
 from .outbox import OutboxEntry, _entry_boundary_valid, _reject_duplicate_keys
 
 _PACK_PATH = "/dist/commons-pack-v1.json"
+_SIGNATURE_PATH = "/dist/commons-pack-v1.sig.json"
 _EVIDENCE_PATH = "/v1/evidence"
 _DEFAULT_MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 _MAX_REQUEST_BYTES = 512 * 1024
@@ -113,10 +114,22 @@ class CommonsAck:
             raise ValueError("invalid Commons ACK")
 
 
+@dataclass(frozen=True, slots=True)
+class CommonsPackDownload:
+    """Exact bytes retrieved from the two fixed Commons release paths."""
+
+    pack: bytes
+    signature: bytes
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.pack, bytes) or not isinstance(self.signature, bytes):
+            raise TypeError("Commons download requires bytes")
+
+
 class CommonsClientProtocol(Protocol):
     """Narrow transport boundary consumed by fail-open orchestration."""
 
-    def download(self) -> bytes: ...
+    def download(self) -> CommonsPackDownload: ...
 
     def submit(self, entry: OutboxEntry) -> CommonsAck: ...
 
@@ -335,16 +348,24 @@ class CommonsClient:
             deadline_guard.cancel()
             connection.close()
 
-    def download(self) -> bytes:
-        """Download the pack from its fixed public path."""
+    def download(self) -> CommonsPackDownload:
+        """Download exact pack and detached-signature bytes from fixed public paths."""
 
-        return self._request(
+        pack = self._request(
             self._pack_origin,
             method="GET",
             path=_PACK_PATH,
             headers={"Accept": "application/json"},
             success_status=200,
         )
+        signature = self._request(
+            self._pack_origin,
+            method="GET",
+            path=_SIGNATURE_PATH,
+            headers={"Accept": "application/json"},
+            success_status=200,
+        )
+        return CommonsPackDownload(pack=pack, signature=signature)
 
     def submit(self, entry: OutboxEntry) -> CommonsAck:
         """Submit one validated envelope with retry identity only in its header."""
