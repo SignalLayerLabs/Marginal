@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -19,7 +20,8 @@ def test_workflow_is_manual_modal_only_and_compares_both_lanes() -> None:
     assert "marginal_predictions.ndjson" in text
     assert text.count("--modal true") == 2
     assert "marginal public-eval" in text
-    assert "actions/upload-artifact@v7" in text
+    assert not re.search(r"actions/upload-artifact@v\d+", text)
+    assert re.search(r"actions/upload-artifact@[0-9a-f]{40}", text)
 
 
 def test_readme_refuses_gold_as_marginal_evidence() -> None:
