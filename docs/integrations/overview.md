@@ -94,6 +94,12 @@ evidence history. Target compatibility does not transfer Earned Enforcement auth
 engine-specific. If the plugin/event contract diverges, PrivacyCode becomes a separate adapter rather
 than accumulating target-specific governance semantics.
 
+Gemini CLI is research-only: no adapter is shipped. The native hooks cover interactive sessions and
+can technically block or rewrite work, but they do not document the stable per-tool identity needed by
+hookkit. Headless `stream-json` provides stronger tool correlation and outcome evidence for runs that
+MARGINAL launches. The recommended first prototype is therefore **Observe** over headless JSONL. See
+[Gemini CLI integration research](gemini-cli.md).
+
 GitHub Copilot remains roadmap work. Codex is labeled Tool Enforcement,
 not Full Compute Enforcement, because specialized and hosted tool paths can fall outside local
 hook coverage.
