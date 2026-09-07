@@ -110,6 +110,11 @@ def _validate_config(config: ProLaneConfig) -> ProLaneConfig:
         raise ValueError("worktree must be the task repository root")
     if resolved_commit != config.base_commit:
         raise ValueError("base_commit did not resolve to the exact requested commit")
+    tree_entries = _git(worktree, "ls-tree", "-r", "-z", config.base_commit, text=False)
+    assert isinstance(tree_entries, bytes)
+    for entry in tree_entries.split(b"\0"):
+        if entry.startswith(b"160000 commit "):
+            raise ValueError("base_commit contains an unsupported gitlink")
     return replace(
         config,
         worktree=worktree,
@@ -153,12 +158,20 @@ def _extract_archive(archive: Path, worktree: Path) -> None:
         raise RuntimeError(f"base archive extraction failed: {completed.stderr.strip()}")
 
 
-def _remove_git_metadata(worktree: Path) -> None:
-    metadata = worktree / ".git"
+def _remove_git_metadata(metadata: Path) -> None:
     if metadata.is_dir() and not metadata.is_symlink():
         shutil.rmtree(metadata)
     elif metadata.exists() or metadata.is_symlink():
         metadata.unlink()
+
+
+def _purge_git_metadata(worktree: Path) -> None:
+    for root, directories, files in os.walk(worktree, topdown=True, followlinks=False):
+        if ".git" in directories:
+            _remove_git_metadata(Path(root) / ".git")
+            directories.remove(".git")
+        if ".git" in files:
+            _remove_git_metadata(Path(root) / ".git")
 
 
 def prepare_repository(config: ProLaneConfig) -> SnapshotProvenance:
@@ -181,7 +194,7 @@ def prepare_repository(config: ProLaneConfig) -> SnapshotProvenance:
         _git(config.worktree, "clean", "-ffd")
         _remove_tracked_files(config.worktree)
         _extract_archive(archive, config.worktree)
-        _remove_git_metadata(config.worktree)
+        _purge_git_metadata(config.worktree)
 
     _git(config.worktree, "init", "-q")
     _git(config.worktree, "add", "-A")

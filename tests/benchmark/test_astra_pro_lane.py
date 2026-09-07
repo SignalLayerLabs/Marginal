@@ -37,6 +37,10 @@ def _repository(tmp_path: Path) -> tuple[Path, str, str]:
     base_commit = _git(repo, "rev-parse", "HEAD")
     (repo / ".deps").mkdir()
     (repo / ".deps" / "installed.txt").write_text("keep me\n", encoding="utf-8")
+    (repo / ".deps" / "nested" / ".git" / "objects").mkdir(parents=True)
+    (repo / ".deps" / "nested" / ".git" / "HEAD").write_text(
+        "ref: refs/heads/future\n", encoding="utf-8"
+    )
     (repo / "base.py").write_text("BASE = False\n", encoding="utf-8")
     (repo / "future.py").write_text("SECRET = True\n", encoding="utf-8")
     _git(repo, "add", "base.py", "future.py")
@@ -75,6 +79,7 @@ def test_prepare_repository_keeps_only_the_base_tree_and_ignored_dependencies(
     assert (repo / "base.py").read_text(encoding="utf-8") == "BASE = True\n"
     assert not (repo / "future.py").exists()
     assert (repo / ".deps" / "installed.txt").read_text(encoding="utf-8") == "keep me\n"
+    assert not (repo / ".deps" / "nested" / ".git").exists()
     assert _git(repo, "status", "--porcelain", "--untracked-files=all") == ""
     assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "HEAD"
     assert _git(repo, "rev-list", "--count", "--all") == "1"
@@ -83,6 +88,24 @@ def test_prepare_repository_keeps_only_the_base_tree_and_ignored_dependencies(
     assert provenance.original_base_tree == original_tree
     assert provenance.snapshot_commit == _git(repo, "rev-parse", "HEAD")
     assert provenance.snapshot_tree == original_tree
+
+
+def test_base_gitlink_is_rejected_before_any_repository_mutation(tmp_path: Path) -> None:
+    repo, _base_commit, _future_commit = _repository(tmp_path)
+    linked_commit = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "update-index", "--add", "--cacheinfo", f"160000,{linked_commit},vendor/sub")
+    _git(repo, "commit", "-qm", "add gitlink")
+    gitlink_base = _git(repo, "rev-parse", "HEAD")
+    nested_git = repo / "vendor" / "sub" / ".git"
+    nested_git.mkdir(parents=True)
+    (nested_git / "HEAD").write_text("future history\n", encoding="utf-8")
+    config = _config(tmp_path, repo, gitlink_base)
+
+    with pytest.raises(ValueError, match="gitlink"):
+        prepare_repository(config)
+
+    assert _git(repo, "rev-parse", "HEAD") == gitlink_base
+    assert nested_git.is_dir()
 
 
 @pytest.mark.parametrize(

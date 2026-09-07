@@ -9,8 +9,9 @@ the benchmark protocol.
   fixed input paths, repository root, and non-existing output before mutation. It archives the base
   tree, retains ignored installed dependencies, removes future/current tracked content and original
   Git metadata, creates a deterministic detached single-commit snapshot, verifies tree equality and
-  history size, forwards the unchanged public prompt to `run_task`, and records original/snapshot
-  commit and tree hashes.
+  history size, rejects base trees containing gitlinks before mutation, purges nested Git metadata,
+  forwards the unchanged public prompt to `run_task`, and records original/snapshot commit and tree
+  hashes.
 - `benchmark/astra/pro/Dockerfile.solver`: layers on a controller-supplied task image, uses pinned
   amd64 Node and uv builder manifests, installs Codex 0.153.4 with the existing wrapper, adds an
   independent Python 3.12.11 runtime, installs MARGINAL/benchmark packages into that runtime's
@@ -24,7 +25,7 @@ the benchmark protocol.
 ```text
 $ .venv/bin/python -m pytest -q tests/benchmark/test_astra_pro_lane.py
 ......                                                                   [100%]
-6 passed in 1.84s
+7 passed in 2.24s
 ```
 
 ```text
@@ -42,4 +43,5 @@ Its final result and smoke checks are recorded below once complete.
   container is disposable.
 - Ignored dependency retention depends on the base tree's ignore rules. The verified snapshot tree
   contains only tracked base-commit files; ignored dependency content remains outside Git.
+- Base commits containing gitlinks are rejected as unsupported infrastructure before mutation.
 - No solver/model request was made during implementation or verification.
