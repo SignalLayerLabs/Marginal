@@ -68,6 +68,22 @@ marginal install codex --autopilot-consent
 
 ## How MARGINAL earns authority
 
+### GPT-6 Astra
+
+The exact model ID `gpt-6-astra` has its own evidence namespace, `openai/gpt-6-astra`.
+When Codex hooks identify that model, decisions and outcomes are recorded locally as work
+happens. Existing unlabelled evidence is not reassigned to Astra. Commons sharing remains opt-in.
+
+A real Astra request was verified with Codex CLI **0.153.4**; **0.147.0** was rejected by the
+provider. This is a tested version, not a claim that every intermediate version is unsupported.
+
+**Astra token savings are not yet demonstrated.** Shadow Mode observes work; it does not
+reduce the model's internal reasoning budget. The complete public OFF/ON evaluation is still
+outstanding. See [Astra evaluation status](benchmark/astra/README.md) for exact preflight facts
+and what remains before a performance claim is justified.
+
+### Evidence gates
+
 1. **Observe** — collect derived action, outcome, coverage, state and evidence signals locally.
 2. **Verify** — bind decisions, policy identity, trust state and governance cost into Decision Receipts.
 3. **Earn** — require representative local evidence, clean coverage and explicit promotion.
