@@ -5,6 +5,10 @@
 This directory records preflight facts, not benchmark results. Product integration tests and a
 successful model request do not demonstrate improved task quality or lower token use.
 
+The active experiment is [SWE-bench Pro](pro/README.md). Its complete 731-task manifest,
+protocol and first official reference-validation artifacts are published there. HumanEval+
+preparation was withdrawn before any scored model inference.
+
 ## Frozen public benchmark inputs
 
 - Dataset: [ScaleAI/SWE-bench_Pro](https://huggingface.co/datasets/ScaleAI/SWE-bench_Pro),
@@ -26,7 +30,7 @@ successful model request do not demonstrate improved task quality or lower token
 | Docker | Existing local benchmark VM started; Docker 29.5.2, 6 CPUs, about 12 GiB RAM |
 | Existing task images | Three historical SWE-bench Lite smoke images; no Pro images |
 | First deterministic Pro image | Manifest reachable; 4,663,263,960 compressed layer bytes |
-| Official Pro grading | Not executed |
+| Official Pro grading | First reference patch passed; 1,350.20 seconds under x86 QEMU |
 | Scored Astra task trajectories | **0 baseline / 0 MARGINAL** |
 
 The successful no-tool request is an API/CLI compatibility probe only. Its input token count
