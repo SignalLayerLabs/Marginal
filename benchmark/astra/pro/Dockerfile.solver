@@ -13,12 +13,12 @@ FROM --platform=linux/amd64 node@sha256:76789712cd1ae89a1225eac9077010d68987a423
 ENV UV_PYTHON_INSTALL_DIR=/overlay/opt/python
 COPY --from=uv_builder /uv /uv
 RUN /uv python install cpython-3.12.11-linux-x86_64-musl \
-    && mkdir -p /overlay/opt/python/bin \
+    && mkdir -p /overlay/opt/python/bin /overlay/opt/marginal-tools/bin \
     && installed_python="$(/uv python find cpython-3.12.11-linux-x86_64-musl)" \
     && ln -s "${installed_python#/overlay}" /overlay/opt/python/bin/python3 \
+    && cp /usr/local/bin/node /overlay/opt/marginal-tools/bin/node \
     && "${installed_python}" --version
 
-COPY --from=codex_builder /usr/local/bin/node /overlay/opt/marginal-tools/bin/node
 COPY --from=codex_builder /usr/local/lib/node_modules/@openai/codex /overlay/opt/marginal-tools/lib/codex
 COPY benchmark/container/codex-wrapper.sh /overlay/opt/marginal-tools/bin/codex
 COPY . /overlay/opt/marginal
