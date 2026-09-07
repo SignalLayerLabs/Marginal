@@ -4,6 +4,7 @@
   "status": "preflight_no_scored_inference",
   "dataset": "ScaleAI/SWE-bench_Pro",
   "dataset_revision": "7ab5114912baf22bb098818e604c02fe7ad2c11f",
+  "dataset_parquet_sha256": "c8cd7115496ad4e9a8b21d088cef576a65bf821bb542b24336f13f714cef13f8",
   "split": "test",
   "task_count": 731,
   "task_inputs_sha256": "9b4f10e1496d8bcda8c2d050602498c13be993518f0798b6935ae3e675cea1f6",

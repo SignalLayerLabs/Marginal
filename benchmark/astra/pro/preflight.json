@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "status": "reference_grading_passed_solver_execution_pending",
+  "first_instance_id": "instance_protonmail__webclients-01ea5214d11e0df8b7170d91bafd34f23cb0f2b1",
+  "base_commit": "24c785b20c23f614eeb9df7073247aeb244c4329",
+  "task_image": "jefzda/sweap-images@sha256:d902632d1374cf0282a4ea301b82c296e13a41127308da0204aca87a4ba62c02",
+  "observed_image_os": "Alpine Linux 3.18.3",
+  "observed_image_python": "3.11.12",
+  "observed_image_node": "16.20.2",
+  "public_dockerfile_os": "Ubuntu 20.04; differs from actual image",
+  "official_gold_resolved": true,
+  "official_gold_wall_seconds": 1350.20,
+  "official_evaluator_commit": "ca10a60a5fcae51e6948ffe1485d4153d421e6c5",
+  "official_evaluator_network": "none",
+  "first_prompt_sha256": "a96856fff430ba01ad1cc7aacb72efb3188db1d00faa33f0c6e514ee2a0cfbc0",
+  "host": "Apple Silicon macOS; x86_64 Colima/QEMU emulation; 6 virtual CPUs; 12 GiB VM RAM",
+  "model_lanes_executed_at_preflight": 0,
+  "project_tests": {"passed": 1024, "warnings": 8},
+  "claim": "Infrastructure preflight only. A reference patch is not a model prediction. No measured savings."
+}
