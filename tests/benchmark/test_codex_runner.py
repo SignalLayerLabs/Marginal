@@ -52,6 +52,7 @@ def _fake_codex(tmp_path: Path) -> Path:
                 "args": sys.argv[1:],
                 "prompt": prompt,
                 "has_hooks": Path(".codex/hooks.json").is_file(),
+                "has_home_hooks": (Path(os.environ["CODEX_HOME"]) / "hooks.json").is_file(),
                 "has_socket_env": "MARGINAL_SOCKET" in os.environ,
                 "home": os.environ.get("HOME"),
                 "codex_home": os.environ.get("CODEX_HOME"),
@@ -81,6 +82,16 @@ def _fake_codex(tmp_path: Path) -> Path:
                         "command": "git status --short",
                         "aggregated_output": "",
                         "exit_code": 0,
+                        "status": "completed",
+                    },
+                }))
+            if os.environ.get("FAKE_FILE_EVENT") == "1":
+                print(json.dumps({
+                    "type": "item.completed",
+                    "item": {
+                        "id": "item-file",
+                        "type": "file_change",
+                        "changes": [{"path": "solution.py", "kind": "update"}],
                         "status": "completed",
                     },
                 }))
@@ -162,6 +173,7 @@ def test_off_has_no_marginal_process_hook_state_or_environment(tmp_path: Path) -
     assert observed["has_socket_env"] is False
     assert observed["home"] != os.environ.get("HOME")
     assert observed["codex_home"] != observed["home"]
+    assert observed["args"][:3] == ["-a", "never", "exec"]
     assert 'shell_environment_policy.inherit="none"' in observed["args"]
     assert not (config.worktree / ".codex").exists()
     schema = json.loads(
@@ -172,7 +184,7 @@ def test_off_has_no_marginal_process_hook_state_or_environment(tmp_path: Path) -
     Draft202012Validator(schema).validate(record)
 
 
-def test_on_starts_daemon_and_loads_only_generated_project_hooks(tmp_path: Path) -> None:
+def test_on_starts_daemon_and_loads_only_generated_isolated_home_hooks(tmp_path: Path) -> None:
     log = tmp_path / "marginal-log.json"
     config = _config(tmp_path, condition="marginal", extra_env={"FAKE_CODEX_LOG": str(log)})
 
@@ -180,12 +192,29 @@ def test_on_starts_daemon_and_loads_only_generated_project_hooks(tmp_path: Path)
     observed = json.loads(log.read_text(encoding="utf-8"))
 
     assert record["run_status"] == "completed"
-    assert observed["has_hooks"] is True
+    assert observed["has_hooks"] is False
+    assert observed["has_home_hooks"] is True
     assert observed["has_socket_env"] is True
-    assert (config.worktree / ".codex" / "hooks.json").is_file()
+    assert "--ignore-user-config" not in observed["args"]
+    assert not (config.worktree / ".codex").exists()
     assert record["governance"]["tokens"] == 0
     assert record["files_modified"] == 1
     assert ".codex" not in (config.run_dir / "model.patch").read_text(encoding="utf-8")
+
+
+def test_on_hook_coverage_counts_only_cli_tool_types_supported_by_hooks(tmp_path: Path) -> None:
+    log = tmp_path / "marginal-log.json"
+    config = _config(
+        tmp_path,
+        condition="marginal",
+        extra_env={"FAKE_CODEX_LOG": str(log), "FAKE_FILE_EVENT": "1"},
+    )
+
+    record = run_task(config)
+
+    assert record["tool_calls"] == 1
+    assert record["shell_commands"] == 0
+    assert record["run_status"] == "completed"
 
 
 def test_on_fails_if_codex_reports_tool_use_without_hook_coverage(tmp_path: Path) -> None:
