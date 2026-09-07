@@ -26,11 +26,12 @@ from .identity import is_canonical_namespace
 from .trust import verify_signed_pack
 
 _CACHE_NAME = "commons-signed-cache-v1.json"
-_MODEL_NAMESPACES = {
+_REQUIRED_MODEL_NAMESPACES = {
     "openai/gpt-5.6-sol",
     "openai/gpt-5.6-terra",
     "openai/gpt-5.6-luna",
 }
+_MODEL_NAMESPACES = _REQUIRED_MODEL_NAMESPACES | {"openai/gpt-6-astra"}
 _MAX_PACK_BYTES = 2 * 1024 * 1024
 _MAX_SIGNATURE_BYTES = 64 * 1024
 _BASE64URL = re.compile(r"[A-Za-z0-9_-]+\Z")
@@ -157,7 +158,11 @@ def _parse_pack(raw: bytes) -> dict[str, Any]:
     ):
         raise ValueError("Commons pack is incompatible")
     models = payload["models"]
-    if not isinstance(models, dict) or set(models) != _MODEL_NAMESPACES:
+    if (
+        not isinstance(models, dict)
+        or not _REQUIRED_MODEL_NAMESPACES.issubset(models)
+        or not set(models).issubset(_MODEL_NAMESPACES)
+    ):
         raise ValueError("Commons pack model registry is invalid")
     for namespace, model in models.items():
         if not _exact_keys(model, {"aggregates"}):

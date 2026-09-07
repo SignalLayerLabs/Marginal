@@ -13,6 +13,7 @@ from marginal.privacy import aggregate_ledger_records
 
 ROOT = Path(__file__).resolve().parents[1]
 NAMESPACES = (
+    "openai/gpt-6-astra",
     "openai/gpt-5.6-sol",
     "openai/gpt-5.6-terra",
     "openai/gpt-5.6-luna",
@@ -135,6 +136,7 @@ def test_registry_contains_only_the_reviewed_exact_model_mapping() -> None:
     assert registry == {
         "schema_version": "1.0",
         "models": {
+            "gpt-6-astra": "openai/gpt-6-astra",
             "gpt-5.6-sol": "openai/gpt-5.6-sol",
             "gpt-5.6-terra": "openai/gpt-5.6-terra",
             "gpt-5.6-luna": "openai/gpt-5.6-luna",
@@ -181,3 +183,20 @@ def test_pack_rejects_noncanonical_or_open_content() -> None:
         candidate = copy.deepcopy(pack)
         mutation(candidate)
         _assert_invalid(validator, candidate)
+
+
+def test_pack_contract_accepts_a_pre_astra_model_set() -> None:
+    pack = {
+        "schema_version": "1.0",
+        "source_commit": "a" * 40,
+        "commons_revision": 1,
+        "compatibility": {"evidence_envelope_schema_version": "1.0"},
+        "models": {
+            namespace: {"aggregates": []}
+            for namespace in NAMESPACES
+            if namespace != "openai/gpt-6-astra"
+        },
+        "integrity": {"sha256": "b" * 64},
+    }
+
+    _validator("commons-pack-v1.json").validate(pack)

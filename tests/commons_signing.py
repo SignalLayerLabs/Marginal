@@ -12,6 +12,7 @@ from marginal.commons.client import CommonsPackDownload
 ROOT_PRIVATE = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
 RELEASE_PRIVATE = Ed25519PrivateKey.from_private_bytes(bytes(range(32, 64)))
 MODEL_NAMESPACES = (
+    "openai/gpt-6-astra",
     "openai/gpt-5.6-luna",
     "openai/gpt-5.6-sol",
     "openai/gpt-5.6-terra",
