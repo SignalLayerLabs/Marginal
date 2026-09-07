@@ -9,5 +9,9 @@ benchmark/*
 !benchmark/__init__.py
 !benchmark/codex_adapter/
 !benchmark/codex_adapter/**
+!benchmark/astra/
+benchmark/astra/*
+!benchmark/astra/__init__.py
+!benchmark/astra/pro_lane.py
 !benchmark/container/
 !benchmark/container/**

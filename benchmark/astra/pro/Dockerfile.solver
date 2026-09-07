@@ -1,0 +1,54 @@
+# syntax=docker/dockerfile:1
+ARG TASK_IMAGE
+
+FROM --platform=linux/amd64 node@sha256:4d676821dff059fd00d277ee4261ef34ea712317fed0737c03941481b5760c96 AS codex_builder
+
+RUN npm install --global --omit=dev "@openai/codex@0.153.4" \
+    && codex --version
+
+FROM --platform=linux/amd64 ghcr.io/astral-sh/uv@sha256:1ececcacbbde240ffca54d400df86e4fdd38f29c1a2366299279d197e92eaed3 AS uv_builder
+
+FROM --platform=linux/amd64 node@sha256:4d676821dff059fd00d277ee4261ef34ea712317fed0737c03941481b5760c96 AS tools_builder
+
+ENV UV_PYTHON_INSTALL_DIR=/overlay/opt/python
+COPY --from=uv_builder /uv /uv
+RUN /uv python install 3.12.11 \
+    && mkdir -p /overlay/opt/python/bin \
+    && installed_python="$(/uv python find 3.12.11)" \
+    && ln -s "${installed_python#/overlay}" /overlay/opt/python/bin/python3 \
+    && "${installed_python}" --version
+
+COPY --from=codex_builder /usr/local/bin/node /overlay/opt/marginal-tools/bin/node
+COPY --from=codex_builder /usr/local/lib/node_modules/@openai/codex /overlay/opt/marginal-tools/lib/codex
+COPY benchmark/container/codex-wrapper.sh /overlay/opt/marginal-tools/bin/codex
+COPY . /overlay/opt/marginal
+
+RUN installed_python="$(/uv python find 3.12.11)" \
+    && site_packages="$("${installed_python}" -c 'import site; print(site.getsitepackages()[0])')" \
+    && cp -R /overlay/opt/marginal/src/marginal "${site_packages}/marginal" \
+    && cp -R /overlay/opt/marginal/benchmark "${site_packages}/benchmark" \
+    && chmod 0555 /overlay/opt/marginal-tools/bin/codex \
+    && env -u PYTHONPATH "${installed_python}" -c \
+      "from marginal import Treasury; from benchmark.astra.pro_lane import ProLaneConfig"
+
+FROM ${TASK_IMAGE}
+
+ARG TASK_IMAGE
+ARG MARGINAL_SOURCE_COMMIT
+LABEL org.opencontainers.image.title="MARGINAL Astra SWE-bench Pro solver" \
+      org.opencontainers.image.source="https://github.com/SignalLayerLabs/Marginal" \
+      org.marginal.codex.version="0.153.4" \
+      org.marginal.python.version="3.12.11" \
+      org.marginal.source.commit="${MARGINAL_SOURCE_COMMIT}" \
+      org.marginal.task.image="${TASK_IMAGE}" \
+      org.marginal.node.image="node@sha256:4d676821dff059fd00d277ee4261ef34ea712317fed0737c03941481b5760c96" \
+      org.marginal.uv.image="ghcr.io/astral-sh/uv@sha256:1ececcacbbde240ffca54d400df86e4fdd38f29c1a2366299279d197e92eaed3"
+
+COPY --from=tools_builder /overlay /
+RUN env -u PYTHONPATH /opt/python/bin/python3 -c \
+      "from marginal import Treasury; from benchmark.astra.pro_lane import ProLaneConfig" \
+    && /opt/marginal-tools/bin/codex --version
+
+ENV PATH=/opt/python/bin:/opt/marginal-tools/bin:${PATH}
+WORKDIR /app
+ENTRYPOINT ["/opt/python/bin/python3", "-m", "benchmark.astra.pro_lane"]
