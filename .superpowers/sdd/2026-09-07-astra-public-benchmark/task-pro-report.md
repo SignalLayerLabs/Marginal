@@ -13,9 +13,9 @@ the benchmark protocol.
   forwards the unchanged public prompt to `run_task`, and records original/snapshot commit and tree
   hashes.
 - `benchmark/astra/pro/Dockerfile.solver`: layers on a controller-supplied task image, uses pinned
-  amd64 Node and uv builder manifests, installs Codex 0.153.4 with the existing wrapper, adds an
-  independent Python 3.12.11 runtime, installs MARGINAL/benchmark packages into that runtime's
-  site-packages, records source/task/tool labels, and invokes the lane CLI from `/app`.
+  amd64 Alpine Node and uv builder manifests, installs Codex 0.153.4 with the existing wrapper,
+  adds an independent musl Python 3.12.11 runtime, installs MARGINAL/benchmark packages into that
+  runtime's site-packages, records source/task/tool labels, and invokes the lane CLI from `/app`.
 - `.dockerignore`: admits only the Astra package files required by the solver image.
 - `tests/benchmark/test_astra_pro_lane.py`: focused repository-isolation, validation, overwrite, and
   forwarding tests.
@@ -35,7 +35,9 @@ All checks passed!
 
 The image build uses task image
 `jefzda/sweap-images@sha256:d902632d1374cf0282a4ea301b82c296e13a41127308da0204aca87a4ba62c02`.
-Its final result and smoke checks are recorded below once complete.
+Despite earlier evaluator metadata describing Ubuntu 20.04/Python 3.8, this exact image is Alpine
+Linux 3.18.3. The solver therefore uses musl-compatible Node and standalone Python binaries. Its
+final image ID and no-inference executable smoke checks are recorded below once complete.
 
 ## Concerns
 
