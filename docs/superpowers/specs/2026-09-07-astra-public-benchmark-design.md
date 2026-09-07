@@ -14,11 +14,10 @@ unlabelled evidence retroactively to Astra.
 
 ## Evaluation
 
-Execution amendment, before scored inference: complete HumanEval+ v0.1.10 (164 tasks)
-using EvalPlus v0.3.1 in both conditions within existing quota. The previously proposed
-SWE-bench Pro run remains incomplete. Function-level results must not be represented as
-real-repository evidence or as equivalent to SWE-bench Pro. All accounting and isolation
-requirements below still apply.
+User correction, before scored inference: use SWE-bench Pro directly. HumanEval+ preparation
+is retained as unexecuted auxiliary infrastructure, not a substitute for repository evidence.
+Run a deterministic prefix of the full 731-task order until the quota reserve or an integrity
+gate stops execution; publish exact coverage, never call a prefix a complete benchmark.
 
 Target SWE-bench Pro Public using its official evaluator and pinned dataset and images.
 Run identical agent/model/reasoning/prompt/tool/timeout conditions OFF and ON, with
