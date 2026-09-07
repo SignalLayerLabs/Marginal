@@ -338,8 +338,11 @@ def _write_samples(
         temporary.replace(samples_dir / f"{lane}.jsonl")
 
 
-def _validate_config(config: BenchmarkConfig) -> tuple[tuple[HumanEvalTask, ...], str]:
+def _validate_config(
+    config: BenchmarkConfig,
+) -> tuple[tuple[HumanEvalTask, ...], str, str]:
     tasks = load_tasks(config.tasks_path)
+    input_sha256 = _sha256(config.tasks_path.read_bytes())
     try:
         protocol = config.protocol_path.read_bytes()
     except OSError as exc:
@@ -350,6 +353,18 @@ def _validate_config(config: BenchmarkConfig) -> tuple[tuple[HumanEvalTask, ...]
             "protocol SHA256 mismatch: "
             f"expected {config.protocol_sha256}, got {actual_protocol_hash}"
         )
+    try:
+        protocol_data = json.loads(protocol)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"immutable protocol is not valid JSON: {exc.msg}") from exc
+    if not isinstance(protocol_data, dict):
+        raise ValueError("immutable protocol must be a JSON object")
+    if protocol_data.get("task_inputs_sha256") != input_sha256:
+        raise ValueError("immutable protocol task input SHA256 does not match the task-only JSONL")
+    dataset = protocol_data.get("dataset")
+    dataset_version = protocol_data.get("dataset_version")
+    if not isinstance(dataset, str) or not dataset or not isinstance(dataset_version, str):
+        raise ValueError("immutable protocol must name its dataset and dataset version")
     if not config.codex_executable.is_file():
         raise ValueError(f"Codex executable does not exist: {config.codex_executable}")
     if not config.auth_source.is_file():
@@ -357,7 +372,7 @@ def _validate_config(config: BenchmarkConfig) -> tuple[tuple[HumanEvalTask, ...]
     run_root = config.run_root.resolve()
     if run_root == _SOURCE_ROOT or run_root.is_relative_to(_SOURCE_ROOT):
         raise ValueError("run root must be outside the source tree")
-    return tasks, _sha256(config.tasks_path.read_bytes())
+    return tasks, input_sha256, f"{dataset} {dataset_version}".strip()
 
 
 def run_benchmark(
@@ -367,7 +382,7 @@ def run_benchmark(
 ) -> dict[str, Any]:
     """Run a bounded number of new lanes and report exact resumable state."""
 
-    tasks, input_sha256 = _validate_config(config)
+    tasks, input_sha256, benchmark_name = _validate_config(config)
     config.run_root.mkdir(parents=True, exist_ok=True)
     schedule = _ordered_lanes(tasks)
     initial: dict[str, tuple[str, dict[str, Any] | None]] = {
@@ -471,7 +486,7 @@ def run_benchmark(
     )
     summary: dict[str, Any] = {
         "schema_version": 1,
-        "benchmark": "HumanEval+ v0.1.10",
+        "benchmark": benchmark_name,
         "input_sha256": input_sha256,
         "protocol_sha256": config.protocol_sha256,
         "expected_tasks": 164,

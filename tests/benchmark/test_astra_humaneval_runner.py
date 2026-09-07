@@ -34,7 +34,17 @@ def _config(tmp_path: Path, *, maximum_new_lanes: int | None = None) -> Benchmar
     tasks_path = tmp_path / "tasks.jsonl"
     _write_tasks(tasks_path)
     protocol_path = tmp_path / "protocol.md"
-    protocol_path.write_text("frozen protocol\n", encoding="utf-8")
+    protocol_path.write_text(
+        json.dumps(
+            {
+                "dataset": "FixtureEval+",
+                "dataset_version": "v-test",
+                "task_inputs_sha256": hashlib.sha256(tasks_path.read_bytes()).hexdigest(),
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     executable = tmp_path / "codex"
     executable.write_text("fixture\n", encoding="utf-8")
     auth = tmp_path / "auth.json"
@@ -167,6 +177,7 @@ def test_bounded_run_creates_independent_detached_lanes_in_frozen_order(tmp_path
     summary = run_benchmark(config, run_task_fn=fake_run_task)
 
     assert summary["launched"] == ["HumanEval/145:off", "HumanEval/145:on"]
+    assert summary["benchmark"] == "FixtureEval+ v-test"
     assert {(row[0], row[1]) for row in observed} == {
         ("HumanEval/145", "baseline"),
         ("HumanEval/145", "marginal"),
@@ -220,7 +231,9 @@ def test_resume_trusts_matching_records_without_reexecution_and_blocks_hash_drif
     assert second["launched"] == ["HumanEval/145:on"]
     assert calls == ["HumanEval/145:baseline", "HumanEval/145:marginal"]
 
-    config.protocol_path.write_text("changed protocol\n", encoding="utf-8")
+    protocol = json.loads(config.protocol_path.read_text(encoding="utf-8"))
+    protocol["experiment"] = "changed-protocol"
+    config.protocol_path.write_text(json.dumps(protocol) + "\n", encoding="utf-8")
     changed = BenchmarkConfig(
         **{
             **config.as_kwargs(),
@@ -233,6 +246,26 @@ def test_resume_trusts_matching_records_without_reexecution_and_blocks_hash_drif
     assert drift["hash_mismatch_lanes"] == ["HumanEval/145:off", "HumanEval/145:on"]
     assert drift["complete"] is False
     assert calls == ["HumanEval/145:baseline", "HumanEval/145:marginal"]
+
+
+def test_protocol_must_bind_the_exact_task_only_input_before_creating_run_root(
+    tmp_path: Path,
+) -> None:
+    config = _config(tmp_path, maximum_new_lanes=1)
+    protocol = json.loads(config.protocol_path.read_text(encoding="utf-8"))
+    protocol["task_inputs_sha256"] = "0" * 64
+    config.protocol_path.write_text(json.dumps(protocol) + "\n", encoding="utf-8")
+    mismatched = BenchmarkConfig(
+        **{
+            **config.as_kwargs(),
+            "protocol_sha256": hashlib.sha256(config.protocol_path.read_bytes()).hexdigest(),
+        }
+    )
+
+    with pytest.raises(ValueError, match="task input SHA256"):
+        run_benchmark(mismatched)
+
+    assert not config.run_root.exists()
 
 
 def test_partial_lane_is_retained_diagnosed_and_blocks_new_launches(tmp_path: Path) -> None:
