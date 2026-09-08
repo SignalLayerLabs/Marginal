@@ -82,6 +82,11 @@ reduce the model's internal reasoning budget. The complete public OFF/ON evaluat
 outstanding. See [Astra evaluation status](benchmark/astra/README.md) for exact preflight facts
 and what remains before a performance claim is justified.
 
+The [SWE-bench Pro protocol and evidence](benchmark/astra/pro/README.md) include all 731
+planned task IDs and the first passing official reference check. That reference check is
+not a model score. A complete OFF/ON run requires 1,462 model executions; no complete
+performance result is claimed until those executions and their grading are available.
+
 ### Evidence gates
 
 1. **Observe** — collect derived action, outcome, coverage, state and evidence signals locally.

@@ -1,4 +1,4 @@
-# GPT-6 Astra evaluation status — 2026-09-07
+# GPT-6 Astra evaluation status — updated 2026-09-08
 
 **No complete Astra OFF/ON benchmark has been executed. No token-saving claim is supported.**
 
@@ -28,8 +28,8 @@ preparation was withdrawn before any scored model inference.
 | Codex 0.153.4 + Astra | Minimal no-tool request completed successfully |
 | Successful request usage | 16,474 input; 11,520 cached input; 7 output; 0 reasoning output |
 | Docker | Existing local benchmark VM started; Docker 29.5.2, 6 CPUs, about 12 GiB RAM |
-| Existing task images | Three historical SWE-bench Lite smoke images; no Pro images |
-| First deterministic Pro image | Manifest reachable; 4,663,263,960 compressed layer bytes |
+| Existing task images | Three historical Lite smoke images retained; first Pro image downloaded |
+| First deterministic Pro image | Pinned in [Pro preflight](pro/preflight.json); actual OS is Alpine 3.18.3 |
 | Official Pro grading | First reference patch passed; 1,350.20 seconds under x86 QEMU |
 | Scored Astra task trajectories | **0 baseline / 0 MARGINAL** |
 
