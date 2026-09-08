@@ -19,7 +19,7 @@ RUN /uv python install cpython-3.12.11-linux-x86_64-musl \
     && "${installed_python}" --version
 
 COPY --from=codex_builder /usr/local/lib/node_modules/@openai/codex /overlay/opt/marginal-tools/lib/codex
-COPY benchmark/astra/pro/codex-native-wrapper.sh /overlay/opt/marginal-tools/bin/codex
+COPY benchmark/container/pro-codex-native-wrapper.sh /overlay/opt/marginal-tools/bin/codex
 COPY . /overlay/opt/marginal
 
 RUN installed_python="$(/uv python find cpython-3.12.11-linux-x86_64-musl)" \

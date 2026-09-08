@@ -35,7 +35,7 @@ def test_pro_launcher_executes_packaged_native_codex_with_vendor_environment(
     vendor_rg.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     native_codex.chmod(0o755)
     vendor_rg.chmod(0o755)
-    launcher = Path("benchmark/astra/pro/codex-native-wrapper.sh")
+    launcher = Path("benchmark/container/pro-codex-native-wrapper.sh")
     environment = {
         **os.environ,
         "CODEX_PACKAGE_ROOT": str(package_root),
