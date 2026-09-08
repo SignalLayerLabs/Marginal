@@ -24,11 +24,11 @@ def test_pro_launcher_executes_packaged_native_codex_with_vendor_environment(
     native_codex.write_text(
         "#!/bin/sh\n"
         "set -eu\n"
-        "test \"$1\" = --version\n"
-        "test \"$(command -v rg)\" = \"$CODEX_TEST_EXPECTED_RG\"\n"
-        "test \"$CODEX_MANAGED_PACKAGE_ROOT\" = \"$CODEX_TEST_EXPECTED_ROOT\"\n"
-        "test \"$CODEX_MANAGED_BY_NPM\" = 1\n"
-        "test \"${CODEX_MANAGED_BY_BUN-unset}\" = unset\n"
+        'test "$1" = --version\n'
+        'test "$(command -v rg)" = "$CODEX_TEST_EXPECTED_RG"\n'
+        'test "$CODEX_MANAGED_PACKAGE_ROOT" = "$CODEX_TEST_EXPECTED_ROOT"\n'
+        'test "$CODEX_MANAGED_BY_NPM" = 1\n'
+        'test "${CODEX_MANAGED_BY_BUN-unset}" = unset\n'
         "printf 'codex 0.153.4\\n'\n",
         encoding="utf-8",
     )
