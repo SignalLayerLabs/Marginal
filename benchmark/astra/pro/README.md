@@ -1,6 +1,6 @@
 # GPT-6 Astra × MARGINAL on SWE-bench Pro
 
-**Execution in progress, not a completed performance benchmark.** The full experiment needs
+**Incomplete; execution paused to preserve remaining account quota (2026-09-08).** The full experiment needs
 731 problems × two independent conditions = 1,462 model executions and official grading.
 A passing reference patch is not evidence that MARGINAL improves quality or reduces tokens.
 
@@ -66,3 +66,13 @@ data or Docker socket. Never publish authentication files. Preserve failed attem
 their usage; do not rerun solved or failed model attempts to select a better result.
 
 No complete benchmark score or measured token-saving percentage is available yet.
+
+## Sprint closeout — 2026-09-08
+
+The native Codex launcher was corrected for the actual Alpine image without upgrading task
+dependencies. Python/module import and `codex-cli 0.153.4` passed the actual-image build check.
+The launcher review passed, and eight focused tests passed. A CI formatting failure in the
+new test was corrected in commit `6470794`; this is separate from runtime validation.
+
+The complete paired experiment remains outstanding. Do not use the reference check or
+runtime smoke as a model score, a token-saving result, or a completed SWE-bench Pro benchmark.
