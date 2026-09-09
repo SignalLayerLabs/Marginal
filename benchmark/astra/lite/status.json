@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "updated_date": "2026-09-09",
+  "complete": false,
+  "contract_frozen": true,
+  "test_split_inference_started": false,
+  "required_model_lanes": 600,
+  "baseline_model_lanes": 0,
+  "marginal_model_lanes": 0,
+  "model_predictions_graded": 0,
+  "validation": {
+    "started": false,
+    "is_included_in_test_score": false
+  },
+  "claim": "The 300-task public contract is frozen. No Lite test-split model inference, grading, performance result, or token-saving result exists."
+}
