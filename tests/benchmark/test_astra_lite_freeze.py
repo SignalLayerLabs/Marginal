@@ -2,74 +2,40 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 import pytest
 from benchmark.astra.lite.freeze import (
+    CANONICAL_MANIFEST_SHA256,
+    CANONICAL_PROTOCOL,
+    CANONICAL_PROTOCOL_SHA256,
     MANIFEST_FIELDS,
-    PUBLIC_SEED,
     FreezeError,
+    _task_from_row,
+    load_pinned_test_metadata,
     load_safe_manifest,
 )
 
-
-def _order(instance_id: str) -> str:
-    return hashlib.sha256(f"{PUBLIC_SEED}\0{instance_id}".encode()).hexdigest()
-
-
-def _conditions(instance_id: str) -> list[str]:
-    digest = hashlib.sha256(f"{PUBLIC_SEED}\0{instance_id}\0condition".encode()).digest()
-    first = "marginal" if digest[-1] & 1 else "baseline"
-    return [first, "baseline" if first == "marginal" else "marginal"]
+ROOT = Path(__file__).resolve().parents[2]
+LITE = ROOT / "benchmark" / "astra" / "lite"
+MANIFEST = LITE / "task-manifest.jsonl"
+PROTOCOL = LITE / "protocol.json"
 
 
-def _row(position: int) -> dict[str, object]:
-    instance_id = f"owner__repo-{position:04d}"
-    return {
-        "instance_id": instance_id,
-        "repo": "owner/repo",
-        "base_commit": f"{position:040x}",
-        "official_image": f"swebench/sweb.eval.x86_64.owner_1776_repo-{position:04d}:latest",
-        "problem_hash": hashlib.sha256(instance_id.encode("utf-8")).hexdigest(),
-        "schedule_position": position,
-        "condition_order": _conditions(instance_id),
-    }
+def _copy_contract(tmp_path: Path) -> Path:
+    shutil.copy2(MANIFEST, tmp_path / MANIFEST.name)
+    shutil.copy2(PROTOCOL, tmp_path / PROTOCOL.name)
+    return tmp_path / MANIFEST.name
 
 
-def _write_contract(directory: Path, rows: list[dict[str, object]]) -> Path:
-    manifest = directory / "task-manifest.jsonl"
-    text = "".join(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n" for row in rows)
-    manifest.write_text(text, encoding="utf-8")
-    (directory / "protocol.json").write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "dataset": "SWE-bench/SWE-bench_Lite",
-                "dataset_revision": "b0dde1093fe417d83b7184254edf8199c1f0dff5",
-                "split": "test",
-                "task_count": 300,
-                "public_seed": PUBLIC_SEED,
-                "task_manifest_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
-            }
-        ),
-        encoding="utf-8",
-    )
-    return manifest
+def test_committed_artifacts_are_the_canonical_full_solver_safe_contract() -> None:
+    tasks = load_safe_manifest(MANIFEST)
+    protocol = json.loads(PROTOCOL.read_text(encoding="utf-8"))
 
-
-def _valid_manifest(tmp_path: Path) -> Path:
-    rows = sorted(
-        (_row(position) for position in range(300)),
-        key=lambda row: _order(str(row["instance_id"])),
-    )
-    for position, row in enumerate(rows):
-        row["schedule_position"] = position
-    return _write_contract(tmp_path, rows)
-
-
-def test_load_safe_manifest_exports_only_the_frozen_solver_safe_contract(tmp_path: Path) -> None:
-    tasks = load_safe_manifest(_valid_manifest(tmp_path))
-
+    assert hashlib.sha256(PROTOCOL.read_bytes()).hexdigest() == CANONICAL_PROTOCOL_SHA256
+    assert hashlib.sha256(MANIFEST.read_bytes()).hexdigest() == CANONICAL_MANIFEST_SHA256
+    assert protocol == CANONICAL_PROTOCOL
     assert len(tasks) == 300
     assert len({task.instance_id for task in tasks}) == 300
     assert (
@@ -77,49 +43,62 @@ def test_load_safe_manifest_exports_only_the_frozen_solver_safe_contract(tmp_pat
         == 600
     )
     assert tuple(tasks[0].__dataclass_fields__) == MANIFEST_FIELDS
-    assert all(task.schedule_position == position for position, task in enumerate(tasks))
+
+
+def test_committed_manifest_exactly_matches_pinned_safe_dataset_projection() -> None:
+    tasks = load_safe_manifest(MANIFEST)
+    projected = load_pinned_test_metadata()
+
+    assert {(task.instance_id, task.repo, task.base_commit) for task in tasks} == {
+        (row.instance_id, row.repo, row.base_commit) for row in projected
+    }
 
 
 @pytest.mark.parametrize(
-    ("mutate", "message"),
+    ("file_name", "mutate", "message"),
     [
-        (lambda rows: rows.pop(), "exactly 300"),
-        (lambda rows: rows.__setitem__(1, dict(rows[0])), "duplicate"),
-        (lambda rows: rows[0].__setitem__("hints_text", "do not expose"), "unsafe fields"),
-        (lambda rows: rows[0].__setitem__("base_commit", "not-a-commit"), "base_commit"),
+        (
+            "protocol.json",
+            lambda value: value.__setitem__("model", "forged-model"),
+            "protocol SHA-256",
+        ),
+        (
+            "task-manifest.jsonl",
+            lambda value: value[0].__setitem__("base_commit", "0" * 40),
+            "protocol SHA-256",
+        ),
     ],
 )
-def test_load_safe_manifest_rejects_unsafe_or_incomplete_contracts(
-    tmp_path: Path, mutate: object, message: str
+def test_loader_rejects_a_changed_artifact_even_when_its_sibling_is_updated(
+    tmp_path: Path, file_name: str, mutate: object, message: str
 ) -> None:
-    manifest = _valid_manifest(tmp_path)
-    rows = [json.loads(line) for line in manifest.read_text(encoding="utf-8").splitlines()]
+    manifest = _copy_contract(tmp_path)
     assert callable(mutate)
-    mutate(rows)
-    _write_contract(tmp_path, rows)
+    changed = tmp_path / file_name
+    if file_name == "protocol.json":
+        value = json.loads(changed.read_text(encoding="utf-8"))
+        mutate(value)
+        changed.write_text(json.dumps(value, sort_keys=True), encoding="utf-8")
+    else:
+        rows = [json.loads(line) for line in changed.read_text(encoding="utf-8").splitlines()]
+        mutate(rows)
+        text = "".join(
+            json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n" for row in rows
+        )
+        changed.write_text(text, encoding="utf-8")
+        protocol = json.loads((tmp_path / "protocol.json").read_text(encoding="utf-8"))
+        protocol["task_manifest_sha256"] = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        (tmp_path / "protocol.json").write_text(
+            json.dumps(protocol, sort_keys=True), encoding="utf-8"
+        )
 
     with pytest.raises(FreezeError, match=message):
         load_safe_manifest(manifest)
 
 
-def test_load_safe_manifest_rejects_an_altered_manifest_hash(tmp_path: Path) -> None:
-    manifest = _valid_manifest(tmp_path)
-    rows = [json.loads(line) for line in manifest.read_text(encoding="utf-8").splitlines()]
-    rows[0]["problem_hash"] = "0" * 64
-    text = "".join(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n" for row in rows)
-    manifest.write_text(text, encoding="utf-8")
-
-    with pytest.raises(FreezeError, match="SHA-256"):
-        load_safe_manifest(manifest)
-
-
-def test_load_safe_manifest_rejects_a_schedule_that_does_not_match_the_public_seed(
-    tmp_path: Path,
-) -> None:
-    manifest = _valid_manifest(tmp_path)
-    rows = [json.loads(line) for line in manifest.read_text(encoding="utf-8").splitlines()]
-    rows[0]["condition_order"] = list(reversed(rows[0]["condition_order"]))
-    _write_contract(tmp_path, rows)
+def test_malformed_condition_order_raises_freeze_error() -> None:
+    row = json.loads(MANIFEST.read_text(encoding="utf-8").splitlines()[0])
+    row["condition_order"] = [["baseline"], "marginal"]
 
     with pytest.raises(FreezeError, match="condition_order"):
-        load_safe_manifest(manifest)
+        _task_from_row(row)

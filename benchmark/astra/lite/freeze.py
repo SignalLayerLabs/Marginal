@@ -7,8 +7,10 @@ Issue text is hashed while freezing and is acquired later through the isolated t
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import re
+import urllib.request
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,6 +20,8 @@ PUBLIC_SEED = "81b598cbff3bff863cbbb4a3dea1489ce9dd3f2070e6bf766befb25cd436cd9b"
 DATASET = "SWE-bench/SWE-bench_Lite"
 DATASET_REVISION = "b0dde1093fe417d83b7184254edf8199c1f0dff5"
 TASK_COUNT = 300
+CANONICAL_MANIFEST_SHA256 = "7a687df2baf842757e90e4b2805a1cf094e4462b10961ec5e90db48a0c9595f7"
+CANONICAL_PROTOCOL_SHA256 = "cbefdbf49ac3ddfbdb15cec451f123125d02e53d67a46d938b612eedd310db14"
 MANIFEST_FIELDS = (
     "instance_id",
     "repo",
@@ -26,6 +30,51 @@ MANIFEST_FIELDS = (
     "problem_hash",
     "schedule_position",
     "condition_order",
+)
+CANONICAL_PROTOCOL: dict[str, object] = {
+    "schema_version": 1,
+    "experiment": "astra-swe-bench-lite-full-20260909",
+    "status": "frozen_no_test_inference",
+    "dataset": DATASET,
+    "dataset_revision": DATASET_REVISION,
+    "split": "test",
+    "task_count": TASK_COUNT,
+    "task_manifest_sha256": CANONICAL_MANIFEST_SHA256,
+    "manifest_fields": list(MANIFEST_FIELDS),
+    "public_seed": PUBLIC_SEED,
+    "task_order": "ascending sha256(seed + NUL + instance_id UTF-8)",
+    "condition_order": (
+        "first condition from low bit of sha256(seed + NUL + instance_id + NUL + condition); "
+        "other condition follows"
+    ),
+    "conditions": ["baseline", "marginal"],
+    "repetitions": 1,
+    "required_lanes": 600,
+    "evaluator_repository": "https://github.com/SWE-bench/SWE-bench",
+    "evaluator_commit": "02e7a74ffd0b707aab73d203fe87bdc7c76afc8e",
+    "evaluator": "v5 local Docker CLI",
+    "marginal_commit": "71c8eae",
+    "agent": "Codex CLI 0.153.4",
+    "model": "gpt-6-astra",
+    "reasoning_effort": "medium",
+    "timeout_seconds": 900,
+    "prompt_path": "benchmark/prompt_template.txt",
+    "prompt_sha256": "3a2ced1afb7e9a74176090db264259c52b6ebcf383d787a1030f83ecb6d67416",
+    "solver_input": "only issue text and a one-commit base-tree snapshot",
+    "solver_prohibitions": [
+        "hints",
+        "gold patches",
+        "benchmark tests",
+        "FAIL_TO_PASS",
+        "PASS_TO_PASS",
+        "evaluator feedback",
+        "other lane artifacts",
+    ],
+    "cost": "zero euros; existing Codex ChatGPT authentication only; no OpenAI API key",
+}
+_PINNED_TEST_PARQUET = (
+    "https://huggingface.co/datasets/SWE-bench/SWE-bench_Lite/resolve/"
+    f"{DATASET_REVISION}/data/test-00000-of-00001.parquet"
 )
 
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")
@@ -49,6 +98,15 @@ class LiteTask:
     problem_hash: str
     schedule_position: int
     condition_order: tuple[str, str]
+
+
+@dataclass(frozen=True, slots=True)
+class LiteSourceMetadata:
+    """Safe identity metadata projected from the pinned public dataset."""
+
+    instance_id: str
+    repo: str
+    base_commit: str
 
 
 def _sha256(value: str | bytes) -> str:
@@ -106,6 +164,7 @@ def _task_from_row(row: Mapping[str, Any]) -> LiteTask:
     if (
         not isinstance(conditions, list)
         or len(conditions) != 2
+        or not all(isinstance(condition, str) for condition in conditions)
         or set(conditions) != {"baseline", "marginal"}
     ):
         raise FreezeError("condition_order must contain baseline and marginal exactly once")
@@ -123,24 +182,59 @@ def _task_from_row(row: Mapping[str, Any]) -> LiteTask:
 def _load_protocol(path: Path, manifest_text: str) -> None:
     protocol_path = path.with_name("protocol.json")
     try:
-        protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+        protocol_text = protocol_path.read_text(encoding="utf-8")
+        protocol = json.loads(protocol_text)
     except (OSError, json.JSONDecodeError) as exc:
         raise FreezeError(f"protocol is unreadable: {protocol_path}") from exc
     if not isinstance(protocol, dict):
         raise FreezeError("protocol must be a JSON object")
-    if (
-        protocol.get("dataset") != DATASET
-        or protocol.get("dataset_revision") != DATASET_REVISION
-        or protocol.get("split") != "test"
-        or protocol.get("task_count") != TASK_COUNT
-        or protocol.get("public_seed") != PUBLIC_SEED
-    ):
+    if _sha256(protocol_text) != CANONICAL_PROTOCOL_SHA256:
+        raise FreezeError("protocol SHA-256 does not match the canonical Lite contract")
+    if protocol != CANONICAL_PROTOCOL:
         raise FreezeError("protocol does not match the frozen SWE-bench Lite contract")
-    expected_hash = protocol.get("task_manifest_sha256")
-    if not isinstance(expected_hash, str) or _HASH.fullmatch(expected_hash) is None:
-        raise FreezeError("protocol task_manifest_sha256 is invalid")
-    if _sha256(manifest_text) != expected_hash:
-        raise FreezeError("task manifest SHA-256 does not match protocol")
+    if _sha256(manifest_text) != CANONICAL_MANIFEST_SHA256:
+        raise FreezeError("manifest SHA-256 does not match the canonical Lite contract")
+    prompt_path = Path(__file__).resolve().parents[3] / "benchmark" / "prompt_template.txt"
+    try:
+        prompt_hash = _sha256(prompt_path.read_bytes())
+    except OSError as exc:
+        raise FreezeError("pinned benchmark prompt is unreadable") from exc
+    if prompt_hash != CANONICAL_PROTOCOL["prompt_sha256"]:
+        raise FreezeError("prompt SHA-256 does not match the frozen Lite contract")
+
+
+def load_pinned_test_metadata() -> tuple[LiteSourceMetadata, ...]:
+    """Read only identity columns from the exact pinned Lite test parquet.
+
+    PyArrow decodes solely the named safe columns; hints, patches, tests, and outcome fields are
+    neither projected nor returned.
+    """
+
+    try:
+        import pyarrow.parquet as pq
+    except ImportError as exc:
+        raise FreezeError("PyArrow is required for safe pinned-dataset projection") from exc
+    request = urllib.request.Request(_PINNED_TEST_PARQUET, headers={"User-Agent": "marginal/1"})
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            parquet = io.BytesIO(response.read())
+        table = pq.ParquetFile(parquet).read(columns=["instance_id", "repo", "base_commit"])
+    except (OSError, ValueError) as exc:
+        raise FreezeError("pinned SWE-bench Lite metadata projection failed") from exc
+    metadata: list[LiteSourceMetadata] = []
+    for row in table.to_pylist():
+        if not isinstance(row, dict):
+            raise FreezeError("pinned SWE-bench Lite metadata row is invalid")
+        metadata.append(
+            LiteSourceMetadata(
+                instance_id=_require_text(row, "instance_id"),
+                repo=_require_text(row, "repo"),
+                base_commit=_require_text(row, "base_commit"),
+            )
+        )
+    if len(metadata) != TASK_COUNT or len({row.instance_id for row in metadata}) != TASK_COUNT:
+        raise FreezeError("pinned SWE-bench Lite metadata is not the 300-task test split")
+    return tuple(metadata)
 
 
 def load_safe_manifest(path: str | Path) -> tuple[LiteTask, ...]:
