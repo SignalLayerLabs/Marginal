@@ -17,7 +17,10 @@ from typing import Any
 
 from benchmark.codex_adapter.runner import RunConfig, run_task
 
-_INSTANCE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*__[A-Za-z0-9][A-Za-z0-9._-]*-[1-9][0-9]*$")
+_INSTANCE_ID = re.compile(
+    r"^instance_[A-Za-z0-9][A-Za-z0-9._-]*__[A-Za-z0-9][A-Za-z0-9._-]*-"
+    r"[0-9a-f]{40}(?:-v(?:[0-9a-f]{40}|nan))?$"
+)
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _CONDITIONS = frozenset({"baseline", "marginal"})
 RunTask = Callable[[RunConfig], dict[str, Any]]

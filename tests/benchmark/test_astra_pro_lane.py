@@ -6,7 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from benchmark.astra.pro_lane import ProLaneConfig, prepare_repository, run_lane
+from benchmark.astra.pro_lane import ProLaneConfig, _validate_config, prepare_repository, run_lane
 from benchmark.codex_adapter.runner import RunConfig
 
 
@@ -56,7 +56,7 @@ def _config(tmp_path: Path, repo: Path, base_commit: str) -> ProLaneConfig:
     codex = tmp_path / "codex"
     codex.write_text("fixture\n", encoding="utf-8")
     return ProLaneConfig(
-        instance_id="acme__widgets-123",
+        instance_id="instance_protonmail__webclients-01ea5214d11e0df8b7170d91bafd34f23cb0f2b1",
         base_commit=base_commit,
         condition="marginal",
         worktree=repo,
@@ -156,10 +156,15 @@ def test_run_lane_forwards_fixed_solver_contract_and_records_hashes(tmp_path: Pa
 
     record = run_lane(config, run_task_fn=fake_run_task)
 
-    assert record == {"run_status": "completed", "instance_id": "acme__widgets-123"}
+    assert record == {
+        "run_status": "completed",
+        "instance_id": "instance_protonmail__webclients-01ea5214d11e0df8b7170d91bafd34f23cb0f2b1",
+    }
     assert len(observed) == 1
     forwarded = observed[0]
-    assert forwarded.instance_id == "acme__widgets-123"
+    assert forwarded.instance_id == (
+        "instance_protonmail__webclients-01ea5214d11e0df8b7170d91bafd34f23cb0f2b1"
+    )
     assert forwarded.condition == "marginal"
     assert forwarded.repetition == 1
     assert forwarded.worktree == repo.resolve()
@@ -176,3 +181,19 @@ def test_run_lane_forwards_fixed_solver_contract_and_records_hashes(tmp_path: Pa
     assert provenance["original_base_commit"] == base_commit
     assert provenance["snapshot_commit"] == forwarded.expected_base_commit
     assert provenance["original_base_tree"] == provenance["snapshot_tree"]
+
+
+def test_manifest_instance_ids_are_accepted_and_unsafe_ids_are_rejected(tmp_path: Path) -> None:
+    repo, base_commit, _future_commit = _repository(tmp_path)
+    config = _config(tmp_path, repo, base_commit)
+    manifest = (
+        Path(__file__).resolve().parents[2] / "benchmark" / "astra" / "pro" / "task-manifest.jsonl"
+    )
+    instance_ids = [json.loads(line)["instance_id"] for line in manifest.read_text().splitlines()]
+
+    for instance_id in instance_ids:
+        _validate_config(replace(config, instance_id=instance_id))
+
+    for instance_id in ("", "../escape", "instance_foo__bar-abc def", " instance_foo__bar-abc"):
+        with pytest.raises(ValueError, match="instance_id"):
+            _validate_config(replace(config, instance_id=instance_id))
