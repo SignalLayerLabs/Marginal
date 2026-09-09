@@ -1,8 +1,9 @@
-"""Execute one SWE-bench Pro lane inside its disposable task container."""
+"""Execute one SWE-bench Lite lane inside its disposable task container."""
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from collections.abc import Callable, Sequence
@@ -11,11 +12,11 @@ from pathlib import Path
 from typing import Any
 
 from benchmark.astra._snapshot import SnapshotProvenance, _git, prepare_exact_tree
+from benchmark.astra.lite.freeze import LiteTask
 from benchmark.codex_adapter.runner import RunConfig, run_task
 
-_INSTANCE_ID = re.compile(
-    r"^instance_[A-Za-z0-9][A-Za-z0-9._-]*__[A-Za-z0-9][A-Za-z0-9._-]*-"
-    r"[0-9a-f]{40}(?:-v(?:[0-9a-f]{40}|nan))?$"
+_CLASSIC_INSTANCE_ID = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9._-]*__[A-Za-z0-9][A-Za-z0-9._-]*-[0-9]+$"
 )
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _CONDITIONS = frozenset({"baseline", "marginal"})
@@ -23,11 +24,10 @@ RunTask = Callable[[RunConfig], dict[str, Any]]
 
 
 @dataclass(frozen=True, slots=True)
-class ProLaneConfig:
-    instance_id: str
-    base_commit: str
+class LiteLaneConfig:
+    task: LiteTask
     condition: str
-    worktree: Path = Path("/app")
+    worktree: Path = Path("/testbed")
     prompt_path: Path = Path("/marginal-input/prompt.txt")
     run_dir: Path = Path("/marginal-output/lane")
     codex_executable: Path = Path("/opt/marginal-tools/bin/codex")
@@ -40,10 +40,10 @@ def _absolute(path: Path, label: str) -> Path:
     return path.resolve()
 
 
-def _validate_config(config: ProLaneConfig) -> ProLaneConfig:
-    if _INSTANCE_ID.fullmatch(config.instance_id) is None:
-        raise ValueError("instance_id is not a valid SWE-bench instance ID")
-    if _COMMIT.fullmatch(config.base_commit) is None:
+def _validate_config(config: LiteLaneConfig) -> LiteLaneConfig:
+    if _CLASSIC_INSTANCE_ID.fullmatch(config.task.instance_id) is None:
+        raise ValueError("instance_id is not a valid classic SWE-bench Lite instance ID")
+    if _COMMIT.fullmatch(config.task.base_commit) is None:
         raise ValueError("base_commit must be a lowercase 40-character SHA")
     if config.condition not in _CONDITIONS:
         raise ValueError("condition must be baseline or marginal")
@@ -68,23 +68,21 @@ def _validate_config(config: ProLaneConfig) -> ProLaneConfig:
         raise FileExistsError(f"run directory already exists: {run_dir}")
     if run_dir == worktree or run_dir.is_relative_to(worktree):
         raise ValueError("run directory must be outside the task repository")
-
     try:
         top_level = str(_git(worktree, "rev-parse", "--show-toplevel")).strip()
         resolved_commit = str(
-            _git(worktree, "rev-parse", f"{config.base_commit}^{{commit}}")
+            _git(worktree, "rev-parse", f"{config.task.base_commit}^{{commit}}")
         ).strip()
     except RuntimeError as exc:
         raise ValueError(f"task repository validation failed: {exc}") from exc
     if Path(top_level).resolve() != worktree:
         raise ValueError("worktree must be the task repository root")
-    if resolved_commit != config.base_commit:
+    if resolved_commit != config.task.base_commit:
         raise ValueError("base_commit did not resolve to the exact requested commit")
-    tree_entries = _git(worktree, "ls-tree", "-r", "-z", config.base_commit, text=False)
+    tree_entries = _git(worktree, "ls-tree", "-r", "-z", config.task.base_commit, text=False)
     assert isinstance(tree_entries, bytes)
-    for entry in tree_entries.split(b"\0"):
-        if entry.startswith(b"160000 commit "):
-            raise ValueError("base_commit contains an unsupported gitlink")
+    if any(entry.startswith(b"160000 commit ") for entry in tree_entries.split(b"\0")):
+        raise ValueError("base_commit contains an unsupported gitlink")
     return replace(
         config,
         worktree=worktree,
@@ -95,26 +93,22 @@ def _validate_config(config: ProLaneConfig) -> ProLaneConfig:
     )
 
 
-def prepare_repository(config: ProLaneConfig) -> SnapshotProvenance:
-    """Replace the task checkout with a detached one-commit base snapshot."""
+def prepare_repository(config: LiteLaneConfig) -> SnapshotProvenance:
+    """Replace the Lite task checkout with a detached one-commit base snapshot."""
 
     config = _validate_config(config)
-    return prepare_exact_tree(config.worktree, config.base_commit, lane_name="Pro")
+    return prepare_exact_tree(config.worktree, config.task.base_commit, lane_name="Lite")
 
 
-def run_lane(
-    config: ProLaneConfig,
-    *,
-    run_task_fn: RunTask = run_task,
-) -> dict[str, Any]:
-    """Prepare and execute one fixed-contract Pro solver lane."""
+def run_lane(config: LiteLaneConfig, *, run_task_fn: RunTask = run_task) -> dict[str, Any]:
+    """Prepare and execute one fixed-contract Lite solver lane."""
 
     config = _validate_config(config)
     provenance = prepare_repository(config)
     prompt = config.prompt_path.read_text(encoding="utf-8")
     record = run_task_fn(
         RunConfig(
-            instance_id=config.instance_id,
+            instance_id=config.task.instance_id,
             condition=config.condition,
             repetition=1,
             worktree=config.worktree,
@@ -129,9 +123,16 @@ def run_lane(
             codex_version="0.153.4",
         )
     )
-    provenance_path = config.run_dir / "pro-lane.json"
+    provenance_path = config.run_dir / "lite-lane.json"
+    payload = {
+        **asdict(provenance),
+        "instance_id": config.task.instance_id,
+        "repo": config.task.repo,
+        "problem_hash": config.task.problem_hash,
+        "rendered_prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+    }
     with provenance_path.open("x", encoding="utf-8") as output:
-        json.dump(asdict(provenance), output, indent=2, sort_keys=True)
+        json.dump(payload, output, indent=2, sort_keys=True)
         output.write("\n")
     return record
 
@@ -139,23 +140,34 @@ def run_lane(
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instance-id", required=True)
+    parser.add_argument("--repo", required=True)
     parser.add_argument("--base-commit", required=True)
+    parser.add_argument("--official-image", required=True)
+    parser.add_argument("--problem-hash", required=True)
+    parser.add_argument("--schedule-position", required=True, type=int)
     parser.add_argument("--condition", required=True, choices=sorted(_CONDITIONS))
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    config = ProLaneConfig(
-        instance_id=args.instance_id,
-        base_commit=args.base_commit,
+    config = LiteLaneConfig(
+        task=LiteTask(
+            instance_id=args.instance_id,
+            repo=args.repo,
+            base_commit=args.base_commit,
+            official_image=args.official_image,
+            problem_hash=args.problem_hash,
+            schedule_position=args.schedule_position,
+            condition_order=("baseline", "marginal"),
+        ),
         condition=args.condition,
     )
     record = run_lane(config)
     print(
         json.dumps(
             {
-                "instance_id": config.instance_id,
+                "instance_id": config.task.instance_id,
                 "condition": config.condition,
                 "run_status": record.get("run_status"),
                 "run_dir": str(config.run_dir),
