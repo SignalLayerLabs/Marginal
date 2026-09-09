@@ -4,10 +4,11 @@ import json
 import os
 import subprocess
 import textwrap
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from benchmark.codex_adapter.runner import RunConfig, run_task
+from benchmark.codex_adapter.runner import RunConfig, _command, run_task
 from jsonschema import Draft202012Validator
 
 
@@ -182,6 +183,17 @@ def test_off_has_no_marginal_process_hook_state_or_environment(tmp_path: Path) -
         )
     )
     Draft202012Validator(schema).validate(record)
+
+
+def test_off_and_on_have_identical_codex_commands_before_hook_installation(tmp_path: Path) -> None:
+    baseline = _config(tmp_path, condition="baseline")
+    marginal = replace(baseline, condition="marginal")
+    environment = {"CODEX_HOME": "/isolated/codex", "HOME": "/isolated/home"}
+
+    baseline_command = _command(baseline, environment)
+    marginal_command = _command(marginal, environment)
+
+    assert baseline_command == marginal_command
 
 
 def test_on_starts_daemon_and_loads_only_generated_isolated_home_hooks(tmp_path: Path) -> None:

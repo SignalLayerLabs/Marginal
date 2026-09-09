@@ -12,6 +12,10 @@ benchmark/*
 !benchmark/astra/
 benchmark/astra/*
 !benchmark/astra/__init__.py
+!benchmark/astra/_snapshot.py
+!benchmark/astra/lite_lane.py
+!benchmark/astra/lite/
+!benchmark/astra/lite/freeze.py
 !benchmark/astra/pro_lane.py
 !benchmark/container/
 !benchmark/container/**

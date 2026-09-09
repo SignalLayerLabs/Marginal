@@ -98,36 +98,30 @@ def _command(config: RunConfig, shell_environment: Mapping[str, str]) -> list[st
         "-a",
         "never",
         "exec",
+        "--ignore-rules",
+        "--ephemeral",
+        "--json",
+        "--color",
+        "never",
+        "--strict-config",
+        "--dangerously-bypass-hook-trust",
+        "-m",
+        config.model,
+        "-c",
+        f'model_reasoning_effort="{config.reasoning_effort}"',
+        "-c",
+        "sandbox_workspace_write.network_access=false",
+        "-c",
+        'shell_environment_policy.inherit="none"',
+        "-c",
+        "shell_environment_policy.ignore_default_excludes=false",
+        "-c",
+        f"shell_environment_policy.set={_toml_inline_table(shell_environment)}",
+        "-s",
+        "workspace-write",
+        "-C",
+        str(config.worktree),
     ]
-    if config.condition == "baseline":
-        command.append("--ignore-user-config")
-    command.extend(
-        [
-            "--ignore-rules",
-            "--ephemeral",
-            "--json",
-            "--color",
-            "never",
-            "--strict-config",
-            "--dangerously-bypass-hook-trust",
-            "-m",
-            config.model,
-            "-c",
-            f'model_reasoning_effort="{config.reasoning_effort}"',
-            "-c",
-            "sandbox_workspace_write.network_access=false",
-            "-c",
-            'shell_environment_policy.inherit="none"',
-            "-c",
-            "shell_environment_policy.ignore_default_excludes=false",
-            "-c",
-            f"shell_environment_policy.set={_toml_inline_table(shell_environment)}",
-            "-s",
-            "workspace-write",
-            "-C",
-            str(config.worktree),
-        ]
-    )
     for feature in _FEATURES_DISABLED:
         command.extend(("--disable", feature))
     command.append("-")
@@ -333,7 +327,7 @@ def _configuration_hash(config: RunConfig) -> str:
 
 
 def run_task(config: RunConfig) -> dict[str, Any]:
-    """Run one already-materialized task and write local raw evidence plus one record."""
+    """Run one task with a matched Codex command; ON differs only by isolated hook treatment."""
 
     worktree = config.worktree.resolve()
     run_dir = config.run_dir.resolve()

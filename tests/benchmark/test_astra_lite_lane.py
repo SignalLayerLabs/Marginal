@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from benchmark.astra.lite.freeze import LiteTask
 from benchmark.astra.lite_lane import LiteLaneConfig, _validate_config, prepare_repository, run_lane
-from benchmark.codex_adapter.runner import RunConfig
+from benchmark.codex_adapter.runner import RunConfig, _command
 
 
 def _git(repo: Path, *args: str, check: bool = True) -> str:
@@ -150,6 +150,10 @@ def test_off_and_on_forward_identical_solver_config_except_condition(tmp_path: P
         marginal_config.timeout_seconds,
         marginal_config.codex_version,
         marginal_config.extra_env,
+    )
+    shell_environment = {"CODEX_HOME": "/isolated/codex", "HOME": "/isolated/home"}
+    assert _command(baseline_config, shell_environment) == _command(
+        replace(baseline_config, condition="marginal"), shell_environment
     )
     for run_config in observed:
         provenance = json.loads((run_config.run_dir / "lite-lane.json").read_text(encoding="utf-8"))
