@@ -1,6 +1,6 @@
 # GPT-6 Astra × MARGINAL on SWE-bench Pro
 
-**Incomplete; execution paused to preserve remaining account quota (2026-09-08).** The full experiment needs
+**Incomplete; no new inference is started above the quota reserve (updated 2026-09-09).** The full experiment needs
 731 problems × two independent conditions = 1,462 model executions and official grading.
 A passing reference patch is not evidence that MARGINAL improves quality or reduces tokens.
 
@@ -10,6 +10,8 @@ A passing reference patch is not evidence that MARGINAL improves quality or redu
 - [All 731 task IDs](task-manifest.jsonl), ordered by SHA256 of instance ID before inference.
 - [Preflight](preflight.json): the first official environment and measured validation facts.
 - [Official reference verdict](gold-eval-results.json) and [parsed tests](gold-test-results.json).
+- [Execution status](execution-status.json): actual coverage, preliminary failures and unavailable metrics.
+- [Pinned September 9 invocation](invocation-20260909.json): image, corrected source overlay and prompt hashes.
 
 The first reference patch passed official grading in 1,350.20 seconds on an Apple Silicon
 Mac running the x86 image under QEMU. This is an infrastructure check, not an Astra score.
@@ -76,3 +78,14 @@ new test was corrected in commit `6470794`; this is separate from runtime valida
 
 The complete paired experiment remains outstanding. Do not use the reference check or
 runtime smoke as a model score, a token-saving result, or a completed SWE-bench Pro benchmark.
+
+On September 9, the runner help and a local sandbox shell check passed. An actual launch
+then exposed classic-vs-Pro instance-ID validation, fixed and tested against all 731 IDs.
+The next attempt stopped at repository integrity: 16 original tracked fixtures matched ignore
+rules and were omitted from the fresh index. Both failures occurred before provider inference;
+they are not model samples. The equality check was retained, not bypassed.
+
+The tracked-file staging fix subsequently passed an offline check in the same solver image:
+the complete recursive tree matched the original base, including all previously omitted files.
+No credentials were mounted and no provider request was made. The execution-status artifact
+records the image, fix commit and matching tree hashes. Model coverage remains **0/1,462**.

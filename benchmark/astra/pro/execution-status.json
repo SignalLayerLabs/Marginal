@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "updated_date": "2026-09-09",
+  "complete": false,
+  "required_model_lanes": 1462,
+  "baseline_model_lanes": 0,
+  "marginal_model_lanes": 0,
+  "model_predictions_graded": 0,
+  "paired_quality_result": null,
+  "paired_token_reduction": null,
+  "reference_checks": {"executed": 1, "passed": 1, "is_model_score": false},
+  "pre_provider_attempts": [
+    {"stage": "instance_id_validation", "result": "failed", "provider_requests": 0, "fixed_in": "e4161548dcce8198913610b1af260e0a1382739e"},
+    {"stage": "repository_snapshot_integrity", "result": "failed", "provider_requests": 0, "expected_tree": "20f05efdb071fa3148288d15abcb6b4b0c194a03", "observed_tree": "37708e37e0be4bea2a21c07b57f130d62f4a7acc", "missing_tracked_files": 16, "extra_files": 0, "changed_files": 0, "cause": "Fresh git add omitted original tracked files matching ignore rules"}
+  ],
+  "snapshot_fix_verification": {
+    "fix_commit": "d9b167fbb071836ddb74d32c639453a23a605e31",
+    "solver_image_id": "sha256:31ce815dc5c1324de5f0a73dae5d2a0cd42ff49db7d2e34cb0a274c62c9b458e",
+    "source_override": "benchmark/astra/pro_lane.py",
+    "instance_id": "instance_protonmail__webclients-01ea5214d11e0df8b7170d91bafd34f23cb0f2b1",
+    "base_commit": "24c785b20c23f614eeb9df7073247aeb244c4329",
+    "original_base_tree": "20f05efdb071fa3148288d15abcb6b4b0c194a03",
+    "snapshot_tree": "20f05efdb071fa3148288d15abcb6b4b0c194a03",
+    "exact_recursive_tree_comparison": "passed",
+    "network": "none",
+    "credentials_mounted": false,
+    "provider_requests": 0,
+    "is_model_score": false
+  },
+  "claim": "No measured model performance or token-saving result. Full SWE-bench Pro evaluation remains incomplete."
+}
