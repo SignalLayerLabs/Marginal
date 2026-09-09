@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-09",
+  "status": "frozen_before_provider_inference",
+  "scope": "first task in the full published order; not a complete benchmark",
+  "instance_id": "instance_protonmail__webclients-01ea5214d11e0df8b7170d91bafd34f23cb0f2b1",
+  "base_commit": "24c785b20c23f614eeb9df7073247aeb244c4329",
+  "solver_image_id": "sha256:31ce815dc5c1324de5f0a73dae5d2a0cd42ff49db7d2e34cb0a274c62c9b458e",
+  "solver_image_source_commit": "a167ab0c9d0c96d0de76c75785ac0906d4545fb5",
+  "source_override": {
+    "file": "benchmark/astra/pro_lane.py",
+    "commit": "e4161548dcce8198913610b1af260e0a1382739e",
+    "sha256": "104197b8e51c709f34cc6a880124391cc68a7a7e478ef0631e9fa2621a5a3134",
+    "mode": "read-only bind mount, identical in both conditions",
+    "targets": [
+      "/opt/marginal/benchmark/astra/pro_lane.py",
+      "/opt/python/cpython-3.12.11-linux-x86_64-musl/lib/python3.12/site-packages/benchmark/astra/pro_lane.py"
+    ],
+    "reason": "Correct classic numeric-ID validation to the published Pro hash-ID format without rebuilding unchanged tools"
+  },
+  "prompt_sha256": "a96856fff430ba01ad1cc7aacb72efb3188db1d00faa33f0c6e514ee2a0cfbc0",
+  "runtime_checks": {
+    "python_module_import": "passed",
+    "codex_version": "codex-cli 0.153.4",
+    "pro_lane_help": "passed",
+    "local_sandbox_shell_exit_zero": "passed"
+  },
+  "prior_attempt": {
+    "stage": "input validation",
+    "error": "instance_id is not a valid SWE-bench instance ID",
+    "provider_requests": 0,
+    "model_sample": false
+  },
+  "native_plugin_promotion": "none; Shadow unchanged",
+  "benchmark_intervention": "experimental adapter, not native default Shadow",
+  "no_new_inference_above_quota_used_percent": 65
+}
