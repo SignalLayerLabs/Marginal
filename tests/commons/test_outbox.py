@@ -279,6 +279,24 @@ def test_outbox_rejects_a_symlinked_queue_directory_without_writing_outside(tmp_
     assert list(outside.iterdir()) == []
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX advisory locks are required")
+def test_atomic_enqueue_does_not_contend_on_the_outbox_scan_lock(tmp_path: Path) -> None:
+    import fcntl
+
+    outbox = CommonsOutbox(tmp_path)
+    assert outbox.enqueue(batch=_batch()) is not None
+    assert len(outbox.pending(limit=1).entries) == 1
+    lock = (outbox.queue_path / ".outbox.lock").open("r+b")
+    fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+    try:
+        queued = outbox.enqueue(batch=_batch())
+    finally:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+        lock.close()
+
+    assert queued is not None
+
+
 @pytest.mark.skipif(os.name == "nt", reason="POSIX process locks are required")
 def test_concurrent_processes_publish_complete_unique_entries(tmp_path: Path) -> None:
     context = multiprocessing.get_context("fork")

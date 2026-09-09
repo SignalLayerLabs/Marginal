@@ -11,7 +11,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
-from ._storage import atomic_create_at, locked_directory, read_bounded_at
+from ._storage import (
+    atomic_create_at,
+    ensure_lock_file_at,
+    locked_directory,
+    opened_directory,
+    read_bounded_at,
+)
 from .evidence import (
     ActionKind,
     AggregateReasonCode,
@@ -252,7 +258,14 @@ class CommonsOutbox:
         ).encode("utf-8")
         if len(encoded) > _MAX_QUEUE_BYTES:
             return None
-        with locked_directory(self.queue_path, create=True, lock_name=".outbox.lock") as directory:
+        directory_context = (
+            locked_directory(self.queue_path, create=True, lock_name=".outbox.lock")
+            if export_receipt is not None
+            else opened_directory(self.queue_path, create=True)
+        )
+        with directory_context as directory:
+            if export_receipt is None:
+                ensure_lock_file_at(directory, ".outbox.lock")
             if export_receipt is not None:
                 for existing_name in os.listdir(directory):
                     if existing_name.startswith("."):

@@ -78,6 +78,41 @@ def _open_lock(directory_descriptor: int, name: str) -> int:
         raise
 
 
+def ensure_lock_file_at(directory_descriptor: int, name: str) -> None:
+    """Create and validate a lock leaf without acquiring its advisory lock."""
+
+    descriptor = _open_lock(directory_descriptor, name)
+    os.close(descriptor)
+
+
+@contextmanager
+def opened_directory(path: Path, *, create: bool) -> Iterator[int]:
+    """Hold one validated nofollow directory descriptor without serializing callers."""
+
+    directory_descriptor = -1
+    for _ in range(16):
+        try:
+            directory_descriptor = _open_parent_directory(path / ".anchor", create_parents=create)
+        except FileExistsError:
+            continue
+        break
+    if directory_descriptor < 0:
+        raise FileExistsError("unable to open concurrently created Commons storage")
+    primary_error: BaseException | None = None
+    try:
+        _validate_directory(directory_descriptor)
+        yield directory_descriptor
+    except BaseException as exc:
+        primary_error = exc
+        raise
+    finally:
+        try:
+            os.close(directory_descriptor)
+        except BaseException:
+            if primary_error is None:
+                raise
+
+
 @contextmanager
 def locked_directory(path: Path, *, create: bool, lock_name: str) -> Iterator[int]:
     """Hold one nofollow directory descriptor and an interprocess lock."""
