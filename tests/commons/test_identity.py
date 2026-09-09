@@ -12,6 +12,7 @@ from marginal.commons.identity import (
 )
 
 REVIEWED = {
+    "gpt-6-astra": "openai/gpt-6-astra",
     "gpt-5.6-sol": "openai/gpt-5.6-sol",
     "gpt-5.6-terra": "openai/gpt-5.6-terra",
     "gpt-5.6-luna": "openai/gpt-5.6-luna",
@@ -41,7 +42,10 @@ def test_exact_public_registry_match_resolves_an_immutable_identity(
         ("openai", "gpt-5.6"),
         ("openai", "gpt-5.6-sol-latest"),
         ("openai", "gpt-5.6-sol-2026-08-21"),
+        ("openai", "gpt-6-astra-latest"),
+        ("openai", "gpt-6-astra-2026-09-07"),
         ("openai", "ft:gpt-5.6-sol:private"),
+        ("openai", "ft:gpt-6-astra:private"),
         ("openai", "private/gpt-5.6-sol"),
         ("custom", "gpt-5.6-sol"),
     ],

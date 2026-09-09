@@ -42,6 +42,7 @@ def _pack_bytes(
     source_commit: str = SOURCE_COMMIT,
     revision: int = 1,
     compatibility: str = "1.0",
+    include_astra: bool = True,
     extra: tuple[str, object] | None = None,
 ) -> bytes:
     payload: dict[str, object] = {
@@ -50,11 +51,16 @@ def _pack_bytes(
         "commons_revision": revision,
         "compatibility": {"evidence_envelope_schema_version": compatibility},
         "models": {
+            "openai/gpt-6-astra": {"aggregates": []},
             "openai/gpt-5.6-sol": {"aggregates": [_aggregate(count=count)]},
             "openai/gpt-5.6-terra": {"aggregates": []},
             "openai/gpt-5.6-luna": {"aggregates": []},
         },
     }
+    if not include_astra:
+        models = payload["models"]
+        assert isinstance(models, dict)
+        models.pop("openai/gpt-6-astra")
     if extra is not None:
         payload[extra[0]] = extra[1]
     canonical = json.dumps(
@@ -92,6 +98,13 @@ def test_refresh_loads_only_the_selected_model_from_a_canonical_pack(tmp_path: P
     assert priors[0].lifecycle.value == "candidate"
     assert cache.revision == 1
     assert stat.S_IMODE(cache.path.stat().st_mode) == 0o600
+
+
+def test_refresh_preserves_compatibility_with_a_signed_pre_astra_pack(tmp_path: Path) -> None:
+    cache = _cache(tmp_path)
+
+    assert cache.refresh(signed_download(_pack_bytes(include_astra=False))) is True
+    assert [prior.count for prior in cache.load_prior()] == [7]
 
 
 @pytest.mark.parametrize(

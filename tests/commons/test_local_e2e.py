@@ -25,6 +25,7 @@ from marginal.integrations.codex.transport import request_session
 
 _SOURCE_COMMIT = "7347a1b4024329780139d17494430f2ccac94fec"
 _MODEL_NAMESPACES = (
+    "openai/gpt-6-astra",
     "openai/gpt-5.6-luna",
     "openai/gpt-5.6-sol",
     "openai/gpt-5.6-terra",

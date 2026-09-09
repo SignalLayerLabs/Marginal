@@ -233,6 +233,68 @@ def test_session_start_and_end_are_complete_hook_lifecycle(tmp_path: Path) -> No
     assert not (data / "sessions" / connection_filename("session-1")).exists()
 
 
+def test_astra_operation_memory_survives_reopen_without_merging_a_model_change(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    _repository(workspace)
+    data = tmp_path / "data"
+    start = replace(_start(workspace), model="gpt-6-astra")
+    connection = start_session_service(start, data_root=data)
+    common = {
+        "session_id": start.session_id,
+        "cwd": start.cwd,
+        "permission_mode": start.permission_mode,
+        "turn_id": "turn-1",
+        "tool_name": "Read",
+        "tool_input": {"path": str(workspace / "tracked.txt")},
+    }
+    astra_pre = {
+        **common,
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6-astra",
+        "tool_use_id": "astra-call",
+    }
+    astra_post = {
+        **astra_pre,
+        "hook_event_name": "PostToolUse",
+        "tool_response": {"exit_code": 0},
+    }
+    changed_pre = {
+        **common,
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-5.6-sol",
+        "tool_use_id": "changed-model-call",
+    }
+    changed_post = {
+        **changed_pre,
+        "hook_event_name": "PostToolUse",
+        "tool_response": {"exit_code": 0},
+    }
+
+    try:
+        assert request_session(connection, operation="pre", payload=astra_pre)["ok"] is True
+        assert request_session(connection, operation="post", payload=astra_post)["ok"] is True
+        assert request_session(connection, operation="pre", payload=changed_pre)["ok"] is True
+        assert request_session(connection, operation="post", payload=changed_post)["ok"] is True
+    finally:
+        stop_session_service(start.session_id, data_root=data)
+
+    repository_hash = current_promotion_identity(workspace).repository_hash
+    reopened = EvidenceStore(data / "evidence" / repository_hash).read_all()
+    operation_records = [
+        record for record in reopened if record.get("event") in {"decision", "outcome"}
+    ]
+
+    assert [record.get("model_namespace") for record in operation_records] == [
+        "openai/gpt-6-astra",
+        "openai/gpt-6-astra",
+        None,
+        None,
+    ]
+
+
 class _OfflineCommonsClient:
     def __init__(self) -> None:
         self.downloads = 0

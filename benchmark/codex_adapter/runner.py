@@ -18,7 +18,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .codex_events import CodexMetrics, EventParseError, parse_codex_jsonl
-from .hook_config import install_project_hooks
+from .hook_config import install_codex_home_hooks
 
 _SOURCE_ROOT = Path(__file__).resolve().parents[2]
 _HOOK_CLIENT = Path(__file__).resolve().with_name("hook_client.py")
@@ -95,34 +95,39 @@ def _toml_inline_table(values: Mapping[str, str]) -> str:
 def _command(config: RunConfig, shell_environment: Mapping[str, str]) -> list[str]:
     command = [
         str(config.codex_executable),
-        "exec",
-        "--ignore-user-config",
-        "--ignore-rules",
-        "--ephemeral",
-        "--json",
-        "--color",
-        "never",
-        "--strict-config",
-        "--dangerously-bypass-hook-trust",
-        "-m",
-        config.model,
-        "-c",
-        f'model_reasoning_effort="{config.reasoning_effort}"',
-        "-c",
-        "sandbox_workspace_write.network_access=false",
-        "-c",
-        'shell_environment_policy.inherit="none"',
-        "-c",
-        "shell_environment_policy.ignore_default_excludes=false",
-        "-c",
-        f"shell_environment_policy.set={_toml_inline_table(shell_environment)}",
-        "-s",
-        "workspace-write",
         "-a",
         "never",
-        "-C",
-        str(config.worktree),
+        "exec",
     ]
+    if config.condition == "baseline":
+        command.append("--ignore-user-config")
+    command.extend(
+        [
+            "--ignore-rules",
+            "--ephemeral",
+            "--json",
+            "--color",
+            "never",
+            "--strict-config",
+            "--dangerously-bypass-hook-trust",
+            "-m",
+            config.model,
+            "-c",
+            f'model_reasoning_effort="{config.reasoning_effort}"',
+            "-c",
+            "sandbox_workspace_write.network_access=false",
+            "-c",
+            'shell_environment_policy.inherit="none"',
+            "-c",
+            "shell_environment_policy.ignore_default_excludes=false",
+            "-c",
+            f"shell_environment_policy.set={_toml_inline_table(shell_environment)}",
+            "-s",
+            "workspace-write",
+            "-C",
+            str(config.worktree),
+        ]
+    )
     for feature in _FEATURES_DISABLED:
         command.extend(("--disable", feature))
     command.append("-")
@@ -381,8 +386,8 @@ def run_task(config: RunConfig) -> dict[str, Any]:
 
         try:
             if config.condition == "marginal":
-                install_project_hooks(
-                    worktree,
+                install_codex_home_hooks(
+                    codex_home,
                     python_executable=Path(sys.executable),
                     hook_client=_HOOK_CLIENT,
                 )
@@ -502,7 +507,7 @@ def run_task(config: RunConfig) -> dict[str, Any]:
     hook_coverage_missing = bool(
         config.condition == "marginal"
         and daemon_summary is not None
-        and int(daemon_summary.get("committed", 0)) != metrics.tool_calls
+        and int(daemon_summary.get("committed", 0)) != metrics.shell_commands
     )
     if security_violation:
         run_status = "security_failed"

@@ -1,0 +1,12 @@
+Resolve the following software issue in the current repository. Implement the required code changes and validate them with the repository's existing tests or your own local checks when feasible.
+
+Use only files in this task repository and its installed dependencies. Do not access the network, authentication files, external workspaces, benchmark infrastructure, reference patches or hidden tests. Do not attempt to retrieve the original fix. Do not modify existing tests to hide a failure. Avoid unnecessary repeated actions. Leave the code changes in the working tree.
+
+Issue:
+{problem_statement}
+
+Requirements:
+{requirements}
+
+Interface:
+{interface}

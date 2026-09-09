@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
   "sha256": {
-    "canonical-model-registry-v1.json": "142a8bc5645141f9c467279d6935663b5b11af03092ce4bd493edd42f3278ea6",
-    "commons-evidence-envelope-v1.json": "7a7601748e94107e5a2ccbf54a376a1d074de48d2f7ddd85dfd2b6b335091277",
-    "commons-pack-v1.json": "2db170ba822cf2dd2052eddd4e3ac84b5a998922201267f0e9fca9bcb06d8305"
+    "canonical-model-registry-v1.json": "693c71c28af5cddb3b1ed0d2a979c078f91b0823d7f36c56d726508d253b392d",
+    "commons-evidence-envelope-v1.json": "ddc26363093c22f5e37c2bcc2a7b4453f37f511b1315a74727e391797584ce7b",
+    "commons-pack-v1.json": "5ad237c956da4ca5ba62e3c62d6bfc333e26745668486d60fb774eb4a574955b"
   }
 }

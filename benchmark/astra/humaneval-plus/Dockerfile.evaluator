@@ -1,0 +1,11 @@
+FROM ganler/evalplus@sha256:26b118098bef281fe8dfe999bf05f1d5b45374b4e6c00161ec0f30592aef4740
+
+COPY evaluator-requirements.txt /tmp/evaluator-requirements.txt
+RUN python -m pip install --no-deps --require-hashes -r /tmp/evaluator-requirements.txt \
+    && python -c 'import importlib.metadata; assert importlib.metadata.version("evalplus") == "0.3.1"'
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    XDG_CACHE_HOME=/tmp/evalplus-cache \
+    HUMANEVAL_OVERRIDE_PATH=/data/HumanEvalPlus.jsonl
+
+ENTRYPOINT ["evalplus.evaluate"]

@@ -1,0 +1,6 @@
+# Versions used for the local official reference evaluation.
+pandas==3.0.5
+pyarrow==25.0.1
+docker==7.2.0
+datasets==5.0.1
+tqdm==4.70.0

@@ -46,6 +46,7 @@ def _pack_bytes() -> bytes:
         "commons_revision": 1,
         "compatibility": {"evidence_envelope_schema_version": "1.0"},
         "models": {
+            "openai/gpt-6-astra": {"aggregates": []},
             MODEL_NAMESPACE: {"aggregates": []},
             "openai/gpt-5.6-terra": {"aggregates": []},
             "openai/gpt-5.6-luna": {"aggregates": []},
