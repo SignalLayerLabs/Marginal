@@ -32,10 +32,12 @@ def _repository(tmp_path: Path) -> tuple[Path, str, str]:
     _git(repo, "config", "user.email", "fixture@example.invalid")
     (repo / ".gitignore").write_text(".deps/\n", encoding="utf-8")
     (repo / "base.py").write_text("BASE = True\n", encoding="utf-8")
+    (repo / ".deps").mkdir()
+    (repo / ".deps" / "tracked.txt").write_text("tracked base file\n", encoding="utf-8")
     _git(repo, "add", ".gitignore", "base.py")
+    _git(repo, "add", "-f", ".deps/tracked.txt")
     _git(repo, "commit", "-qm", "base")
     base_commit = _git(repo, "rev-parse", "HEAD")
-    (repo / ".deps").mkdir()
     (repo / ".deps" / "installed.txt").write_text("keep me\n", encoding="utf-8")
     (repo / ".deps" / "nested" / ".git" / "objects").mkdir(parents=True)
     (repo / ".deps" / "nested" / ".git" / "HEAD").write_text(
@@ -77,8 +79,10 @@ def test_prepare_repository_keeps_only_the_base_tree_and_ignored_dependencies(
     provenance = prepare_repository(config)
 
     assert (repo / "base.py").read_text(encoding="utf-8") == "BASE = True\n"
+    assert (repo / ".deps" / "tracked.txt").read_text(encoding="utf-8") == "tracked base file\n"
     assert not (repo / "future.py").exists()
     assert (repo / ".deps" / "installed.txt").read_text(encoding="utf-8") == "keep me\n"
+    assert _git_result(repo, "ls-files", "--error-unmatch", ".deps/installed.txt").returncode != 0
     assert not (repo / ".deps" / "nested" / ".git").exists()
     assert _git(repo, "status", "--porcelain", "--untracked-files=all") == ""
     assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "HEAD"

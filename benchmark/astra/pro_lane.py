@@ -51,6 +51,7 @@ def _git(
     *args: str,
     env: dict[str, str] | None = None,
     text: bool = True,
+    input_data: str | bytes | None = None,
 ) -> str | bytes:
     completed = subprocess.run(
         ["git", *args],
@@ -59,6 +60,7 @@ def _git(
         capture_output=True,
         check=False,
         text=text,
+        input=input_data,
         timeout=120,
     )
     if completed.returncode != 0:
@@ -184,6 +186,16 @@ def prepare_repository(config: ProLaneConfig) -> SnapshotProvenance:
     original_tree = str(
         _git(config.worktree, "rev-parse", f"{config.base_commit}^{{tree}}")
     ).strip()
+    base_paths = _git(
+        config.worktree,
+        "ls-tree",
+        "-r",
+        "-z",
+        "--name-only",
+        config.base_commit,
+        text=False,
+    )
+    assert isinstance(base_paths, bytes)
     with tempfile.TemporaryDirectory(prefix="marginal-pro-base-") as temporary:
         archive = Path(temporary) / "base.tar"
         _git(
@@ -200,7 +212,15 @@ def prepare_repository(config: ProLaneConfig) -> SnapshotProvenance:
         _purge_git_metadata(config.worktree)
 
     _git(config.worktree, "init", "-q")
-    _git(config.worktree, "add", "-A")
+    _git(
+        config.worktree,
+        "add",
+        "-f",
+        "--pathspec-from-file=-",
+        "--pathspec-file-nul",
+        text=False,
+        input_data=base_paths,
+    )
     commit_environment = dict(os.environ)
     commit_environment.update(
         {
