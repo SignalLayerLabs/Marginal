@@ -214,6 +214,7 @@ def prepare_repository(config: ProLaneConfig) -> SnapshotProvenance:
     _git(config.worktree, "init", "-q")
     _git(
         config.worktree,
+        "--literal-pathspecs",
         "add",
         "-f",
         "--pathspec-from-file=-",
