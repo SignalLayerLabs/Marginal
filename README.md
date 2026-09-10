@@ -82,6 +82,12 @@ reduce the model's internal reasoning budget. The complete public OFF/ON evaluat
 outstanding. See [Astra evaluation status](benchmark/astra/README.md) for exact preflight facts
 and what remains before a performance claim is justified.
 
+The full [300-task paired SWE-bench Lite contract](benchmark/astra/lite/protocol.json) is now
+preregistered with a public seed, exact dataset and evaluator revisions, a safe task manifest,
+and an immutable resume controller. Test-split execution remains **0/600 lanes** while the
+separate `dev` pipeline validation is completed. See the machine-readable
+[campaign status](benchmark/astra/lite/status.json) and [validation record](benchmark/astra/lite/validation.json).
+
 The [SWE-bench Pro protocol and evidence](benchmark/astra/pro/README.md) include all 731
 planned task IDs and the first passing official reference check. That reference check is
 not a model score. A complete OFF/ON run requires 1,462 model executions; no complete

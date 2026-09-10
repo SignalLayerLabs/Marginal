@@ -16,7 +16,34 @@
   "model": "gpt-6-astra",
   "reasoning_effort": "medium",
   "codex_version": "0.153.4",
-  "attempts_started": false,
+  "attempts_started": true,
   "official_grading_complete": false,
-  "result": null
+  "result": {
+    "valid_pair": false,
+    "test_score_impact": "none",
+    "model_lanes_executed": 4,
+    "pipeline_attempts": [
+      {
+        "campaign": "campaign",
+        "model_lanes": 0,
+        "outcome": "prelaunch_git_resolver_failure"
+      },
+      {
+        "campaign": "campaign-v2",
+        "model_lanes": 2,
+        "outcome": "invalid_nested_sandbox_namespace_unavailable",
+        "baseline_tokens": 39173,
+        "marginal_tokens": 39434
+      },
+      {
+        "campaign": "campaign-v3",
+        "model_lanes": 2,
+        "outcome": "invalid_nested_sandbox_mount_propagation_unavailable",
+        "baseline_tokens": 39207,
+        "marginal_tokens": 39039
+      }
+    ],
+    "latest_fix_commit": "678f880",
+    "next_step": "rerun the dev pair after quota reset; do not start test inference before it passes"
+  }
 }

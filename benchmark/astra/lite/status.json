@@ -9,10 +9,13 @@
   "marginal_model_lanes": 0,
   "model_predictions_graded": 0,
   "validation": {
-    "started": false,
+    "started": true,
     "is_included_in_test_score": false,
     "instance_id": "pvlib__pvlib-python-1072",
-    "split": "dev"
+    "split": "dev",
+    "valid_pair_complete": false,
+    "invalid_model_lanes": 4,
+    "latest_fix_commit": "678f880"
   },
-  "claim": "The 300-task public contract and resumable runner are frozen. No Lite test-split model inference, grading, performance result, or token-saving result exists."
+  "claim": "The 300-task public contract and resumable runner are frozen. Dev validation found and fixed container sandbox defects; a valid dev pair is still required. No Lite test-split inference, grading, performance result, or token-saving result exists."
 }
