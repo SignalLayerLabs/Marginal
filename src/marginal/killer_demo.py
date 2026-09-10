@@ -12,6 +12,7 @@ from typing import Any, cast
 
 from .adapters import funded_call
 from .budget import BudgetLimits
+from .controls import ActionOutcomeStatus, NoProgressConfig, NoProgressDetector
 from .models import Action, Cost
 from .policy import MarginalPolicy, PolicyConfig
 from .treasury import Treasury
@@ -577,6 +578,67 @@ def render_killer_demo_svg(result: dict[str, Any]) -> str:
     )
 
 
+_NO_PROGRESS_OBSERVATIONS: tuple[tuple[str, str, str], ...] = (
+    ("patch:apply", "w#4f2a", "e#91c0"),
+    ("verify:targeted", "w#8b13", "e#2d77"),
+    ("verify:targeted", "w#8b13", "e#2d77"),
+    ("verify:targeted", "w#8b13", "e#2d77"),
+)
+
+
+def build_no_progress_trace() -> list[dict[str, Any]]:
+    detector = NoProgressDetector()
+    rows: list[dict[str, Any]] = []
+    for tick, (semantic_key, state_hash, evidence_hash) in enumerate(
+        _NO_PROGRESS_OBSERVATIONS, start=1
+    ):
+        signal = detector.evaluate(semantic_key, state_hash, evidence_hash)
+        rows.append(
+            {
+                "tick": tick,
+                "action": semantic_key,
+                "state": state_hash,
+                "evidence": evidence_hash,
+                "outcome": ActionOutcomeStatus.SUCCESS.value,
+                "reason_code": signal.reason_code,
+                "reason": signal.reason,
+                "should_recommend_stop": signal.should_recommend_stop,
+                "enforcement_eligible": signal.enforcement_eligible,
+            }
+        )
+        detector.observe(semantic_key, state_hash, evidence_hash, ActionOutcomeStatus.SUCCESS)
+    return rows
+
+
+def render_no_progress_trace() -> str:
+    rows = build_no_progress_trace()
+    width = max(len(str(row["action"])) for row in rows)
+    lines = [
+        "# MARGINAL no-progress pattern",
+        "# illustrative deterministic sequence, replayed from the shipped control",
+        "# not provider telemetry, not an enforcement benchmark",
+        f"# threshold: max_same_evidence_completions="
+        f"{NoProgressConfig().max_same_evidence_completions}",
+        "",
+    ]
+    for row in rows:
+        lines.append(
+            f"t{row['tick']}  {str(row['action']).ljust(width)}  outcome={row['outcome']}  "
+            f"state={row['state']}  evidence={row['evidence']}  ->  {row['reason_code']}"
+        )
+        lines.append(f"      {row['reason']}")
+    lines.extend(
+        [
+            "",
+            "Shadow Mode         records the stop recommendation; the action still executes.",
+            "Earned Enforcement  is separate. It requires an adapter with real blocking",
+            "                    capability and sufficient local evidence, and this",
+            "                    illustration grants none of it.",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
 def build_killer_demo_playback(result: dict[str, Any]) -> dict[str, Any]:
     baseline_outputs = {
         (item["stage"], item["name"]): item["output"] for item in result["baseline_actions"]
@@ -1085,6 +1147,45 @@ h1 {
 .proof-card h3 { margin: 0 0 8px; }
 .proof-card p, .proof-card li { color: var(--muted); font-size: 12px; line-height: 1.55; }
 .proof-card code { color: #dce6f0; font: 11px var(--mono); }
+.pattern { margin: 0 0 42px; }
+.snippet {
+  margin-top: 14px;
+  border: 1px solid #222d38;
+  border-radius: 12px;
+  background: #05080c;
+  overflow: hidden;
+}
+.snippet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 13px;
+  border-bottom: 1px solid #222d38;
+  color: var(--muted);
+  font: 800 9px var(--mono);
+  letter-spacing: .08em;
+}
+.snippet-copy { padding: 7px 12px; font-size: 9px; }
+.snippet-body {
+  margin: 0;
+  max-height: 340px;
+  overflow: auto;
+  padding: 13px;
+  color: #9eabb7;
+  font: 11px/1.55 var(--mono);
+  white-space: pre;
+  scrollbar-width: thin;
+}
+.snippet-body:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
+.snippet-status {
+  min-height: 15px;
+  margin: 0;
+  padding: 0 13px 11px;
+  color: var(--lime);
+  font: 10px var(--mono);
+}
 .legacy-contract { display: none; }
 .footer {
   display: flex;
@@ -1183,6 +1284,9 @@ def render_killer_demo_js() -> str:
     stages: $$('[data-stage]'),
     baselineLane: $('[data-lane="baseline"]'),
     marginalLane: $('[data-lane="marginal"]'),
+    copyTrace: $('[data-action="copy-trace"]'),
+    trace: $("#no-progress-trace"),
+    copyStatus: $("#copy-status"),
   };
 
   function metric(lane, name) {
@@ -1370,6 +1474,51 @@ def render_killer_demo_js() -> str:
     dom.pause.disabled = true;
   }
 
+  function announceCopy(message) {
+    if (dom.copyStatus) dom.copyStatus.textContent = message;
+  }
+
+  function copyWithSelection(text) {
+    const restore = document.activeElement;
+    const holder = document.createElement("textarea");
+    holder.value = text;
+    holder.setAttribute("readonly", "");
+    holder.setAttribute("aria-hidden", "true");
+    holder.style.position = "fixed";
+    holder.style.top = "-1000px";
+    holder.style.opacity = "0";
+    document.body.appendChild(holder);
+    holder.select();
+    let copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch (error) {
+      copied = false;
+    }
+    holder.remove();
+    if (restore instanceof HTMLElement) restore.focus();
+    return copied;
+  }
+
+  function copyTrace() {
+    if (!dom.trace) return;
+    announceCopy("");
+    const text = dom.trace.textContent || "";
+    const copied = () => announceCopy("No-progress trace copied.");
+    const blocked = () =>
+      announceCopy("Copy was blocked. Select the trace and copy it manually.");
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(copied, () => {
+        if (copyWithSelection(text)) copied();
+        else blocked();
+      });
+      return;
+    }
+    if (copyWithSelection(text)) copied();
+    else blocked();
+  }
+
+  dom.copyTrace?.addEventListener("click", copyTrace);
   dom.run?.addEventListener("click", playRace);
   dom.pause?.addEventListener("click", pauseRace);
   dom.step?.addEventListener("click", () => {
@@ -1384,7 +1533,7 @@ def render_killer_demo_js() -> str:
 
   document.addEventListener("keydown", (event) => {
     const tag = document.activeElement?.tagName || "";
-    if (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(tag)) return;
+    if (["INPUT", "SELECT", "TEXTAREA", "BUTTON", "PRE"].includes(tag)) return;
     if (event.code === "Space") {
       event.preventDefault();
       state.playing ? pauseRace() : playRace();
@@ -1464,6 +1613,7 @@ def render_killer_demo_html(result: dict[str, Any]) -> str:
       <nav class="navlinks" aria-label="Killer Demo navigation">
         <a href="#race">Race</a>
         <a href="#proof">Proof</a>
+        <a href="#no-progress">Pattern</a>
         <a href="trace.jsonl">Trace</a>
         <a href="https://github.com/SignalLayerLabs/Marginal">GitHub ↗</a>
       </nav>
@@ -1649,6 +1799,44 @@ def render_killer_demo_html(result: dict[str, Any]) -> str:
         </article>
       </section>
 
+      <section class="pattern" id="no-progress">
+        <article class="proof-card">
+          <span class="eyebrow">QUOTABLE MECHANISM · ILLUSTRATIVE</span>
+          <h3>The no-progress pattern, in four lines.</h3>
+          <p>
+            Same semantic action, successful outcome, unchanged workspace state, no new evidence.
+            That is the sequence MARGINAL treats as a no-progress repetition candidate. The trace
+            below is replayed from the shipped control over a fixed synthetic observation
+            sequence, so it is an illustration of the mechanism and not provider telemetry,
+            a production run, or an enforcement benchmark.
+          </p>
+          <div class="snippet">
+            <div class="snippet-head">
+              <span>no-progress-trace.txt</span>
+              <button
+                class="control snippet-copy"
+                type="button"
+                data-action="copy-trace"
+                aria-describedby="copy-status"
+              >COPY TRACE</button>
+            </div>
+            <pre
+              class="snippet-body"
+              id="no-progress-trace"
+              tabindex="0"
+              role="region"
+              aria-label="Illustrative no-progress trace"
+            >{{NO_PROGRESS_TRACE}}</pre>
+            <p class="snippet-status" id="copy-status" role="status" aria-live="polite"></p>
+          </div>
+          <p>
+            Shadow Mode records that recommendation and still lets the action execute. Earned
+            Enforcement is a separate authority that an adapter has to earn from local evidence,
+            and nothing on this page grants it.
+          </p>
+        </article>
+      </section>
+
       <div class="legacy-contract" aria-hidden="true">
         <span>MARGINAL Killer Demo</span>
         <span>Same verified outcome. Far fewer tokens, lower cost, lower latency.</span>
@@ -1685,6 +1873,7 @@ def render_killer_demo_html(result: dict[str, Any]) -> str:
         "{{SCENARIO}}": html.escape(str(result["scenario"])),
         "{{VERIFIER}}": html.escape(str(result["defect"]["verifier"])),
         "{{DISCLAIMER}}": html.escape(str(result["disclaimer"])),
+        "{{NO_PROGRESS_TRACE}}": html.escape(render_no_progress_trace()),
         "{{BASELINE_TOKENS}}": f"{baseline['tokens']:,}",
         "{{MARGINAL_TOKENS}}": f"{marginal['tokens']:,}",
         "{{BASELINE_CALLS}}": str(baseline["calls"]),
