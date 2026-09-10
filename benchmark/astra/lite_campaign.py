@@ -660,6 +660,10 @@ class DockerLiteRuntime:
                 "docker",
                 "run",
                 "--rm",
+                "--cap-add",
+                "SYS_ADMIN",
+                "--security-opt",
+                "seccomp=unconfined",
                 "--mount",
                 f"type=bind,src={prompt},dst=/marginal-input/prompt.txt,readonly",
                 "--mount",
@@ -715,6 +719,16 @@ class DockerLiteRuntime:
         text = (completed.stdout + "\n" + completed.stderr).lower()
         if "quota" in text or "capacity" in text:
             return {"run_status": "quota_exhausted"}
+        events_path = lane_dir / "runtime" / "codex-events.jsonl"
+        try:
+            events_text = events_path.read_text(encoding="utf-8", errors="replace").lower()
+        except FileNotFoundError:
+            events_text = ""
+        if (
+            "bwrap: no permissions" in events_text
+            or "failed to create a new namespace" in events_text
+        ):
+            return {"run_status": "infrastructure_failed", "error_code": "SANDBOX_UNAVAILABLE"}
         if completed.returncode != 0 and not (lane_dir / "runtime" / "run-record.json").is_file():
             return {
                 "run_status": "infrastructure_failed",

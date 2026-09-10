@@ -323,6 +323,8 @@ def test_docker_runtime_is_injectable_and_uses_only_explicit_image_operations(
         assert (lane / "docker.stderr.log").is_file()
     docker_runs = [command for command in commands if command[:2] == ["docker", "run"]]
     assert len(docker_runs) == 2
+    assert all("--cap-add" in command and "SYS_ADMIN" in command for command in docker_runs)
+    assert all("seccomp=unconfined" in command for command in docker_runs)
     exchange = str((tmp_path / "exchange").resolve())
     assert all(any(f"src={exchange}/" in item for item in command) for command in docker_runs)
     runtime.close()
@@ -355,6 +357,41 @@ def test_outer_docker_failure_without_inner_record_is_infrastructure(tmp_path: P
 
     assert result == {"run_status": "infrastructure_failed", "docker_exit_code": 125}
     assert (lane / "docker.stderr.log").read_text(encoding="utf-8") == "mount source missing"
+
+
+def test_inner_bwrap_failure_is_infrastructure_even_when_container_exits_zero(
+    tmp_path: Path,
+) -> None:
+    from benchmark.astra.lite_campaign import DockerLiteRuntime, PreparedTask
+
+    auth = tmp_path / "auth.json"
+    auth.write_text("{}\n", encoding="utf-8")
+    lane = tmp_path / "lane"
+    (lane / "runtime").mkdir(parents=True)
+    (lane / "runtime" / "codex-events.jsonl").write_text(
+        '{"type":"item.completed","item":{"type":"command_execution",'
+        '"aggregated_output":"bwrap: No permissions to create a new namespace"}}\n',
+        encoding="utf-8",
+    )
+
+    def successful_docker(command, **_kwargs):
+        return subprocess.CompletedProcess(command, 0, "{}\n", "")
+
+    runtime = DockerLiteRuntime(
+        source_root=tmp_path,
+        auth_source=auth,
+        exchange_root=tmp_path / "exchange",
+        executor=successful_docker,
+    )
+    result = runtime.run_lane(
+        _task(0, "django__django-11099", ("baseline", "marginal")),
+        "baseline",
+        PreparedTask("repo/task@sha256:" + "b" * 64, "sha256:" + "c" * 64),
+        lane,
+        "safe input",
+    )
+
+    assert result == {"run_status": "infrastructure_failed", "error_code": "SANDBOX_UNAVAILABLE"}
 
 
 def test_frozen_product_archive_tampering_refuses_docker_launch_and_close_is_scoped(
