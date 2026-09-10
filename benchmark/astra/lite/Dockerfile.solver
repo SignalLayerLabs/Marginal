@@ -44,20 +44,10 @@ LABEL org.opencontainers.image.title="MARGINAL Astra SWE-bench Lite solver" \
       org.marginal.uv.image="ghcr.io/astral-sh/uv@sha256:1ececcacbbde240ffca54d400df86e4fdd38f29c1a2366299279d197e92eaed3"
 
 COPY --from=tools_builder /overlay /
-RUN rm -f /opt/python/lib/python3.12/site-packages/benchmark/codex_adapter/{daemon.py,engine.py,hook_client.py,hook_config.py} \
-    && env -u PYTHONPATH /opt/python/bin/python3 -c \
+RUN env -u PYTHONPATH /opt/python/bin/python3 -c \
       "from benchmark.astra.lite_lane import LiteLaneConfig" \
     && /opt/marginal-tools/bin/codex --version
 
 ENV PATH=/opt/python/bin:/opt/marginal-tools/bin:${PATH}
 WORKDIR /testbed
 ENTRYPOINT ["/opt/python/bin/python3", "-m", "benchmark.astra.lite_lane"]
-
-FROM baseline AS marginal
-COPY src/marginal /opt/marginal-source/marginal
-COPY benchmark/codex_adapter /opt/marginal-source/codex_adapter
-RUN site_packages="$(/opt/python/bin/python3 -c 'import site; print(site.getsitepackages()[0])')" \
-    && cp -R /opt/marginal-source/marginal "${site_packages}/marginal" \
-    && cp -R /opt/marginal-source/codex_adapter "${site_packages}/benchmark/codex_adapter" \
-    && env -u PYTHONPATH /opt/python/bin/python3 -c \
-      "from marginal import Treasury; from benchmark.astra.lite_lane import LiteLaneConfig"

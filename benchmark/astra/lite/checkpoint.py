@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import fcntl
 import hashlib
 import json
 import os
@@ -148,6 +149,19 @@ class CampaignCheckpoint:
     def has_lease(self, task: LiteTask) -> bool:
         return self.lease_dir(task).exists()
 
+    @contextlib.contextmanager
+    def campaign_lock(self):
+        """One POSIX process owns selection/reconciliation for an invocation."""
+
+        self.root.mkdir(parents=True, exist_ok=True)
+        lock_path = self.root / ".campaign.lock"
+        with lock_path.open("a+b") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
     def claim_task(self, task: LiteTask) -> bool:
         """Atomically claim the complete ordered pair; a stale lease is never reusable."""
 
@@ -199,6 +213,9 @@ class CampaignCheckpoint:
                 or prepared["overlay_image"],
                 "source_commit": prepared["source_commit"],
                 "source_tree": prepared["source_tree"],
+                "product_commit": prepared["product_commit"],
+                "product_tree": prepared["product_tree"],
+                "activation_mount_digest": prepared["activation_mount_digest"],
                 "prompt_sha256": prepared["prompt_sha256"],
             },
         )
@@ -236,13 +253,23 @@ class CampaignCheckpoint:
             "source_commit",
             "source_tree",
             "prompt_sha256",
+            "product_commit",
+            "product_tree",
+            "activation_mount_digest",
         }
         if set(value) != expected:
             raise CheckpointError("prepared task record contains unsafe or missing fields")
         if value["instance_id"] != task.instance_id:
             raise CheckpointError("prepared task record identity mismatch")
         image_keys = ("task_image", "overlay_image", "baseline_image", "marginal_image")
-        provenance_keys = ("source_commit", "source_tree", "prompt_sha256")
+        provenance_keys = (
+            "source_commit",
+            "source_tree",
+            "prompt_sha256",
+            "product_commit",
+            "product_tree",
+            "activation_mount_digest",
+        )
         if not all(isinstance(value[key], str) for key in (*image_keys, *provenance_keys)):
             raise CheckpointError("prepared task record has invalid image identity")
         if not value["task_image"] or not value["overlay_image"]:
@@ -258,6 +285,9 @@ class CampaignCheckpoint:
             "source_commit",
             "source_tree",
             "prompt_sha256",
+            "product_commit",
+            "product_tree",
+            "activation_mount_digest",
         }
         if set(prepared) != expected or not all(
             isinstance(value, str) for value in prepared.values()
@@ -270,3 +300,16 @@ class CampaignCheckpoint:
 
     def record_outcome(self, lane: Path, outcome: dict[str, Any]) -> None:
         atomic_create_json(lane / "outcome.json", outcome)
+
+    def record_prelaunch_failure(self, task: LiteTask, error: BaseException) -> None:
+        path = self.root / "prelaunch" / f"{self.task_key(task)}.json"
+        if path.exists():
+            return
+        atomic_create_json(
+            path,
+            {
+                "schema_version": 1,
+                "instance_id": task.instance_id,
+                "error_type": type(error).__name__,
+            },
+        )

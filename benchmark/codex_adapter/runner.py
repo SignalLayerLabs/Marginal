@@ -389,7 +389,12 @@ def run_task(config: RunConfig) -> dict[str, Any]:
                 environment["MARGINAL_SOCKET"] = str(socket_path)
                 environment["MARGINAL_HOOK_FAILURE_LOG"] = str(hook_failure_path)
                 daemon_environment = dict(environment)
-                daemon_environment["PYTHONPATH"] = str(_SOURCE_ROOT)
+                product_path = daemon_environment.get("PYTHONPATH")
+                daemon_environment["PYTHONPATH"] = (
+                    f"{product_path}{os.pathsep}{_SOURCE_ROOT}"
+                    if product_path
+                    else str(_SOURCE_ROOT)
+                )
                 with (
                     daemon_stdout_path.open("wb") as daemon_stdout,
                     daemon_stderr_path.open("wb") as daemon_stderr,

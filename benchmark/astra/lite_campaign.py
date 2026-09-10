@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import subprocess
+import tarfile
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, replace
@@ -37,6 +39,8 @@ _FROZEN_MARGINAL_COMMIT = "71c8eae5ef1321c45c3d5c7aa8af1ffcded719b1"
 class SourceProvenance:
     commit: str
     tree: str
+    product_commit: str = _FROZEN_MARGINAL_COMMIT
+    product_tree: str = ""
 
 
 def verify_frozen_source(
@@ -44,7 +48,7 @@ def verify_frozen_source(
     *,
     git_executor: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
 ) -> SourceProvenance:
-    """Resolve a clean source checkout to the one preregistered product commit."""
+    """Resolve a clean harness checkout and the exact frozen product Git object."""
 
     root = source_root.resolve()
 
@@ -58,14 +62,17 @@ def verify_frozen_source(
 
     expected = git(f"{_FROZEN_MARGINAL_COMMIT}^{{commit}}")
     actual = git("HEAD^{commit}")
-    if expected != _FROZEN_MARGINAL_COMMIT or actual != expected:
-        raise CampaignError("source checkout does not resolve to frozen MARGINAL commit 71c8eae")
+    if expected != _FROZEN_MARGINAL_COMMIT:
+        raise CampaignError("frozen MARGINAL commit 71c8eae is unavailable")
     if git("status", "--porcelain"):
         raise CampaignError("frozen MARGINAL source checkout must be clean")
     tree = git("HEAD^{tree}")
     if len(tree) != 40 or any(character not in "0123456789abcdef" for character in tree):
         raise CampaignError("frozen MARGINAL source tree is invalid")
-    return SourceProvenance(commit=actual, tree=tree)
+    product_tree = git(f"{_FROZEN_MARGINAL_COMMIT}^{{tree}}")
+    return SourceProvenance(
+        commit=actual, tree=tree, product_commit=expected, product_tree=product_tree
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +91,9 @@ class PreparedTask:
     marginal_image: str = ""
     source_commit: str = ""
     source_tree: str = ""
+    product_commit: str = ""
+    product_tree: str = ""
+    activation_mount_digest: str = ""
     prompt_sha256: str = ""
 
     def image_for(self, condition: str) -> str:
@@ -184,9 +194,14 @@ class Campaign:
         )
 
     def next_tasks(self) -> tuple[LiteTask, ...]:
-        """Only tasks with no lease are runnable; interrupted leases are intentionally skipped."""
-
-        return tuple(task for task in self.tasks if not self.checkpoint.has_lease(task))
+        return tuple(
+            task
+            for task in self.tasks
+            if any(
+                not self.checkpoint.has_attempt(task, condition)
+                for condition in task.condition_order
+            )
+        )
 
     def status(self) -> dict[str, int]:
         entries = self.entries()
@@ -292,37 +307,50 @@ class CampaignRunner:
         self.runtime.remove_image(prepared.task_image)
 
     def run(self, *, max_lanes: int) -> RunSummary:
-        if max_lanes < 2:
-            raise CampaignError("max_lanes must permit one complete paired task")
-        campaign = Campaign(self.checkpoint)
+        if max_lanes <= 0:
+            raise CampaignError("max_lanes must be positive")
         launched = 0
-        for task in campaign.next_tasks():
-            if launched + 2 > max_lanes:
-                break
-            if not self.checkpoint.claim_task(task):
-                continue
-            prepared = self._prepared(task)
-            # The provider is permitted to project only the issue text, then it is hash checked
-            # before being supplied to the disposable lane.
-            solver_input = render_solver_input(task, self.problem_provider(task))
-            lanes = self.checkpoint.stage_pair(task, asdict(prepared))
-            for condition, lane in zip(task.condition_order, lanes, strict=True):
+        with self.checkpoint.campaign_lock():
+            campaign = Campaign(self.checkpoint)
+            for entry in campaign.entries():
+                lane = self.checkpoint.lane_dir(entry.task, entry.condition)
+                if lane.is_dir() and not (lane / "outcome.json").exists():
+                    self.checkpoint.record_outcome(
+                        lane,
+                        {
+                            "schema_version": 3,
+                            "state": "uncertain_interrupted",
+                            "category": "infrastructure",
+                            "run_status": "uncertain",
+                        },
+                    )
+            for entry in campaign.next_entries():
+                if launched >= max_lanes:
+                    break
+                try:
+                    prepared = self._prepared(entry.task)
+                    solver_input = render_solver_input(
+                        entry.task, self.problem_provider(entry.task)
+                    )
+                except Exception as exc:
+                    self.checkpoint.record_prelaunch_failure(entry.task, exc)
+                    return RunSummary(launched=launched, stop_reason="infrastructure")
+                lane = self.checkpoint.claim_attempt(entry.task, entry.condition, asdict(prepared))
+                if lane is None:
+                    continue
+                atomic_create_bytes(lane / "model.patch", b"")
                 launched += 1
                 record: Mapping[str, Any] | None = None
                 failure: BaseException | None = None
                 try:
                     record = self.runtime.run_lane(
-                        task,
-                        condition,
-                        replace(prepared, overlay_image=prepared.image_for(condition)),
-                        lane,
-                        solver_input,
+                        entry.task, entry.condition, prepared, lane, solver_input
                     )
                 except Exception as exc:
                     failure = exc
                 category = _outcome_category(lane, record, failure)
                 outcome: dict[str, Any] = {
-                    "schema_version": 2,
+                    "schema_version": 3,
                     "state": "finished",
                     "category": category,
                     "run_status": str((record or {}).get("run_status", "infrastructure_failed")),
@@ -330,9 +358,9 @@ class CampaignRunner:
                 if failure is not None:
                     outcome["error_type"] = type(failure).__name__
                 self.checkpoint.record_outcome(lane, outcome)
+                self._cleanup_if_paired(entry.task, prepared)
                 if category == "quota":
                     return RunSummary(launched=launched, stop_reason="quota")
-            self._cleanup_if_paired(task, prepared)
         return RunSummary(launched=launched, stop_reason=None)
 
 
@@ -439,6 +467,33 @@ class DockerLiteRuntime:
         self.auth_source = auth_source.resolve()
         self.executor = executor
         self.git_executor = git_executor
+        self._product_dir: Path | None = None
+
+    def _product_source(self, source: SourceProvenance) -> Path:
+        if self._product_dir is not None:
+            return self._product_dir
+        target = Path(tempfile.mkdtemp(prefix="lite-frozen-product-"))
+        archive = subprocess.run(
+            ["git", "archive", "--format=tar", source.product_commit, "src/marginal"],
+            cwd=self.source_root,
+            check=False,
+            capture_output=True,
+        )
+        if archive.returncode != 0:
+            raise CampaignError("could not extract frozen MARGINAL product Git object")
+        with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as bundle:
+            members = bundle.getmembers()
+            if any(
+                Path(member.name).is_absolute() or ".." in Path(member.name).parts
+                for member in members
+            ):
+                raise CampaignError("frozen product archive has unsafe paths")
+            bundle.extractall(target, members, filter="data")
+        product = target / "src"
+        if not (product / "marginal").is_dir():
+            raise CampaignError("frozen product archive lacks src/marginal")
+        self._product_dir = product
+        return product
 
     def _command(
         self, command: list[str], *, timeout: int = 1800
@@ -452,6 +507,7 @@ class DockerLiteRuntime:
 
     def prepare(self, task: LiteTask) -> PreparedTask:
         source = verify_frozen_source(self.source_root, git_executor=self.git_executor)
+        product = self._product_source(source)
         pulled = self._command(["docker", "pull", task.official_image])
         if pulled.returncode != 0:
             raise CampaignError("Docker could not pull the official task image")
@@ -471,43 +527,40 @@ class DockerLiteRuntime:
         image_key = hashlib.sha256((task.instance_id + task_image).encode()).hexdigest()
         tag = f"marginal-lite-{image_key[:24]}"
 
-        def build(condition: str) -> str:
-            runtime_tag = f"{tag}-{condition}"
-            built = self._command(
-                [
-                    "docker",
-                    "build",
-                    "--file",
-                    str(self.source_root / "benchmark/astra/lite/Dockerfile.solver"),
-                    "--target",
-                    condition,
+        runtime_tag = f"{tag}-shared"
+        built = self._command(
+            [
+                "docker",
+                "build",
+                "--file",
+                str(self.source_root / "benchmark/astra/lite/Dockerfile.solver"),
+                "--target",
+                "baseline",
+                "--build-arg",
+                f"TASK_IMAGE={task_image}",
                     "--build-arg",
-                    f"TASK_IMAGE={task_image}",
-                    "--build-arg",
-                    f"MARGINAL_SOURCE_COMMIT={source.commit}",
-                    "--tag",
-                    runtime_tag,
-                    str(self.source_root),
-                ]
-            )
-            if built.returncode != 0:
-                raise CampaignError(f"Docker could not build the {condition} task runtime")
-            identity = self._command(
-                ["docker", "image", "inspect", "--format", "{{.Id}}", runtime_tag]
-            )
-            if identity.returncode != 0 or not identity.stdout.strip().startswith("sha256:"):
-                raise CampaignError(f"Docker did not resolve an immutable {condition} image ID")
-            return identity.stdout.strip()
-
-        baseline = build("baseline")
-        marginal = build("marginal")
+                    f"MARGINAL_SOURCE_COMMIT={source.product_commit}",
+                "--tag",
+                runtime_tag,
+                str(self.source_root),
+            ]
+        )
+        if built.returncode != 0:
+            raise CampaignError("Docker could not build the shared task runtime")
+        identity = self._command(["docker", "image", "inspect", "--format", "{{.Id}}", runtime_tag])
+        if identity.returncode != 0 or not identity.stdout.strip().startswith("sha256:"):
+            raise CampaignError("Docker did not resolve an immutable shared image ID")
+        shared = identity.stdout.strip()
         return PreparedTask(
             task_image=task_image,
-            overlay_image=marginal,
-            baseline_image=baseline,
-            marginal_image=marginal,
+            overlay_image=shared,
+            baseline_image=shared,
+            marginal_image=shared,
             source_commit=source.commit,
             source_tree=source.tree,
+            product_commit=source.product_commit,
+            product_tree=source.product_tree,
+            activation_mount_digest=hashlib.sha256(str(product).encode()).hexdigest(),
         )
 
     def run_lane(
@@ -549,6 +602,21 @@ class DockerLiteRuntime:
                 "--condition",
                 condition,
             ]
+            if condition == "marginal":
+                product = self._product_source(
+                    SourceProvenance(
+                        prepared.source_commit,
+                        prepared.source_tree,
+                        prepared.product_commit,
+                        prepared.product_tree,
+                    )
+                )
+                command[3:3] = [
+                    "--mount",
+                    f"type=bind,src={product},dst=/opt/marginal-product/src,readonly",
+                    "--env",
+                    "PYTHONPATH=/opt/marginal-product/src",
+                ]
             # LiteLaneConfig defaults are container paths; a dedicated subdirectory preserves the
             # immutable outer lane directory and its pre-launch marker.
             command.extend(["--run-dir", "/marginal-output/attempt/runtime"])

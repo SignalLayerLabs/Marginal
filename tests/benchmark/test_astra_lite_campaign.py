@@ -92,13 +92,14 @@ def test_run_writes_an_attempt_marker_before_a_lane_can_launch(tmp_path: Path) -
     ).is_file()
 
 
-def test_run_refuses_to_split_a_paired_task_at_a_one_lane_limit(tmp_path: Path) -> None:
-    from benchmark.astra.lite_campaign import CampaignError, CampaignRunner, initialize_campaign
+def test_run_can_stop_after_one_lane_without_claiming_its_sibling(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import CampaignRunner, initialize_campaign
 
     task = _task(0, "django__django-11099", ("baseline", "marginal"))
     initialize_campaign(tmp_path, (task,))
-    with pytest.raises(CampaignError, match="complete paired task"):
-        CampaignRunner(tmp_path, FakeRuntime([], []), _provider).run(max_lanes=1)
+    runtime = FakeRuntime([], [])
+    assert CampaignRunner(tmp_path, runtime, _provider).run(max_lanes=1).launched == 1
+    assert [item[:2] for item in runtime.launched] == [(task.instance_id, "baseline")]
 
 
 def test_quota_stop_preserves_attempt_and_stops_before_next_lane(tmp_path: Path) -> None:
@@ -267,12 +268,9 @@ def test_docker_runtime_is_injectable_and_uses_only_explicit_image_operations(
     runtime.remove_image(prepared.task_image)
 
     assert prepared.task_image == f"example/{task.instance_id}@sha256:{'b' * 64}"
-    assert prepared.baseline_image == f"sha256:{'c' * 64}"
-    assert prepared.marginal_image == prepared.overlay_image == f"sha256:{'d' * 64}"
+    assert prepared.baseline_image == prepared.marginal_image == prepared.overlay_image
     assert [command[:3] for command in commands] == [
         ["docker", "pull", task.official_image],
-        ["docker", "image", "inspect"],
-        ["docker", "build", "--file"],
         ["docker", "image", "inspect"],
         ["docker", "build", "--file"],
         ["docker", "image", "inspect"],
@@ -293,7 +291,7 @@ def test_changed_frozen_prompt_is_rejected_before_solver_input_is_rendered(tmp_p
         render_solver_input(task, _provider(task), prompt_path=prompt)
 
 
-def test_task_lease_stages_empty_patches_before_an_abrupt_exit_and_blocks_sibling(
+def test_interrupted_lane_is_reconciled_and_untouched_sibling_remains_runnable(
     tmp_path: Path,
 ) -> None:
     from benchmark.astra.lite_campaign import CampaignRunner, initialize_campaign
@@ -312,10 +310,10 @@ def test_task_lease_stages_empty_patches_before_an_abrupt_exit_and_blocks_siblin
 
     root = tmp_path / "lanes" / "0000-django__django-11099"
     assert (root / "baseline" / "model.patch").read_bytes() == b""
-    assert (root / "marginal" / "model.patch").read_bytes() == b""
+    assert not (root / "marginal" / "attempt.json").exists()
     sibling = FakeRuntime([], [])
-    assert CampaignRunner(tmp_path, sibling, _provider).run(max_lanes=2).launched == 0
-    assert sibling.launched == []
+    assert CampaignRunner(tmp_path, sibling, _provider).run(max_lanes=2).launched == 1
+    assert [entry[:2] for entry in sibling.launched] == [(task.instance_id, "marginal")]
     assert exiting.removed == []
 
 
@@ -339,7 +337,7 @@ def test_stderr_only_quota_signal_stops_before_the_next_task_is_claimed(tmp_path
 
     assert result.stop_reason == "quota"
     assert [item[:2] for item in runtime.launched] == [(first.instance_id, "baseline")]
-    assert not (tmp_path / "leases" / "0001-sympy__sympy-12419").exists()
+    assert not (tmp_path / "lanes" / "0001-sympy__sympy-12419" / "baseline").exists()
 
 
 def test_auth_marker_collection_fails_closed_for_unparseable_auth(tmp_path: Path) -> None:
