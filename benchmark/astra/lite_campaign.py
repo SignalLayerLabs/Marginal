@@ -664,6 +664,8 @@ class DockerLiteRuntime:
                 "SYS_ADMIN",
                 "--security-opt",
                 "seccomp=unconfined",
+                "--security-opt",
+                "apparmor=unconfined",
                 "--mount",
                 f"type=bind,src={prompt},dst=/marginal-input/prompt.txt,readonly",
                 "--mount",
@@ -717,24 +719,44 @@ class DockerLiteRuntime:
         atomic_create_bytes(lane_dir / "docker.stdout.log", completed.stdout.encode("utf-8"))
         atomic_create_bytes(lane_dir / "docker.stderr.log", completed.stderr.encode("utf-8"))
         text = (completed.stdout + "\n" + completed.stderr).lower()
-        if "quota" in text or "capacity" in text:
+        record_path = lane_dir / "runtime" / "run-record.json"
+        inner_record: dict[str, Any] | None = None
+        if record_path.is_file():
+            try:
+                loaded = json.loads(record_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                return {
+                    "run_status": "infrastructure_failed",
+                    "error_code": "INVALID_RUN_RECORD",
+                }
+            if not isinstance(loaded, dict) or not isinstance(loaded.get("run_status"), str):
+                return {
+                    "run_status": "infrastructure_failed",
+                    "error_code": "INVALID_RUN_RECORD",
+                }
+            inner_record = loaded
+        if "quota" in text or "capacity" in text or _quota_signal(lane_dir, inner_record):
             return {"run_status": "quota_exhausted"}
         events_path = lane_dir / "runtime" / "codex-events.jsonl"
         try:
             events_text = events_path.read_text(encoding="utf-8", errors="replace").lower()
         except FileNotFoundError:
             events_text = ""
-        if (
-            "bwrap: no permissions" in events_text
-            or "failed to create a new namespace" in events_text
+        if any(
+            marker in events_text
+            for marker in (
+                "bwrap: no permissions",
+                "failed to create a new namespace",
+                "bwrap: failed to make / slave",
+            )
         ):
             return {"run_status": "infrastructure_failed", "error_code": "SANDBOX_UNAVAILABLE"}
-        if completed.returncode != 0 and not (lane_dir / "runtime" / "run-record.json").is_file():
+        if completed.returncode != 0 or inner_record is None:
             return {
                 "run_status": "infrastructure_failed",
                 "docker_exit_code": completed.returncode,
             }
-        return {"run_status": "completed" if completed.returncode == 0 else "codex_failed"}
+        return inner_record
 
     def remove_image(self, image: str) -> None:
         removed = self._command(["docker", "image", "rm", image], timeout=120)

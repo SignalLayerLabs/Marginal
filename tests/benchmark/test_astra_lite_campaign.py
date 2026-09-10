@@ -318,13 +318,14 @@ def test_docker_runtime_is_injectable_and_uses_only_explicit_image_operations(
         lane = tmp_path / condition
         lane.mkdir()
         result = runtime.run_lane(task, condition, prepared, lane, "safe input")
-        assert result["run_status"] == "completed"
+        assert result["run_status"] == "infrastructure_failed"
         assert (lane / "docker.stdout.log").is_file()
         assert (lane / "docker.stderr.log").is_file()
     docker_runs = [command for command in commands if command[:2] == ["docker", "run"]]
     assert len(docker_runs) == 2
     assert all("--cap-add" in command and "SYS_ADMIN" in command for command in docker_runs)
     assert all("seccomp=unconfined" in command for command in docker_runs)
+    assert all("apparmor=unconfined" in command for command in docker_runs)
     exchange = str((tmp_path / "exchange").resolve())
     assert all(any(f"src={exchange}/" in item for item in command) for command in docker_runs)
     runtime.close()
@@ -392,6 +393,39 @@ def test_inner_bwrap_failure_is_infrastructure_even_when_container_exits_zero(
     )
 
     assert result == {"run_status": "infrastructure_failed", "error_code": "SANDBOX_UNAVAILABLE"}
+
+
+def test_inner_run_record_status_is_the_outer_runtime_source_of_truth(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import DockerLiteRuntime, PreparedTask
+
+    auth = tmp_path / "auth.json"
+    auth.write_text("{}\n", encoding="utf-8")
+    lane = tmp_path / "lane"
+    (lane / "runtime").mkdir(parents=True)
+    (lane / "runtime" / "run-record.json").write_text(
+        '{"run_status":"integration_failed","error_code":"HOOK_COVERAGE_MISSING"}\n',
+        encoding="utf-8",
+    )
+
+    def successful_docker(command, **_kwargs):
+        return subprocess.CompletedProcess(command, 0, "{}\n", "")
+
+    runtime = DockerLiteRuntime(
+        source_root=tmp_path,
+        auth_source=auth,
+        exchange_root=tmp_path / "exchange",
+        executor=successful_docker,
+    )
+    result = runtime.run_lane(
+        _task(0, "django__django-11099", ("baseline", "marginal")),
+        "baseline",
+        PreparedTask("repo/task@sha256:" + "b" * 64, "sha256:" + "c" * 64),
+        lane,
+        "safe input",
+    )
+
+    assert result["run_status"] == "integration_failed"
+    assert result["error_code"] == "HOOK_COVERAGE_MISSING"
 
 
 def test_frozen_product_archive_tampering_refuses_docker_launch_and_close_is_scoped(
