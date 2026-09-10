@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import re
+import tarfile
+import tempfile
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
@@ -32,6 +35,8 @@ class LiteLaneConfig:
     run_dir: Path = Path("/marginal-output/lane")
     codex_executable: Path = Path("/opt/marginal-tools/bin/codex")
     auth_source: Path = Path("/run/secrets/codex-auth.json")
+    marginal_product_archive: Path | None = None
+    marginal_product_sha256: str | None = None
 
 
 def _absolute(path: Path, label: str) -> Path:
@@ -104,25 +109,55 @@ def run_lane(config: LiteLaneConfig, *, run_task_fn: RunTask = run_task) -> dict
     """Prepare and execute one fixed-contract Lite solver lane."""
 
     config = _validate_config(config)
+    product_context = contextlib.nullcontext(None)
+    if config.condition == "marginal":
+        if config.marginal_product_archive is None or config.marginal_product_sha256 is None:
+            raise ValueError("marginal lane requires frozen product archive provenance")
+        try:
+            actual = hashlib.sha256(config.marginal_product_archive.read_bytes()).hexdigest()
+        except OSError as exc:
+            raise ValueError("frozen product archive is unreadable") from exc
+        if actual != config.marginal_product_sha256:
+            raise ValueError("frozen product archive digest mismatch")
+        product_context = tempfile.TemporaryDirectory(prefix="lite-product-")
     provenance = prepare_repository(config)
     prompt = config.prompt_path.read_text(encoding="utf-8")
-    record = run_task_fn(
-        RunConfig(
-            instance_id=config.task.instance_id,
-            condition=config.condition,
-            repetition=1,
-            worktree=config.worktree,
-            expected_base_commit=provenance.snapshot_commit,
-            run_dir=config.run_dir,
-            prompt=prompt,
-            codex_executable=config.codex_executable,
-            auth_source=config.auth_source,
-            model="gpt-6-astra",
-            reasoning_effort="medium",
-            timeout_seconds=900,
-            codex_version="0.153.4",
+    with product_context as product_root:
+        extra_env: dict[str, str] = {}
+        if product_root is not None:
+            try:
+                with tarfile.open(config.marginal_product_archive) as archive:
+                    members = archive.getmembers()
+                    if any(
+                        Path(member.name).is_absolute() or ".." in Path(member.name).parts
+                        for member in members
+                    ):
+                        raise ValueError("frozen product archive contains an unsafe path")
+                    archive.extractall(product_root, members=members, filter="data")
+            except (OSError, tarfile.TarError) as exc:
+                raise ValueError("frozen product archive is unreadable") from exc
+            source = Path(product_root) / "src"
+            if not (source / "marginal").is_dir():
+                raise ValueError("frozen product archive lacks src/marginal")
+            extra_env["PYTHONPATH"] = str(source)
+        record = run_task_fn(
+            RunConfig(
+                instance_id=config.task.instance_id,
+                condition=config.condition,
+                repetition=1,
+                worktree=config.worktree,
+                expected_base_commit=provenance.snapshot_commit,
+                run_dir=config.run_dir,
+                prompt=prompt,
+                codex_executable=config.codex_executable,
+                auth_source=config.auth_source,
+                model="gpt-6-astra",
+                reasoning_effort="medium",
+                timeout_seconds=900,
+                codex_version="0.153.4",
+                extra_env=extra_env,
+            )
         )
-    )
     provenance_path = config.run_dir / "lite-lane.json"
     payload = {
         **asdict(provenance),
@@ -147,6 +182,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--schedule-position", required=True, type=int)
     parser.add_argument("--condition", required=True, choices=sorted(_CONDITIONS))
     parser.add_argument("--run-dir", type=Path, default=Path("/marginal-output/lane"))
+    parser.add_argument("--marginal-product-archive", type=Path)
+    parser.add_argument("--marginal-product-sha256")
     return parser
 
 
@@ -164,6 +201,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
         condition=args.condition,
         run_dir=args.run_dir,
+        marginal_product_archive=args.marginal_product_archive,
+        marginal_product_sha256=args.marginal_product_sha256,
     )
     record = run_lane(config)
     print(

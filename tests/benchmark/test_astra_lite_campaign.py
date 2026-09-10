@@ -194,6 +194,26 @@ def test_export_rejects_auth_markers_and_does_not_export_outcome_data(tmp_path: 
         )
 
 
+def test_export_rejects_even_a_short_authentication_marker(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import (
+        CampaignError,
+        CampaignRunner,
+        export_predictions,
+        initialize_campaign,
+    )
+
+    task = _task(0, "django__django-11099", ("baseline", "marginal"))
+    initialize_campaign(tmp_path, (task,))
+    CampaignRunner(tmp_path, FakeRuntime([], []), _provider).run(max_lanes=2)
+    patch = tmp_path / "lanes" / "0000-django__django-11099" / "baseline" / "model.patch"
+    patch.write_bytes(b"tiny")
+
+    with pytest.raises(CampaignError, match="authentication"):
+        export_predictions(
+            tmp_path, "baseline", tmp_path / "baseline.jsonl", auth_markers=(b"tiny",)
+        )
+
+
 def test_solver_entrypoint_accepts_a_child_runtime_directory_for_immutable_attempts() -> None:
     from benchmark.astra.lite_lane import _parser
 
@@ -248,6 +268,17 @@ def test_docker_runtime_is_injectable_and_uses_only_explicit_image_operations(
     def fake_git(command, **_kwargs):
         if command[-2:] == ["status", "--porcelain"]:
             return subprocess.CompletedProcess(command, 0, "", "")
+        if command[1:3] == ["archive", "--format=tar"]:
+            return subprocess.run(
+                command,
+                cwd=Path(__file__).resolve().parents[2],
+                check=False,
+                capture_output=True,
+            )
+        if command[-1].endswith(":src/marginal"):
+            return subprocess.CompletedProcess(
+                command, 0, "8b99ca79a11133117f538add2bf474851183de89\n", ""
+            )
         if command[-1].endswith("^{commit}"):
             return subprocess.CompletedProcess(
                 command, 0, "71c8eae5ef1321c45c3d5c7aa8af1ffcded719b1\n", ""
@@ -269,6 +300,8 @@ def test_docker_runtime_is_injectable_and_uses_only_explicit_image_operations(
 
     assert prepared.task_image == f"example/{task.instance_id}@sha256:{'b' * 64}"
     assert prepared.baseline_image == prepared.marginal_image == prepared.overlay_image
+    assert prepared.product_subtree
+    assert prepared.product_archive_sha256 == prepared.activation_mount_digest
     assert [command[:3] for command in commands] == [
         ["docker", "pull", task.official_image],
         ["docker", "image", "inspect"],
@@ -278,6 +311,79 @@ def test_docker_runtime_is_injectable_and_uses_only_explicit_image_operations(
         ["docker", "image", "rm"],
     ]
     assert not any("prune" in command for command in commands)
+    runtime.close()
+
+
+def test_frozen_product_archive_tampering_refuses_docker_launch_and_close_is_scoped(
+    tmp_path: Path,
+) -> None:
+    from benchmark.astra.lite_campaign import CampaignError, DockerLiteRuntime
+
+    auth = tmp_path / "auth.json"
+    auth.write_text("{}\n", encoding="utf-8")
+    commands: list[list[str]] = []
+    task = _task(0, "django__django-11099", ("baseline", "marginal"))
+
+    def fake_docker(command, **_kwargs):
+        commands.append(command)
+        if command[:2] == ["docker", "pull"]:
+            return subprocess.CompletedProcess(command, 0, "", "")
+        if command[-1] == task.official_image:
+            return subprocess.CompletedProcess(command, 0, f"example/task@sha256:{'b' * 64}\n", "")
+        if command[:3] == ["docker", "image", "inspect"]:
+            return subprocess.CompletedProcess(command, 0, f"sha256:{'c' * 64}\n", "")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    def fake_git(command, **_kwargs):
+        if command[1:3] == ["archive", "--format=tar"]:
+            return subprocess.run(
+                command,
+                cwd=Path(__file__).resolve().parents[2],
+                check=False,
+                capture_output=True,
+            )
+        if command[-2:] == ["status", "--porcelain"]:
+            return subprocess.CompletedProcess(command, 0, "", "")
+        if command[-1].endswith("^{commit}"):
+            return subprocess.CompletedProcess(
+                command, 0, "71c8eae5ef1321c45c3d5c7aa8af1ffcded719b1\n", ""
+            )
+        if command[-1].endswith(":src/marginal"):
+            return subprocess.CompletedProcess(
+                command, 0, "8b99ca79a11133117f538add2bf474851183de89\n", ""
+            )
+        return subprocess.CompletedProcess(
+            command, 0, "51c22b9eec66b08bfa58ac8bad89bd964aaafd39\n", ""
+        )
+
+    runtime = DockerLiteRuntime(
+        source_root=Path(__file__).resolve().parents[2],
+        auth_source=auth,
+        executor=fake_docker,
+        git_executor=fake_git,
+    )
+    prepared = runtime.prepare(task)
+    archive = runtime._product_archive
+    assert archive is not None
+    unrelated = tmp_path / "unrelated.tar"
+    unrelated.write_bytes(b"leave me")
+    archive.chmod(0o644)
+    archive.write_bytes(b"tampered")
+    lane = tmp_path / "lane"
+    lane.mkdir()
+
+    with pytest.raises(CampaignError, match="digest mismatch"):
+        runtime.run_lane(
+            task,
+            "marginal",
+            prepared,
+            lane,
+            "safe input",
+        )
+    assert not any(command[:2] == ["docker", "run"] for command in commands)
+    runtime.close()
+    assert not archive.exists()
+    assert unrelated.read_bytes() == b"leave me"
 
 
 def test_changed_frozen_prompt_is_rejected_before_solver_input_is_rendered(tmp_path: Path) -> None:
@@ -366,6 +472,10 @@ def test_source_provenance_requires_the_clean_frozen_product_commit(tmp_path: Pa
         if command[-1] == "HEAD^{commit}":
             return subprocess.CompletedProcess(
                 command, 0, "71c8eae5ef1321c45c3d5c7aa8af1ffcded719b1\n", ""
+            )
+        if command[-1].endswith(":src/marginal"):
+            return subprocess.CompletedProcess(
+                command, 0, "8b99ca79a11133117f538add2bf474851183de89\n", ""
             )
         return subprocess.CompletedProcess(
             command, 0, "51c22b9eec66b08bfa58ac8bad89bd964aaafd39\n", ""

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
+import tarfile
 from dataclasses import replace
 from pathlib import Path
 
@@ -77,6 +79,16 @@ def _config(
     )
 
 
+def _product_archive(tmp_path: Path) -> tuple[Path, str]:
+    archive = tmp_path / "marginal.tar"
+    source = tmp_path / "product" / "src" / "marginal"
+    source.mkdir(parents=True)
+    (source / "__init__.py").write_text("PRODUCT = True\n", encoding="utf-8")
+    with tarfile.open(archive, "w") as output:
+        output.add(source.parent, arcname="src")
+    return archive, hashlib.sha256(archive.read_bytes()).hexdigest()
+
+
 def test_classic_lite_ids_are_accepted_and_pro_or_traversal_ids_are_rejected(
     tmp_path: Path,
 ) -> None:
@@ -118,6 +130,8 @@ def test_off_and_on_forward_identical_solver_config_except_condition(tmp_path: P
     marginal_repo, marginal_base, _marginal_future = _repository(tmp_path / "marginal")
     baseline = _config(tmp_path / "baseline", baseline_repo, base_commit, condition="baseline")
     marginal = _config(tmp_path / "marginal", marginal_repo, marginal_base, condition="marginal")
+    archive, digest = _product_archive(tmp_path)
+    marginal = replace(marginal, marginal_product_archive=archive, marginal_product_sha256=digest)
     observed: list[RunConfig] = []
 
     def fake_run_task(run_config: RunConfig) -> dict[str, object]:
@@ -140,7 +154,6 @@ def test_off_and_on_forward_identical_solver_config_except_condition(tmp_path: P
         baseline_config.reasoning_effort,
         baseline_config.timeout_seconds,
         baseline_config.codex_version,
-        baseline_config.extra_env,
     ) == (
         marginal_config.instance_id,
         marginal_config.repetition,
@@ -149,8 +162,9 @@ def test_off_and_on_forward_identical_solver_config_except_condition(tmp_path: P
         marginal_config.reasoning_effort,
         marginal_config.timeout_seconds,
         marginal_config.codex_version,
-        marginal_config.extra_env,
     )
+    assert baseline_config.extra_env == {}
+    assert marginal_config.extra_env["PYTHONPATH"].endswith("/src")
     shell_environment = {"CODEX_HOME": "/isolated/codex", "HOME": "/isolated/home"}
     assert _command(baseline_config, shell_environment) == _command(
         replace(baseline_config, condition="marginal"), shell_environment
@@ -158,3 +172,24 @@ def test_off_and_on_forward_identical_solver_config_except_condition(tmp_path: P
     for run_config in observed:
         provenance = json.loads((run_config.run_dir / "lite-lane.json").read_text(encoding="utf-8"))
         assert provenance["snapshot_commit"] == run_config.expected_base_commit
+
+
+def test_tampered_product_archive_is_refused_before_solver_execution(tmp_path: Path) -> None:
+    repo, base_commit, _future_commit = _repository(tmp_path)
+    archive, digest = _product_archive(tmp_path)
+    archive.write_bytes(b"tampered")
+    config = replace(
+        _config(tmp_path, repo, base_commit, condition="marginal"),
+        marginal_product_archive=archive,
+        marginal_product_sha256=digest,
+    )
+    launched = False
+
+    def must_not_run(_config: RunConfig) -> dict[str, object]:
+        nonlocal launched
+        launched = True
+        return {"run_status": "completed"}
+
+    with pytest.raises(ValueError, match="digest mismatch"):
+        run_lane(config, run_task_fn=must_not_run)
+    assert not launched

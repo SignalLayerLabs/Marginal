@@ -21,7 +21,7 @@ DATASET = "SWE-bench/SWE-bench_Lite"
 DATASET_REVISION = "b0dde1093fe417d83b7184254edf8199c1f0dff5"
 TASK_COUNT = 300
 CANONICAL_MANIFEST_SHA256 = "7a687df2baf842757e90e4b2805a1cf094e4462b10961ec5e90db48a0c9595f7"
-CANONICAL_PROTOCOL_SHA256 = "cbefdbf49ac3ddfbdb15cec451f123125d02e53d67a46d938b612eedd310db14"
+CANONICAL_PROTOCOL_SHA256 = "e0c994a3179fc99a93af84349e7d07ec8a3905a380c2a02ffee2cb5a21bc8ff3"
 MANIFEST_FIELDS = (
     "instance_id",
     "repo",
@@ -54,6 +54,11 @@ CANONICAL_PROTOCOL: dict[str, object] = {
     "evaluator_commit": "02e7a74ffd0b707aab73d203fe87bdc7c76afc8e",
     "evaluator": "v5 local Docker CLI",
     "marginal_commit": "71c8eae",
+    "marginal_product_commit": "71c8eae5ef1321c45c3d5c7aa8af1ffcded719b1",
+    "marginal_product_subtree": "8b99ca79a11133117f538add2bf474851183de89",
+    "marginal_product_archive_sha256": (
+        "2050e4cbe1b233633ed016637a687e4d674aa970338fe5fc24e480cb3e313bbd"
+    ),
     "agent": "Codex CLI 0.153.4",
     "model": "gpt-6-astra",
     "reasoning_effort": "medium",

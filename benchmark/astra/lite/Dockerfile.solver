@@ -38,6 +38,7 @@ LABEL org.opencontainers.image.title="MARGINAL Astra SWE-bench Lite solver" \
       org.marginal.codex.version="0.153.4" \
       org.marginal.python.version="3.12.11" \
       org.marginal.source.commit="${MARGINAL_SOURCE_COMMIT}" \
+      org.marginal.product.present="false" \
       org.marginal.task.image="${TASK_IMAGE}" \
       org.marginal.node.image="node@sha256:76789712cd1ae89a1225eac9077010d68987a423588042dac30446f502f1858c" \
       org.marginal.codex-builder.image="node@sha256:4d676821dff059fd00d277ee4261ef34ea712317fed0737c03941481b5760c96" \

@@ -9,10 +9,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import io
 import json
+import os
 import subprocess
-import tarfile
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, replace
@@ -33,6 +32,8 @@ class CampaignError(RuntimeError):
 
 
 _FROZEN_MARGINAL_COMMIT = "71c8eae5ef1321c45c3d5c7aa8af1ffcded719b1"
+FROZEN_PRODUCT_SUBTREE = "8b99ca79a11133117f538add2bf474851183de89"
+FROZEN_PRODUCT_ARCHIVE_SHA256 = "2050e4cbe1b233633ed016637a687e4d674aa970338fe5fc24e480cb3e313bbd"
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +42,7 @@ class SourceProvenance:
     tree: str
     product_commit: str = _FROZEN_MARGINAL_COMMIT
     product_tree: str = ""
+    product_subtree: str = ""
 
 
 def verify_frozen_source(
@@ -70,8 +72,15 @@ def verify_frozen_source(
     if len(tree) != 40 or any(character not in "0123456789abcdef" for character in tree):
         raise CampaignError("frozen MARGINAL source tree is invalid")
     product_tree = git(f"{_FROZEN_MARGINAL_COMMIT}^{{tree}}")
+    subtree = git(f"{_FROZEN_MARGINAL_COMMIT}:src/marginal")
+    if subtree != FROZEN_PRODUCT_SUBTREE:
+        raise CampaignError("frozen MARGINAL subtree identity mismatch")
     return SourceProvenance(
-        commit=actual, tree=tree, product_commit=expected, product_tree=product_tree
+        commit=actual,
+        tree=tree,
+        product_commit=expected,
+        product_tree=product_tree,
+        product_subtree=subtree,
     )
 
 
@@ -93,6 +102,8 @@ class PreparedTask:
     source_tree: str = ""
     product_commit: str = ""
     product_tree: str = ""
+    product_subtree: str = ""
+    product_archive_sha256: str = ""
     activation_mount_digest: str = ""
     prompt_sha256: str = ""
 
@@ -377,6 +388,32 @@ def _patch_bytes(lane_dir: Path) -> bytes:
         raise CampaignError(f"attempt lacks a durable patch artifact: {lane_dir}") from None
 
 
+PUBLIC_ARTIFACT_ALLOWLIST = frozenset({"predictions"})
+
+
+def validate_public_artifacts(
+    artifacts: Mapping[str, bytes], *, auth_markers: Sequence[bytes] = ()
+) -> None:
+    """Fail closed before durable publication of any allowlisted public payload.
+
+    Public formats are deliberately enumerated here.  New trajectories or provenance exports
+    must join this allowlist and call this function before they become materialized artifacts.
+    """
+
+    if not artifacts or not set(artifacts).issubset(PUBLIC_ARTIFACT_ALLOWLIST):
+        raise CampaignError("public artifact is not in the explicit export allowlist")
+    markers = tuple(marker for marker in auth_markers if marker)
+    if len(markers) != len(tuple(auth_markers)) or any(
+        not isinstance(marker, bytes) for marker in markers
+    ):
+        raise CampaignError("public artifact authentication markers are invalid")
+    for name, payload in artifacts.items():
+        if not isinstance(payload, bytes):
+            raise CampaignError(f"public artifact payload is unreadable: {name}")
+        if any(marker in payload for marker in markers):
+            raise CampaignError("authentication material detected in public artifact")
+
+
 def export_predictions(
     root: str | Path,
     condition: str,
@@ -389,7 +426,7 @@ def export_predictions(
 
     if condition not in {"baseline", "marginal"}:
         raise CampaignError("condition must be baseline or marginal")
-    markers = tuple(marker for marker in auth_markers if len(marker) >= 16)
+    markers = tuple(auth_markers)
     records: list[dict[str, str]] = []
     for task in Campaign.open(root).tasks:
         lane = CampaignCheckpoint(Path(root)).lane_dir(task, condition)
@@ -398,8 +435,6 @@ def export_predictions(
                 f"cannot export an unattempted lane: {task.instance_id}/{condition}"
             )
         patch = _patch_bytes(lane)
-        if any(marker in patch for marker in markers):
-            raise CampaignError("authentication material detected in exportable patch")
         records.append(
             {
                 "instance_id": task.instance_id,
@@ -411,8 +446,7 @@ def export_predictions(
     if output.exists():
         raise CampaignError("export destination already exists")
     payload = "".join(json.dumps(item, sort_keys=True) + "\n" for item in records).encode("utf-8")
-    if any(marker in payload for marker in markers):
-        raise CampaignError("authentication material detected in public export payload")
+    validate_public_artifacts({"predictions": payload}, auth_markers=markers)
     try:
         atomic_create_bytes(output, payload, mode=0o644)
     except CheckpointError as exc:
@@ -467,33 +501,62 @@ class DockerLiteRuntime:
         self.auth_source = auth_source.resolve()
         self.executor = executor
         self.git_executor = git_executor
-        self._product_dir: Path | None = None
+        self._product_archive: Path | None = None
 
-    def _product_source(self, source: SourceProvenance) -> Path:
-        if self._product_dir is not None:
-            return self._product_dir
-        target = Path(tempfile.mkdtemp(prefix="lite-frozen-product-"))
-        archive = subprocess.run(
+    def __enter__(self) -> DockerLiteRuntime:
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.close()
+
+    def close(self) -> None:
+        if self._product_archive is not None:
+            self._product_archive.unlink(missing_ok=True)
+            self._product_archive = None
+
+    def _product_tar(self, source: SourceProvenance) -> Path:
+        if self._product_archive is not None:
+            self.validate_frozen_product_archive(self._product_archive)
+            return self._product_archive
+        descriptor, name = tempfile.mkstemp(prefix="lite-frozen-product-", suffix=".tar")
+        target = Path(name)
+        archive = self.git_executor(
             ["git", "archive", "--format=tar", source.product_commit, "src/marginal"],
             cwd=self.source_root,
             check=False,
             capture_output=True,
+            text=False,
+            timeout=30,
         )
         if archive.returncode != 0:
+            os.close(descriptor)
+            target.unlink(missing_ok=True)
             raise CampaignError("could not extract frozen MARGINAL product Git object")
-        with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as bundle:
-            members = bundle.getmembers()
-            if any(
-                Path(member.name).is_absolute() or ".." in Path(member.name).parts
-                for member in members
-            ):
-                raise CampaignError("frozen product archive has unsafe paths")
-            bundle.extractall(target, members, filter="data")
-        product = target / "src"
-        if not (product / "marginal").is_dir():
-            raise CampaignError("frozen product archive lacks src/marginal")
-        self._product_dir = product
-        return product
+        payload = archive.stdout
+        if isinstance(payload, str):
+            # Enables a simple injected Git fixture without weakening byte verification.
+            payload = payload.encode("utf-8")
+        try:
+            with os.fdopen(descriptor, "wb") as output:
+                output.write(payload)
+                output.flush()
+                os.fsync(output.fileno())
+            target.chmod(0o444)
+            self.validate_frozen_product_archive(target)
+        except BaseException:
+            target.unlink(missing_ok=True)
+            raise
+        self._product_archive = target
+        return target
+
+    @staticmethod
+    def validate_frozen_product_archive(path: Path) -> None:
+        try:
+            payload = path.read_bytes()
+        except OSError as exc:
+            raise CampaignError("frozen product archive is unreadable") from exc
+        if hashlib.sha256(payload).hexdigest() != FROZEN_PRODUCT_ARCHIVE_SHA256:
+            raise CampaignError("frozen product archive digest mismatch")
 
     def _command(
         self, command: list[str], *, timeout: int = 1800
@@ -507,7 +570,7 @@ class DockerLiteRuntime:
 
     def prepare(self, task: LiteTask) -> PreparedTask:
         source = verify_frozen_source(self.source_root, git_executor=self.git_executor)
-        product = self._product_source(source)
+        self._product_tar(source)
         pulled = self._command(["docker", "pull", task.official_image])
         if pulled.returncode != 0:
             raise CampaignError("Docker could not pull the official task image")
@@ -538,8 +601,8 @@ class DockerLiteRuntime:
                 "baseline",
                 "--build-arg",
                 f"TASK_IMAGE={task_image}",
-                    "--build-arg",
-                    f"MARGINAL_SOURCE_COMMIT={source.product_commit}",
+                "--build-arg",
+                f"MARGINAL_SOURCE_COMMIT={source.commit}",
                 "--tag",
                 runtime_tag,
                 str(self.source_root),
@@ -560,7 +623,9 @@ class DockerLiteRuntime:
             source_tree=source.tree,
             product_commit=source.product_commit,
             product_tree=source.product_tree,
-            activation_mount_digest=hashlib.sha256(str(product).encode()).hexdigest(),
+            product_subtree=source.product_subtree,
+            product_archive_sha256=FROZEN_PRODUCT_ARCHIVE_SHA256,
+            activation_mount_digest=FROZEN_PRODUCT_ARCHIVE_SHA256,
         )
 
     def run_lane(
@@ -603,23 +668,32 @@ class DockerLiteRuntime:
                 condition,
             ]
             if condition == "marginal":
-                product = self._product_source(
+                product = self._product_tar(
                     SourceProvenance(
                         prepared.source_commit,
                         prepared.source_tree,
                         prepared.product_commit,
                         prepared.product_tree,
+                        prepared.product_subtree,
                     )
                 )
+                self.validate_frozen_product_archive(product)
                 command[3:3] = [
                     "--mount",
-                    f"type=bind,src={product},dst=/opt/marginal-product/src,readonly",
-                    "--env",
-                    "PYTHONPATH=/opt/marginal-product/src",
+                    f"type=bind,src={product},dst=/opt/marginal-product/marginal.tar,readonly",
                 ]
             # LiteLaneConfig defaults are container paths; a dedicated subdirectory preserves the
             # immutable outer lane directory and its pre-launch marker.
             command.extend(["--run-dir", "/marginal-output/attempt/runtime"])
+            if condition == "marginal":
+                command.extend(
+                    [
+                        "--marginal-product-archive",
+                        "/opt/marginal-product/marginal.tar",
+                        "--marginal-product-sha256",
+                        FROZEN_PRODUCT_ARCHIVE_SHA256,
+                    ]
+                )
             completed = self._command(command, timeout=960)
         text = (completed.stdout + "\n" + completed.stderr).lower()
         if "quota" in text or "capacity" in text:
@@ -697,13 +771,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif args.command == "status":
         print(json.dumps(Campaign.open(args.campaign_dir).status(), sort_keys=True))
     elif args.command == "run":
-        runtime = DockerLiteRuntime(
-            source_root=args.source_root,
-            auth_source=args.auth,
-        )
-        result = CampaignRunner(
-            args.campaign_dir, runtime, JsonProblemProvider(args.problem_source)
-        ).run(max_lanes=args.max_lanes)
+        with DockerLiteRuntime(source_root=args.source_root, auth_source=args.auth) as runtime:
+            result = CampaignRunner(
+                args.campaign_dir, runtime, JsonProblemProvider(args.problem_source)
+            ).run(max_lanes=args.max_lanes)
         print(json.dumps(asdict(result), sort_keys=True))
     else:
         export_predictions(

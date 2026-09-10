@@ -214,14 +214,14 @@ def _changed_paths(worktree: Path) -> list[str]:
 
 def _auth_markers(auth_source: Path) -> tuple[bytes, ...]:
     raw = auth_source.read_bytes()
-    markers: set[bytes] = {raw.strip()} if len(raw.strip()) >= 16 else set()
+    markers: set[bytes] = {raw.strip()} if raw.strip() else set()
     try:
         decoded = json.loads(raw)
     except json.JSONDecodeError:
         decoded = None
 
     def collect(value: object) -> None:
-        if isinstance(value, str) and len(value.encode("utf-8")) >= 16:
+        if isinstance(value, str) and value:
             markers.add(value.encode("utf-8"))
         elif isinstance(value, dict):
             for item in value.values():

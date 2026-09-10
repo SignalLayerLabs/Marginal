@@ -215,6 +215,8 @@ class CampaignCheckpoint:
                 "source_tree": prepared["source_tree"],
                 "product_commit": prepared["product_commit"],
                 "product_tree": prepared["product_tree"],
+                "product_subtree": prepared["product_subtree"],
+                "product_archive_sha256": prepared["product_archive_sha256"],
                 "activation_mount_digest": prepared["activation_mount_digest"],
                 "prompt_sha256": prepared["prompt_sha256"],
             },
@@ -255,6 +257,8 @@ class CampaignCheckpoint:
             "prompt_sha256",
             "product_commit",
             "product_tree",
+            "product_subtree",
+            "product_archive_sha256",
             "activation_mount_digest",
         }
         if set(value) != expected:
@@ -268,6 +272,8 @@ class CampaignCheckpoint:
             "prompt_sha256",
             "product_commit",
             "product_tree",
+            "product_subtree",
+            "product_archive_sha256",
             "activation_mount_digest",
         )
         if not all(isinstance(value[key], str) for key in (*image_keys, *provenance_keys)):
@@ -287,6 +293,8 @@ class CampaignCheckpoint:
             "prompt_sha256",
             "product_commit",
             "product_tree",
+            "product_subtree",
+            "product_archive_sha256",
             "activation_mount_digest",
         }
         if set(prepared) != expected or not all(
