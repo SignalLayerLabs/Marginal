@@ -461,8 +461,10 @@ def test_source_provenance_requires_the_clean_frozen_product_commit(tmp_path: Pa
 
     root = tmp_path / "source"
     root.mkdir()
+    observed_commands: list[list[str]] = []
 
     def clean_git(command, **_kwargs):
+        observed_commands.append(command)
         if command[-2:] == ["status", "--porcelain"]:
             return subprocess.CompletedProcess(command, 0, "", "")
         if command[-1].endswith("^{commit}") and command[-1] != "HEAD^{commit}":
@@ -485,6 +487,9 @@ def test_source_provenance_requires_the_clean_frozen_product_commit(tmp_path: Pa
 
     assert provenance.commit == "71c8eae5ef1321c45c3d5c7aa8af1ffcded719b1"
     assert provenance.tree == "51c22b9eec66b08bfa58ac8bad89bd964aaafd39"
+    assert all(
+        command[1] == "rev-parse" for command in observed_commands if command[-1] != "--porcelain"
+    )
 
     def dirty_git(command, **kwargs):
         if command[-2:] == ["status", "--porcelain"]:

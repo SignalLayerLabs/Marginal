@@ -62,17 +62,17 @@ def verify_frozen_source(
             raise CampaignError("frozen MARGINAL source cannot be resolved as a Git checkout")
         return completed.stdout.strip()
 
-    expected = git(f"{_FROZEN_MARGINAL_COMMIT}^{{commit}}")
-    actual = git("HEAD^{commit}")
+    expected = git("rev-parse", f"{_FROZEN_MARGINAL_COMMIT}^{{commit}}")
+    actual = git("rev-parse", "HEAD^{commit}")
     if expected != _FROZEN_MARGINAL_COMMIT:
         raise CampaignError("frozen MARGINAL commit 71c8eae is unavailable")
     if git("status", "--porcelain"):
         raise CampaignError("frozen MARGINAL source checkout must be clean")
-    tree = git("HEAD^{tree}")
+    tree = git("rev-parse", "HEAD^{tree}")
     if len(tree) != 40 or any(character not in "0123456789abcdef" for character in tree):
         raise CampaignError("frozen MARGINAL source tree is invalid")
-    product_tree = git(f"{_FROZEN_MARGINAL_COMMIT}^{{tree}}")
-    subtree = git(f"{_FROZEN_MARGINAL_COMMIT}:src/marginal")
+    product_tree = git("rev-parse", f"{_FROZEN_MARGINAL_COMMIT}^{{tree}}")
+    subtree = git("rev-parse", f"{_FROZEN_MARGINAL_COMMIT}:src/marginal")
     if subtree != FROZEN_PRODUCT_SUBTREE:
         raise CampaignError("frozen MARGINAL subtree identity mismatch")
     return SourceProvenance(
