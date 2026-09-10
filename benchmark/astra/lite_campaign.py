@@ -494,11 +494,13 @@ class DockerLiteRuntime:
         *,
         source_root: Path,
         auth_source: Path,
+        exchange_root: Path | None = None,
         executor: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
         git_executor: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     ):
         self.source_root = source_root.resolve()
         self.auth_source = auth_source.resolve()
+        self.exchange_root = (exchange_root or Path(tempfile.gettempdir())).resolve()
         self.executor = executor
         self.git_executor = git_executor
         self._product_archive: Path | None = None
@@ -514,11 +516,23 @@ class DockerLiteRuntime:
             self._product_archive.unlink(missing_ok=True)
             self._product_archive = None
 
+    def _ensure_exchange_root(self) -> None:
+        try:
+            self.exchange_root.mkdir(parents=True)
+        except FileExistsError:
+            if not self.exchange_root.is_dir():
+                raise CampaignError("runtime exchange root is not a directory") from None
+        else:
+            self.exchange_root.chmod(0o700)
+
     def _product_tar(self, source: SourceProvenance) -> Path:
         if self._product_archive is not None:
             self.validate_frozen_product_archive(self._product_archive)
             return self._product_archive
-        descriptor, name = tempfile.mkstemp(prefix="lite-frozen-product-", suffix=".tar")
+        self._ensure_exchange_root()
+        descriptor, name = tempfile.mkstemp(
+            prefix="lite-frozen-product-", suffix=".tar", dir=self.exchange_root
+        )
         target = Path(name)
         archive = self.git_executor(
             ["git", "archive", "--format=tar", source.product_commit, "src/marginal"],
@@ -638,7 +652,8 @@ class DockerLiteRuntime:
     ) -> Mapping[str, Any]:
         if not self.auth_source.is_file():
             raise CampaignError("Codex authentication source is unavailable")
-        with tempfile.TemporaryDirectory(prefix="lite-input-") as temporary:
+        self._ensure_exchange_root()
+        with tempfile.TemporaryDirectory(prefix="lite-input-", dir=self.exchange_root) as temporary:
             prompt = Path(temporary) / "prompt.txt"
             prompt.write_text(solver_input, encoding="utf-8")
             command = [
@@ -695,9 +710,16 @@ class DockerLiteRuntime:
                     ]
                 )
             completed = self._command(command, timeout=960)
+        atomic_create_bytes(lane_dir / "docker.stdout.log", completed.stdout.encode("utf-8"))
+        atomic_create_bytes(lane_dir / "docker.stderr.log", completed.stderr.encode("utf-8"))
         text = (completed.stdout + "\n" + completed.stderr).lower()
         if "quota" in text or "capacity" in text:
             return {"run_status": "quota_exhausted"}
+        if completed.returncode != 0 and not (lane_dir / "runtime" / "run-record.json").is_file():
+            return {
+                "run_status": "infrastructure_failed",
+                "docker_exit_code": completed.returncode,
+            }
         return {"run_status": "completed" if completed.returncode == 0 else "codex_failed"}
 
     def remove_image(self, image: str) -> None:
@@ -771,7 +793,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif args.command == "status":
         print(json.dumps(Campaign.open(args.campaign_dir).status(), sort_keys=True))
     elif args.command == "run":
-        with DockerLiteRuntime(source_root=args.source_root, auth_source=args.auth) as runtime:
+        with DockerLiteRuntime(
+            source_root=args.source_root,
+            auth_source=args.auth,
+            exchange_root=args.campaign_dir / ".runtime-exchange",
+        ) as runtime:
             result = CampaignRunner(
                 args.campaign_dir, runtime, JsonProblemProvider(args.problem_source)
             ).run(max_lanes=args.max_lanes)

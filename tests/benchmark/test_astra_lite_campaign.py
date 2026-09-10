@@ -290,6 +290,7 @@ def test_docker_runtime_is_injectable_and_uses_only_explicit_image_operations(
     runtime = DockerLiteRuntime(
         source_root=Path(__file__).resolve().parents[2],
         auth_source=auth,
+        exchange_root=tmp_path / "exchange",
         executor=fake_docker,
         git_executor=fake_git,
     )
@@ -311,7 +312,49 @@ def test_docker_runtime_is_injectable_and_uses_only_explicit_image_operations(
         ["docker", "image", "rm"],
     ]
     assert not any("prune" in command for command in commands)
+
+    commands.clear()
+    for condition in ("baseline", "marginal"):
+        lane = tmp_path / condition
+        lane.mkdir()
+        result = runtime.run_lane(task, condition, prepared, lane, "safe input")
+        assert result["run_status"] == "completed"
+        assert (lane / "docker.stdout.log").is_file()
+        assert (lane / "docker.stderr.log").is_file()
+    docker_runs = [command for command in commands if command[:2] == ["docker", "run"]]
+    assert len(docker_runs) == 2
+    exchange = str((tmp_path / "exchange").resolve())
+    assert all(any(f"src={exchange}/" in item for item in command) for command in docker_runs)
     runtime.close()
+
+
+def test_outer_docker_failure_without_inner_record_is_infrastructure(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import DockerLiteRuntime, PreparedTask
+
+    auth = tmp_path / "auth.json"
+    auth.write_text("{}\n", encoding="utf-8")
+
+    def failed_docker(command, **_kwargs):
+        return subprocess.CompletedProcess(command, 125, "", "mount source missing")
+
+    runtime = DockerLiteRuntime(
+        source_root=tmp_path,
+        auth_source=auth,
+        exchange_root=tmp_path / "exchange",
+        executor=failed_docker,
+    )
+    lane = tmp_path / "lane"
+    lane.mkdir()
+    result = runtime.run_lane(
+        _task(0, "django__django-11099", ("baseline", "marginal")),
+        "baseline",
+        PreparedTask("repo/task@sha256:" + "b" * 64, "sha256:" + "c" * 64),
+        lane,
+        "safe input",
+    )
+
+    assert result == {"run_status": "infrastructure_failed", "docker_exit_code": 125}
+    assert (lane / "docker.stderr.log").read_text(encoding="utf-8") == "mount source missing"
 
 
 def test_frozen_product_archive_tampering_refuses_docker_launch_and_close_is_scoped(
