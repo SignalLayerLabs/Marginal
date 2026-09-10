@@ -13,7 +13,8 @@ FROM --platform=linux/amd64 node@sha256:76789712cd1ae89a1225eac9077010d68987a423
 ENV UV_PYTHON_INSTALL_DIR=/overlay/opt/python
 COPY --from=uv_builder /uv /uv
 RUN /uv python install cpython-3.12.11-linux-x86_64-musl \
-    && mkdir -p /overlay/opt/python/bin /overlay/opt/marginal-tools/bin \
+    && mkdir -p /overlay/lib /overlay/opt/python/bin /overlay/opt/marginal-tools/bin \
+    && cp /lib/ld-musl-x86_64.so.1 /overlay/lib/ld-musl-x86_64.so.1 \
     && installed_python="$(/uv python find cpython-3.12.11-linux-x86_64-musl)" \
     && ln -s "${installed_python#/overlay}" /overlay/opt/python/bin/python3 \
     && "${installed_python}" --version
