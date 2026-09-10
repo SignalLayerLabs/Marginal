@@ -79,6 +79,8 @@ class CampaignCheckpoint:
         return self.root / "schedule.jsonl"
 
     def initialize(self, tasks: tuple[LiteTask, ...]) -> None:
+        if os.name != "posix":
+            raise CheckpointError("Lite campaign checkpoints require a POSIX host")
         if not tasks:
             raise CheckpointError("campaign schedule must not be empty")
         if [task.schedule_position for task in tasks] != list(range(len(tasks))):
@@ -140,6 +142,33 @@ class CampaignCheckpoint:
             raise CheckpointError("condition is not scheduled for this task")
         return self.root / "lanes" / self.task_key(task) / condition
 
+    def lease_dir(self, task: LiteTask) -> Path:
+        return self.root / "leases" / self.task_key(task)
+
+    def has_lease(self, task: LiteTask) -> bool:
+        return self.lease_dir(task).exists()
+
+    def claim_task(self, task: LiteTask) -> bool:
+        """Atomically claim the complete ordered pair; a stale lease is never reusable."""
+
+        lease = self.lease_dir(task)
+        lease.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            lease.mkdir()
+        except FileExistsError:
+            return False
+        os.chmod(lease, 0o700)
+        atomic_create_json(
+            lease / "lease.json",
+            {
+                "schema_version": 2,
+                "state": "leased",
+                "instance_id": task.instance_id,
+                "schedule_position": task.schedule_position,
+            },
+        )
+        return True
+
     def has_attempt(self, task: LiteTask, condition: str) -> bool:
         return self.lane_dir(task, condition).exists()
 
@@ -164,9 +193,30 @@ class CampaignCheckpoint:
                 "schedule_position": task.schedule_position,
                 "task_image": prepared["task_image"],
                 "overlay_image": prepared["overlay_image"],
+                "runtime_image": prepared[
+                    "baseline_image" if condition == "baseline" else "marginal_image"
+                ]
+                or prepared["overlay_image"],
+                "source_commit": prepared["source_commit"],
+                "source_tree": prepared["source_tree"],
+                "prompt_sha256": prepared["prompt_sha256"],
             },
         )
         return lane
+
+    def stage_pair(self, task: LiteTask, prepared: dict[str, str]) -> tuple[Path, Path]:
+        """Create both pre-launch records and exportable empty patches under the task lease."""
+
+        if not self.has_lease(task):
+            raise CheckpointError("cannot stage a task without its immutable lease")
+        lanes: list[Path] = []
+        for condition in task.condition_order:
+            lane = self.claim_attempt(task, condition, prepared)
+            if lane is None:
+                raise CheckpointError("a task lease has an existing or uncertain lane")
+            atomic_create_bytes(lane / "model.patch", b"")
+            lanes.append(lane)
+        return lanes[0], lanes[1]
 
     def task_record_path(self, task: LiteTask) -> Path:
         return self.root / "tasks" / f"{self.task_key(task)}.json"
@@ -176,18 +226,42 @@ class CampaignCheckpoint:
         if not path.exists():
             return None
         value = read_json(path)
-        if set(value) != {"schema_version", "instance_id", "task_image", "overlay_image"}:
+        expected = {
+            "schema_version",
+            "instance_id",
+            "task_image",
+            "overlay_image",
+            "baseline_image",
+            "marginal_image",
+            "source_commit",
+            "source_tree",
+            "prompt_sha256",
+        }
+        if set(value) != expected:
             raise CheckpointError("prepared task record contains unsafe or missing fields")
         if value["instance_id"] != task.instance_id:
             raise CheckpointError("prepared task record identity mismatch")
-        if not all(
-            isinstance(value[key], str) and value[key] for key in ("task_image", "overlay_image")
-        ):
+        image_keys = ("task_image", "overlay_image", "baseline_image", "marginal_image")
+        provenance_keys = ("source_commit", "source_tree", "prompt_sha256")
+        if not all(isinstance(value[key], str) for key in (*image_keys, *provenance_keys)):
             raise CheckpointError("prepared task record has invalid image identity")
-        return {"task_image": value["task_image"], "overlay_image": value["overlay_image"]}
+        if not value["task_image"] or not value["overlay_image"]:
+            raise CheckpointError("prepared task record has invalid image identity")
+        return {key: value[key] for key in expected if key not in {"schema_version", "instance_id"}}
 
     def record_prepared(self, task: LiteTask, prepared: dict[str, str]) -> None:
-        if set(prepared) != {"task_image", "overlay_image"} or not all(prepared.values()):
+        expected = {
+            "task_image",
+            "overlay_image",
+            "baseline_image",
+            "marginal_image",
+            "source_commit",
+            "source_tree",
+            "prompt_sha256",
+        }
+        if set(prepared) != expected or not all(
+            isinstance(value, str) for value in prepared.values()
+        ):
             raise CheckpointError("prepared image record is invalid")
         atomic_create_json(
             self.task_record_path(task),

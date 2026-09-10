@@ -18,7 +18,6 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .codex_events import CodexMetrics, EventParseError, parse_codex_jsonl
-from .hook_config import install_codex_home_hooks
 
 _SOURCE_ROOT = Path(__file__).resolve().parents[2]
 _HOOK_CLIENT = Path(__file__).resolve().with_name("hook_client.py")
@@ -380,6 +379,8 @@ def run_task(config: RunConfig) -> dict[str, Any]:
 
         try:
             if config.condition == "marginal":
+                from .hook_config import install_codex_home_hooks
+
                 install_codex_home_hooks(
                     codex_home,
                     python_executable=Path(sys.executable),

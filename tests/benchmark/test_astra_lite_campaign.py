@@ -84,28 +84,21 @@ def test_run_writes_an_attempt_marker_before_a_lane_can_launch(tmp_path: Path) -
             )
             return super().run_lane(task, condition, prepared, lane_dir, solver_input)
 
-    result = CampaignRunner(tmp_path, InspectingRuntime([], []), _provider).run(max_lanes=1)
+    result = CampaignRunner(tmp_path, InspectingRuntime([], []), _provider).run(max_lanes=2)
 
-    assert result.launched == 1
+    assert result.launched == 2
     assert (
         tmp_path / "lanes" / "0000-django__django-11099" / "baseline" / "attempt.json"
     ).is_file()
 
 
-def test_interrupted_attempt_is_preserved_and_never_launched_again(tmp_path: Path) -> None:
-    from benchmark.astra.lite_campaign import CampaignRunner, initialize_campaign
+def test_run_refuses_to_split_a_paired_task_at_a_one_lane_limit(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import CampaignError, CampaignRunner, initialize_campaign
 
     task = _task(0, "django__django-11099", ("baseline", "marginal"))
     initialize_campaign(tmp_path, (task,))
-    first = FakeRuntime([], [])
-    CampaignRunner(tmp_path, first, _provider).run(max_lanes=1)
-    second = FakeRuntime([], [])
-    CampaignRunner(tmp_path, second, _provider).run(max_lanes=2)
-
-    assert first.launched == [
-        (task.instance_id, "baseline", f"local/{task.instance_id}@sha256:{'c' * 64}")
-    ]
-    assert [item[:2] for item in second.launched] == [(task.instance_id, "marginal")]
+    with pytest.raises(CampaignError, match="complete paired task"):
+        CampaignRunner(tmp_path, FakeRuntime([], []), _provider).run(max_lanes=1)
 
 
 def test_quota_stop_preserves_attempt_and_stops_before_next_lane(tmp_path: Path) -> None:
@@ -135,7 +128,7 @@ def test_lane_failure_preserves_an_empty_patch_for_later_export(tmp_path: Path) 
         def run_lane(self, task, condition, prepared, lane_dir, solver_input):
             raise RuntimeError("fixture Docker failure")
 
-    CampaignRunner(tmp_path, FailingRuntime([], []), _provider).run(max_lanes=1)
+    CampaignRunner(tmp_path, FailingRuntime([], []), _provider).run(max_lanes=2)
 
     lane = tmp_path / "lanes" / "0000-django__django-11099" / "baseline"
     assert (lane / "model.patch").read_bytes() == b""
@@ -244,16 +237,29 @@ def test_docker_runtime_is_injectable_and_uses_only_explicit_image_operations(
                 command, 0, f"example/{task.instance_id}@sha256:{'b' * 64}\n", ""
             )
         if command[:3] == ["docker", "image", "inspect"]:
-            return subprocess.CompletedProcess(command, 0, f"sha256:{'c' * 64}\n", "")
+            suffix = "c" if command[-1].endswith("baseline") else "d"
+            return subprocess.CompletedProcess(command, 0, f"sha256:{suffix * 64}\n", "")
         return subprocess.CompletedProcess(command, 0, "", "")
 
     auth = tmp_path / "auth.json"
     auth.write_text("{}\n", encoding="utf-8")
+
+    def fake_git(command, **_kwargs):
+        if command[-2:] == ["status", "--porcelain"]:
+            return subprocess.CompletedProcess(command, 0, "", "")
+        if command[-1].endswith("^{commit}"):
+            return subprocess.CompletedProcess(
+                command, 0, "71c8eae5ef1321c45c3d5c7aa8af1ffcded719b1\n", ""
+            )
+        return subprocess.CompletedProcess(
+            command, 0, "51c22b9eec66b08bfa58ac8bad89bd964aaafd39\n", ""
+        )
+
     runtime = DockerLiteRuntime(
         source_root=Path(__file__).resolve().parents[2],
         auth_source=auth,
-        marginal_commit="a" * 40,
         executor=fake_docker,
+        git_executor=fake_git,
     )
 
     prepared = runtime.prepare(task)
@@ -261,9 +267,12 @@ def test_docker_runtime_is_injectable_and_uses_only_explicit_image_operations(
     runtime.remove_image(prepared.task_image)
 
     assert prepared.task_image == f"example/{task.instance_id}@sha256:{'b' * 64}"
-    assert prepared.overlay_image == f"sha256:{'c' * 64}"
+    assert prepared.baseline_image == f"sha256:{'c' * 64}"
+    assert prepared.marginal_image == prepared.overlay_image == f"sha256:{'d' * 64}"
     assert [command[:3] for command in commands] == [
         ["docker", "pull", task.official_image],
+        ["docker", "image", "inspect"],
+        ["docker", "build", "--file"],
         ["docker", "image", "inspect"],
         ["docker", "build", "--file"],
         ["docker", "image", "inspect"],
@@ -271,3 +280,108 @@ def test_docker_runtime_is_injectable_and_uses_only_explicit_image_operations(
         ["docker", "image", "rm"],
     ]
     assert not any("prune" in command for command in commands)
+
+
+def test_changed_frozen_prompt_is_rejected_before_solver_input_is_rendered(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import CampaignError, render_solver_input
+
+    task = _task(0, "django__django-11099", ("baseline", "marginal"))
+    prompt = tmp_path / "prompt.txt"
+    prompt.write_text("ISSUE: {{problem_statement}}\n", encoding="utf-8")
+
+    with pytest.raises(CampaignError, match="prompt SHA-256"):
+        render_solver_input(task, _provider(task), prompt_path=prompt)
+
+
+def test_task_lease_stages_empty_patches_before_an_abrupt_exit_and_blocks_sibling(
+    tmp_path: Path,
+) -> None:
+    from benchmark.astra.lite_campaign import CampaignRunner, initialize_campaign
+
+    task = _task(0, "django__django-11099", ("baseline", "marginal"))
+    initialize_campaign(tmp_path, (task,))
+
+    class ExitingRuntime(FakeRuntime):
+        def run_lane(self, task, condition, prepared, lane_dir, solver_input):
+            self.launched.append((task.instance_id, condition, prepared.overlay_image))
+            raise SystemExit(75)
+
+    exiting = ExitingRuntime([], [])
+    with pytest.raises(SystemExit):
+        CampaignRunner(tmp_path, exiting, _provider).run(max_lanes=2)
+
+    root = tmp_path / "lanes" / "0000-django__django-11099"
+    assert (root / "baseline" / "model.patch").read_bytes() == b""
+    assert (root / "marginal" / "model.patch").read_bytes() == b""
+    sibling = FakeRuntime([], [])
+    assert CampaignRunner(tmp_path, sibling, _provider).run(max_lanes=2).launched == 0
+    assert sibling.launched == []
+    assert exiting.removed == []
+
+
+def test_stderr_only_quota_signal_stops_before_the_next_task_is_claimed(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import CampaignRunner, initialize_campaign
+
+    first = _task(0, "django__django-11099", ("baseline", "marginal"))
+    second = _task(1, "sympy__sympy-12419", ("baseline", "marginal"))
+    initialize_campaign(tmp_path, (first, second))
+
+    class StderrQuotaRuntime(FakeRuntime):
+        def run_lane(self, task, condition, prepared, lane_dir, solver_input):
+            self.launched.append((task.instance_id, condition, prepared.overlay_image))
+            runtime = lane_dir / "runtime"
+            runtime.mkdir()
+            (runtime / "codex-stderr.log").write_text("account capacity exhausted\n")
+            return {"run_status": "codex_failed"}
+
+    runtime = StderrQuotaRuntime([], [])
+    result = CampaignRunner(tmp_path, runtime, _provider).run(max_lanes=4)
+
+    assert result.stop_reason == "quota"
+    assert [item[:2] for item in runtime.launched] == [(first.instance_id, "baseline")]
+    assert not (tmp_path / "leases" / "0001-sympy__sympy-12419").exists()
+
+
+def test_auth_marker_collection_fails_closed_for_unparseable_auth(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import CampaignError, _auth_markers
+
+    auth = tmp_path / "auth.json"
+    auth.write_text("not-json", encoding="utf-8")
+
+    with pytest.raises(CampaignError, match="authentication"):
+        _auth_markers(auth)
+
+
+def test_source_provenance_requires_the_clean_frozen_product_commit(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import CampaignError, verify_frozen_source
+
+    root = tmp_path / "source"
+    root.mkdir()
+
+    def clean_git(command, **_kwargs):
+        if command[-2:] == ["status", "--porcelain"]:
+            return subprocess.CompletedProcess(command, 0, "", "")
+        if command[-1].endswith("^{commit}") and command[-1] != "HEAD^{commit}":
+            return subprocess.CompletedProcess(
+                command, 0, "71c8eae5ef1321c45c3d5c7aa8af1ffcded719b1\n", ""
+            )
+        if command[-1] == "HEAD^{commit}":
+            return subprocess.CompletedProcess(
+                command, 0, "71c8eae5ef1321c45c3d5c7aa8af1ffcded719b1\n", ""
+            )
+        return subprocess.CompletedProcess(
+            command, 0, "51c22b9eec66b08bfa58ac8bad89bd964aaafd39\n", ""
+        )
+
+    provenance = verify_frozen_source(root, git_executor=clean_git)
+
+    assert provenance.commit == "71c8eae5ef1321c45c3d5c7aa8af1ffcded719b1"
+    assert provenance.tree == "51c22b9eec66b08bfa58ac8bad89bd964aaafd39"
+
+    def dirty_git(command, **kwargs):
+        if command[-2:] == ["status", "--porcelain"]:
+            return subprocess.CompletedProcess(command, 0, " M benchmark/prompt_template.txt\n", "")
+        return clean_git(command, **kwargs)
+
+    with pytest.raises(CampaignError, match="clean"):
+        verify_frozen_source(root, git_executor=dirty_git)

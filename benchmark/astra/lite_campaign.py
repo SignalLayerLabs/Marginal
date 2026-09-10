@@ -8,14 +8,12 @@ are dependency-injected so unit tests never need a daemon, a dataset, or Codex i
 from __future__ import annotations
 
 import argparse
-import contextlib
 import hashlib
 import json
-import os
 import subprocess
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -25,11 +23,49 @@ from benchmark.astra.lite.checkpoint import (
     atomic_create_bytes,
     read_json,
 )
-from benchmark.astra.lite.freeze import LiteTask, load_safe_manifest
+from benchmark.astra.lite.freeze import CANONICAL_PROTOCOL, LiteTask, load_safe_manifest
 
 
 class CampaignError(RuntimeError):
     """Raised when campaign integrity or the solver isolation boundary is violated."""
+
+
+_FROZEN_MARGINAL_COMMIT = "71c8eae5ef1321c45c3d5c7aa8af1ffcded719b1"
+
+
+@dataclass(frozen=True, slots=True)
+class SourceProvenance:
+    commit: str
+    tree: str
+
+
+def verify_frozen_source(
+    source_root: Path,
+    *,
+    git_executor: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+) -> SourceProvenance:
+    """Resolve a clean source checkout to the one preregistered product commit."""
+
+    root = source_root.resolve()
+
+    def git(*args: str) -> str:
+        completed = git_executor(
+            ["git", *args], cwd=root, check=False, capture_output=True, text=True, timeout=30
+        )
+        if completed.returncode != 0:
+            raise CampaignError("frozen MARGINAL source cannot be resolved as a Git checkout")
+        return completed.stdout.strip()
+
+    expected = git(f"{_FROZEN_MARGINAL_COMMIT}^{{commit}}")
+    actual = git("HEAD^{commit}")
+    if expected != _FROZEN_MARGINAL_COMMIT or actual != expected:
+        raise CampaignError("source checkout does not resolve to frozen MARGINAL commit 71c8eae")
+    if git("status", "--porcelain"):
+        raise CampaignError("frozen MARGINAL source checkout must be clean")
+    tree = git("HEAD^{tree}")
+    if len(tree) != 40 or any(character not in "0123456789abcdef" for character in tree):
+        raise CampaignError("frozen MARGINAL source tree is invalid")
+    return SourceProvenance(commit=actual, tree=tree)
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +80,18 @@ class PreparedTask:
 
     task_image: str
     overlay_image: str
+    baseline_image: str = ""
+    marginal_image: str = ""
+    source_commit: str = ""
+    source_tree: str = ""
+    prompt_sha256: str = ""
+
+    def image_for(self, condition: str) -> str:
+        if condition == "baseline":
+            return self.baseline_image or self.overlay_image
+        if condition == "marginal":
+            return self.marginal_image or self.overlay_image
+        raise CampaignError("condition must be baseline or marginal")
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,9 +136,26 @@ def render_solver_input(
         template = template_file.read_text(encoding="utf-8")
     except OSError as exc:
         raise CampaignError("frozen solver prompt is unreadable") from exc
+    if _prompt_sha256(template) != CANONICAL_PROTOCOL["prompt_sha256"]:
+        raise CampaignError("frozen solver prompt SHA-256 does not match the protocol")
     if template.count("{{problem_statement}}") != 1:
         raise CampaignError("frozen solver prompt has an invalid issue placeholder")
     return template.replace("{{problem_statement}}", problem)
+
+
+def _prompt_sha256(template: str) -> str:
+    return hashlib.sha256(template.encode("utf-8")).hexdigest()
+
+
+def frozen_prompt_sha256() -> str:
+    path = Path(__file__).resolve().parents[1] / "prompt_template.txt"
+    try:
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise CampaignError("frozen solver prompt is unreadable") from exc
+    if digest != CANONICAL_PROTOCOL["prompt_sha256"]:
+        raise CampaignError("frozen solver prompt SHA-256 does not match the protocol")
+    return digest
 
 
 class Campaign:
@@ -117,6 +182,11 @@ class Campaign:
             for entry in self.entries()
             if not self.checkpoint.has_attempt(entry.task, entry.condition)
         )
+
+    def next_tasks(self) -> tuple[LiteTask, ...]:
+        """Only tasks with no lease are runnable; interrupted leases are intentionally skipped."""
+
+        return tuple(task for task in self.tasks if not self.checkpoint.has_lease(task))
 
     def status(self) -> dict[str, int]:
         entries = self.entries()
@@ -149,9 +219,27 @@ def initialize_campaign(root: str | Path, tasks: tuple[LiteTask, ...]) -> Campai
     return Campaign(checkpoint)
 
 
-def _outcome_category(record: Mapping[str, Any] | None, error: BaseException | None) -> str:
+def _quota_signal(lane: Path, record: Mapping[str, Any] | None) -> bool:
+    if "quota" in str((record or {}).get("run_status", "")).lower():
+        return True
+    for name in ("codex-stderr.log", "run-record.json"):
+        candidate = lane / "runtime" / name
+        try:
+            text = candidate.read_text(encoding="utf-8", errors="replace").lower()
+        except FileNotFoundError:
+            continue
+        if "quota" in text or "capacity exhausted" in text or "rate limit" in text:
+            return True
+    return False
+
+
+def _outcome_category(
+    lane: Path, record: Mapping[str, Any] | None, error: BaseException | None
+) -> str:
     if error is not None:
         return "infrastructure"
+    if _quota_signal(lane, record):
+        return "quota"
     status = str((record or {}).get("run_status", ""))
     lowered = status.lower()
     if "quota" in lowered or "capacity" in lowered:
@@ -174,6 +262,7 @@ class CampaignRunner:
         if recorded is not None:
             return PreparedTask(**recorded)
         prepared = self.runtime.prepare(task)
+        prepared = replace(prepared, prompt_sha256=frozen_prompt_sha256())
         values = asdict(prepared)
         try:
             self.checkpoint.record_prepared(task, values)
@@ -187,53 +276,63 @@ class CampaignRunner:
 
     def _cleanup_if_paired(self, task: LiteTask, prepared: PreparedTask) -> None:
         if not all(
-            self.checkpoint.has_attempt(task, condition) for condition in task.condition_order
+            (self.checkpoint.lane_dir(task, condition) / "model.patch").is_file()
+            and (self.checkpoint.lane_dir(task, condition) / "outcome.json").is_file()
+            for condition in task.condition_order
         ):
             return
         # Explicit identities only; never use a broad Docker prune operation.
-        self.runtime.remove_image(prepared.overlay_image)
+        for image in dict.fromkeys(
+            (
+                prepared.baseline_image or prepared.overlay_image,
+                prepared.marginal_image or prepared.overlay_image,
+            )
+        ):
+            self.runtime.remove_image(image)
         self.runtime.remove_image(prepared.task_image)
 
     def run(self, *, max_lanes: int) -> RunSummary:
-        if max_lanes <= 0:
-            raise CampaignError("max_lanes must be positive")
+        if max_lanes < 2:
+            raise CampaignError("max_lanes must permit one complete paired task")
         campaign = Campaign(self.checkpoint)
         launched = 0
-        for entry in campaign.next_entries():
-            if launched >= max_lanes:
+        for task in campaign.next_tasks():
+            if launched + 2 > max_lanes:
                 break
-            prepared = self._prepared(entry.task)
+            if not self.checkpoint.claim_task(task):
+                continue
+            prepared = self._prepared(task)
             # The provider is permitted to project only the issue text, then it is hash checked
             # before being supplied to the disposable lane.
-            solver_input = render_solver_input(entry.task, self.problem_provider(entry.task))
-            lane = self.checkpoint.claim_attempt(entry.task, entry.condition, asdict(prepared))
-            if lane is None:
-                continue
-            launched += 1
-            record: Mapping[str, Any] | None = None
-            failure: BaseException | None = None
-            try:
-                record = self.runtime.run_lane(
-                    entry.task, entry.condition, prepared, lane, solver_input
-                )
-            except Exception as exc:
-                failure = exc
-            category = _outcome_category(record, failure)
-            patch = _patch_path(lane)
-            if not patch.exists():
-                atomic_create_bytes(lane / "model.patch", b"")
-            outcome: dict[str, Any] = {
-                "schema_version": 1,
-                "state": "finished",
-                "category": category,
-                "run_status": str((record or {}).get("run_status", "infrastructure_failed")),
-            }
-            if failure is not None:
-                outcome["error_type"] = type(failure).__name__
-            self.checkpoint.record_outcome(lane, outcome)
-            self._cleanup_if_paired(entry.task, prepared)
-            if category == "quota":
-                return RunSummary(launched=launched, stop_reason="quota")
+            solver_input = render_solver_input(task, self.problem_provider(task))
+            lanes = self.checkpoint.stage_pair(task, asdict(prepared))
+            for condition, lane in zip(task.condition_order, lanes, strict=True):
+                launched += 1
+                record: Mapping[str, Any] | None = None
+                failure: BaseException | None = None
+                try:
+                    record = self.runtime.run_lane(
+                        task,
+                        condition,
+                        replace(prepared, overlay_image=prepared.image_for(condition)),
+                        lane,
+                        solver_input,
+                    )
+                except Exception as exc:
+                    failure = exc
+                category = _outcome_category(lane, record, failure)
+                outcome: dict[str, Any] = {
+                    "schema_version": 2,
+                    "state": "finished",
+                    "category": category,
+                    "run_status": str((record or {}).get("run_status", "infrastructure_failed")),
+                }
+                if failure is not None:
+                    outcome["error_type"] = type(failure).__name__
+                self.checkpoint.record_outcome(lane, outcome)
+                if category == "quota":
+                    return RunSummary(launched=launched, stop_reason="quota")
+            self._cleanup_if_paired(task, prepared)
         return RunSummary(launched=launched, stop_reason=None)
 
 
@@ -283,23 +382,13 @@ def export_predictions(
     output = Path(destination)
     if output.exists():
         raise CampaignError("export destination already exists")
-    output.parent.mkdir(parents=True, exist_ok=True)
     payload = "".join(json.dumps(item, sort_keys=True) + "\n" for item in records).encode("utf-8")
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{output.name}.", dir=output.parent)
-    temporary = Path(temporary_name)
+    if any(marker in payload for marker in markers):
+        raise CampaignError("authentication material detected in public export payload")
     try:
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(payload)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.chmod(temporary, 0o644)
-        try:
-            os.link(temporary, output)
-        except FileExistsError as exc:
-            raise CampaignError("export destination already exists") from exc
-    finally:
-        with contextlib.suppress(FileNotFoundError):
-            temporary.unlink()
+        atomic_create_bytes(output, payload, mode=0o644)
+    except CheckpointError as exc:
+        raise CampaignError("export destination already exists or cannot be published") from exc
 
 
 class JsonProblemProvider:
@@ -343,13 +432,13 @@ class DockerLiteRuntime:
         *,
         source_root: Path,
         auth_source: Path,
-        marginal_commit: str,
         executor: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+        git_executor: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     ):
         self.source_root = source_root.resolve()
         self.auth_source = auth_source.resolve()
-        self.marginal_commit = marginal_commit
         self.executor = executor
+        self.git_executor = git_executor
 
     def _command(
         self, command: list[str], *, timeout: int = 1800
@@ -362,6 +451,7 @@ class DockerLiteRuntime:
             raise CampaignError(f"Docker infrastructure failure: {exc}") from exc
 
     def prepare(self, task: LiteTask) -> PreparedTask:
+        source = verify_frozen_source(self.source_root, git_executor=self.git_executor)
         pulled = self._command(["docker", "pull", task.official_image])
         if pulled.returncode != 0:
             raise CampaignError("Docker could not pull the official task image")
@@ -380,27 +470,45 @@ class DockerLiteRuntime:
             raise CampaignError("Docker did not resolve an immutable official image digest")
         image_key = hashlib.sha256((task.instance_id + task_image).encode()).hexdigest()
         tag = f"marginal-lite-{image_key[:24]}"
-        built = self._command(
-            [
-                "docker",
-                "build",
-                "--file",
-                str(self.source_root / "benchmark/astra/lite/Dockerfile.solver"),
-                "--build-arg",
-                f"TASK_IMAGE={task_image}",
-                "--build-arg",
-                f"MARGINAL_SOURCE_COMMIT={self.marginal_commit}",
-                "--tag",
-                tag,
-                str(self.source_root),
-            ]
+
+        def build(condition: str) -> str:
+            runtime_tag = f"{tag}-{condition}"
+            built = self._command(
+                [
+                    "docker",
+                    "build",
+                    "--file",
+                    str(self.source_root / "benchmark/astra/lite/Dockerfile.solver"),
+                    "--target",
+                    condition,
+                    "--build-arg",
+                    f"TASK_IMAGE={task_image}",
+                    "--build-arg",
+                    f"MARGINAL_SOURCE_COMMIT={source.commit}",
+                    "--tag",
+                    runtime_tag,
+                    str(self.source_root),
+                ]
+            )
+            if built.returncode != 0:
+                raise CampaignError(f"Docker could not build the {condition} task runtime")
+            identity = self._command(
+                ["docker", "image", "inspect", "--format", "{{.Id}}", runtime_tag]
+            )
+            if identity.returncode != 0 or not identity.stdout.strip().startswith("sha256:"):
+                raise CampaignError(f"Docker did not resolve an immutable {condition} image ID")
+            return identity.stdout.strip()
+
+        baseline = build("baseline")
+        marginal = build("marginal")
+        return PreparedTask(
+            task_image=task_image,
+            overlay_image=marginal,
+            baseline_image=baseline,
+            marginal_image=marginal,
+            source_commit=source.commit,
+            source_tree=source.tree,
         )
-        if built.returncode != 0:
-            raise CampaignError("Docker could not build the task overlay")
-        identity = self._command(["docker", "image", "inspect", "--format", "{{.Id}}", tag])
-        if identity.returncode != 0 or not identity.stdout.strip().startswith("sha256:"):
-            raise CampaignError("Docker did not resolve an immutable overlay image ID")
-        return PreparedTask(task_image=task_image, overlay_image=identity.stdout.strip())
 
     def run_lane(
         self,
@@ -451,19 +559,21 @@ class DockerLiteRuntime:
         return {"run_status": "completed" if completed.returncode == 0 else "codex_failed"}
 
     def remove_image(self, image: str) -> None:
-        self._command(["docker", "image", "rm", image], timeout=120)
+        removed = self._command(["docker", "image", "rm", image], timeout=120)
+        if removed.returncode != 0:
+            raise CampaignError(f"Docker could not remove explicit image: {image}")
 
 
 def _auth_markers(path: Path) -> tuple[bytes, ...]:
-    raw = path.read_bytes()
-    markers: set[bytes] = {raw.strip()} if len(raw.strip()) >= 16 else set()
     try:
+        raw = path.read_bytes()
         value = json.loads(raw)
-    except json.JSONDecodeError:
-        value = None
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CampaignError("authentication material is unreadable or unparseable") from exc
+    markers: set[bytes] = set()
 
     def collect(item: object) -> None:
-        if isinstance(item, str) and len(item.encode()) >= 16:
+        if isinstance(item, str) and item:
             markers.add(item.encode())
         elif isinstance(item, dict):
             for child in item.values():
@@ -492,7 +602,6 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--problem-source", required=True, type=Path)
     run.add_argument("--auth", required=True, type=Path)
     run.add_argument("--source-root", type=Path, default=Path.cwd())
-    run.add_argument("--marginal-commit", required=True)
     export = commands.add_parser("export")
     export.add_argument("--campaign-dir", required=True, type=Path)
     export.add_argument("--condition", required=True, choices=("baseline", "marginal"))
@@ -523,7 +632,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         runtime = DockerLiteRuntime(
             source_root=args.source_root,
             auth_source=args.auth,
-            marginal_commit=args.marginal_commit,
         )
         result = CampaignRunner(
             args.campaign_dir, runtime, JsonProblemProvider(args.problem_source)
