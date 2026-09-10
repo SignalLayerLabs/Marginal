@@ -11,7 +11,7 @@ def test_lite_solver_docker_context_includes_exact_runtime_closure() -> None:
     )
 
     assert "benchmark.astra.lite_lane" in dockerfile
-    assert "cp /lib/ld-musl-x86_64.so.1 /overlay/lib/ld-musl-x86_64.so.1" in dockerfile
+    assert "cp /lib/ld-musl-x86_64.so.1 /overlay/usr/lib/ld-musl-x86_64.so.1" in dockerfile
     for path in (
         "benchmark/astra/_snapshot.py",
         "benchmark/astra/lite_lane.py",
