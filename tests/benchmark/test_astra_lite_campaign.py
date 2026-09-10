@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -224,3 +225,49 @@ def test_solver_entrypoint_accepts_a_child_runtime_directory_for_immutable_attem
     )
 
     assert args.run_dir == Path("/marginal-output/attempt/runtime")
+
+
+def test_docker_runtime_is_injectable_and_uses_only_explicit_image_operations(
+    tmp_path: Path,
+) -> None:
+    from benchmark.astra.lite_campaign import DockerLiteRuntime
+
+    task = _task(0, "django__django-11099", ("baseline", "marginal"))
+    commands: list[list[str]] = []
+
+    def fake_docker(command, **_kwargs):
+        commands.append(command)
+        if command[:2] == ["docker", "pull"]:
+            return subprocess.CompletedProcess(command, 0, "", "")
+        if command[-1] == task.official_image:
+            return subprocess.CompletedProcess(
+                command, 0, f"example/{task.instance_id}@sha256:{'b' * 64}\n", ""
+            )
+        if command[:3] == ["docker", "image", "inspect"]:
+            return subprocess.CompletedProcess(command, 0, f"sha256:{'c' * 64}\n", "")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    auth = tmp_path / "auth.json"
+    auth.write_text("{}\n", encoding="utf-8")
+    runtime = DockerLiteRuntime(
+        source_root=Path(__file__).resolve().parents[2],
+        auth_source=auth,
+        marginal_commit="a" * 40,
+        executor=fake_docker,
+    )
+
+    prepared = runtime.prepare(task)
+    runtime.remove_image(prepared.overlay_image)
+    runtime.remove_image(prepared.task_image)
+
+    assert prepared.task_image == f"example/{task.instance_id}@sha256:{'b' * 64}"
+    assert prepared.overlay_image == f"sha256:{'c' * 64}"
+    assert [command[:3] for command in commands] == [
+        ["docker", "pull", task.official_image],
+        ["docker", "image", "inspect"],
+        ["docker", "build", "--file"],
+        ["docker", "image", "inspect"],
+        ["docker", "image", "rm"],
+        ["docker", "image", "rm"],
+    ]
+    assert not any("prune" in command for command in commands)
