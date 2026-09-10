@@ -146,6 +146,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--problem-hash", required=True)
     parser.add_argument("--schedule-position", required=True, type=int)
     parser.add_argument("--condition", required=True, choices=sorted(_CONDITIONS))
+    parser.add_argument("--run-dir", type=Path, default=Path("/marginal-output/lane"))
     return parser
 
 
@@ -162,6 +163,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             condition_order=("baseline", "marginal"),
         ),
         condition=args.condition,
+        run_dir=args.run_dir,
     )
     record = run_lane(config)
     print(

@@ -1,0 +1,226 @@
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import dataclass
+from pathlib import Path
+
+import pytest
+from benchmark.astra.lite.freeze import LiteTask
+
+
+def _task(position: int, instance_id: str, order: tuple[str, str]) -> LiteTask:
+    return LiteTask(
+        instance_id=instance_id,
+        repo="django/django",
+        base_commit="a" * 40,
+        official_image=f"example/{instance_id}:latest",
+        problem_hash=hashlib.sha256(f"Issue {instance_id}".encode()).hexdigest(),
+        schedule_position=position,
+        condition_order=order,
+    )
+
+
+@dataclass
+class FakeRuntime:
+    launched: list[tuple[str, str, str]]
+    removed: list[str]
+    quota_after: tuple[str, str] | None = None
+
+    def prepare(self, task: LiteTask):
+        from benchmark.astra.lite_campaign import PreparedTask
+
+        return PreparedTask(
+            task_image=f"example/{task.instance_id}@sha256:{'b' * 64}",
+            overlay_image=f"local/{task.instance_id}@sha256:{'c' * 64}",
+        )
+
+    def run_lane(self, task, condition, prepared, lane_dir, solver_input):
+        self.launched.append((task.instance_id, condition, prepared.overlay_image))
+        (lane_dir / "model.patch").write_text("diff --git a/a b/a\n", encoding="utf-8")
+        if self.quota_after == (task.instance_id, condition):
+            return {"run_status": "quota_exhausted"}
+        return {"run_status": "completed"}
+
+    def remove_image(self, image: str) -> None:
+        self.removed.append(image)
+
+
+def _provider(task: LiteTask) -> dict[str, str]:
+    return {"instance_id": task.instance_id, "problem_statement": f"Issue {task.instance_id}"}
+
+
+def test_init_persists_the_given_schedule_order_without_reordering(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import Campaign, initialize_campaign
+
+    tasks = (
+        _task(0, "b__b-2", ("marginal", "baseline")),
+        _task(1, "a__a-1", ("baseline", "marginal")),
+    )
+    initialize_campaign(tmp_path, tasks)
+
+    campaign = Campaign.open(tmp_path)
+    assert [(item.task.instance_id, item.condition) for item in campaign.next_entries()] == [
+        ("b__b-2", "marginal"),
+        ("b__b-2", "baseline"),
+        ("a__a-1", "baseline"),
+        ("a__a-1", "marginal"),
+    ]
+
+
+def test_run_writes_an_attempt_marker_before_a_lane_can_launch(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import CampaignRunner, initialize_campaign
+
+    task = _task(0, "django__django-11099", ("baseline", "marginal"))
+    initialize_campaign(tmp_path, (task,))
+    FakeRuntime([], [])
+
+    class InspectingRuntime(FakeRuntime):
+        def run_lane(self, task, condition, prepared, lane_dir, solver_input):
+            assert (
+                json.loads((lane_dir / "attempt.json").read_text(encoding="utf-8"))["state"]
+                == "started"
+            )
+            return super().run_lane(task, condition, prepared, lane_dir, solver_input)
+
+    result = CampaignRunner(tmp_path, InspectingRuntime([], []), _provider).run(max_lanes=1)
+
+    assert result.launched == 1
+    assert (
+        tmp_path / "lanes" / "0000-django__django-11099" / "baseline" / "attempt.json"
+    ).is_file()
+
+
+def test_interrupted_attempt_is_preserved_and_never_launched_again(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import CampaignRunner, initialize_campaign
+
+    task = _task(0, "django__django-11099", ("baseline", "marginal"))
+    initialize_campaign(tmp_path, (task,))
+    first = FakeRuntime([], [])
+    CampaignRunner(tmp_path, first, _provider).run(max_lanes=1)
+    second = FakeRuntime([], [])
+    CampaignRunner(tmp_path, second, _provider).run(max_lanes=2)
+
+    assert first.launched == [
+        (task.instance_id, "baseline", f"local/{task.instance_id}@sha256:{'c' * 64}")
+    ]
+    assert [item[:2] for item in second.launched] == [(task.instance_id, "marginal")]
+
+
+def test_quota_stop_preserves_attempt_and_stops_before_next_lane(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import CampaignRunner, initialize_campaign
+
+    task = _task(0, "django__django-11099", ("baseline", "marginal"))
+    initialize_campaign(tmp_path, (task,))
+    runtime = FakeRuntime([], [], quota_after=(task.instance_id, "baseline"))
+
+    result = CampaignRunner(tmp_path, runtime, _provider).run(max_lanes=2)
+
+    assert result.stop_reason == "quota"
+    assert [item[:2] for item in runtime.launched] == [(task.instance_id, "baseline")]
+    outcome = json.loads(
+        (tmp_path / "lanes" / "0000-django__django-11099" / "baseline" / "outcome.json").read_text()
+    )
+    assert outcome["category"] == "quota"
+
+
+def test_lane_failure_preserves_an_empty_patch_for_later_export(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import CampaignRunner, initialize_campaign
+
+    task = _task(0, "django__django-11099", ("baseline", "marginal"))
+    initialize_campaign(tmp_path, (task,))
+
+    class FailingRuntime(FakeRuntime):
+        def run_lane(self, task, condition, prepared, lane_dir, solver_input):
+            raise RuntimeError("fixture Docker failure")
+
+    CampaignRunner(tmp_path, FailingRuntime([], []), _provider).run(max_lanes=1)
+
+    lane = tmp_path / "lanes" / "0000-django__django-11099" / "baseline"
+    assert (lane / "model.patch").read_bytes() == b""
+    assert json.loads((lane / "outcome.json").read_text())["category"] == "infrastructure"
+
+
+def test_off_on_pair_uses_one_prepared_overlay_then_removes_only_explicit_images(
+    tmp_path: Path,
+) -> None:
+    from benchmark.astra.lite_campaign import CampaignRunner, initialize_campaign
+
+    task = _task(0, "django__django-11099", ("marginal", "baseline"))
+    initialize_campaign(tmp_path, (task,))
+    runtime = FakeRuntime([], [])
+
+    CampaignRunner(tmp_path, runtime, _provider).run(max_lanes=2)
+
+    assert [item[1] for item in runtime.launched] == ["marginal", "baseline"]
+    assert len({item[2] for item in runtime.launched}) == 1
+    assert runtime.removed == [
+        f"local/{task.instance_id}@sha256:{'c' * 64}",
+        f"example/{task.instance_id}@sha256:{'b' * 64}",
+    ]
+
+
+def test_problem_projection_must_be_safe_and_match_the_frozen_hash(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import CampaignError, render_solver_input
+
+    task = _task(0, "django__django-11099", ("baseline", "marginal"))
+    assert "Issue django__django-11099" in render_solver_input(task, _provider(task))
+    with pytest.raises(CampaignError, match="allowlisted"):
+        render_solver_input(task, {**_provider(task), "hints": "forbidden"})
+    with pytest.raises(CampaignError, match="hash"):
+        render_solver_input(task, {"instance_id": task.instance_id, "problem_statement": "changed"})
+
+
+def test_export_rejects_auth_markers_and_does_not_export_outcome_data(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import (
+        CampaignError,
+        CampaignRunner,
+        export_predictions,
+        initialize_campaign,
+    )
+
+    task = _task(0, "django__django-11099", ("baseline", "marginal"))
+    initialize_campaign(tmp_path, (task,))
+    runtime = FakeRuntime([], [])
+    CampaignRunner(tmp_path, runtime, _provider).run(max_lanes=2)
+
+    destination = tmp_path / "baseline.jsonl"
+    export_predictions(tmp_path, "baseline", destination, auth_markers=(b"secret-marker-123456",))
+    exported = json.loads(destination.read_text(encoding="utf-8"))
+    assert set(exported) == {"instance_id", "model_patch", "model_name_or_path"}
+    assert "completed" not in destination.read_text(encoding="utf-8")
+
+    destination.unlink()
+    patch = tmp_path / "lanes" / "0000-django__django-11099" / "baseline" / "model.patch"
+    patch.write_bytes(b"secret-marker-123456")
+    with pytest.raises(CampaignError, match="authentication"):
+        export_predictions(
+            tmp_path, "baseline", destination, auth_markers=(b"secret-marker-123456",)
+        )
+
+
+def test_solver_entrypoint_accepts_a_child_runtime_directory_for_immutable_attempts() -> None:
+    from benchmark.astra.lite_lane import _parser
+
+    args = _parser().parse_args(
+        [
+            "--instance-id",
+            "django__django-11099",
+            "--repo",
+            "django/django",
+            "--base-commit",
+            "a" * 40,
+            "--official-image",
+            "swebench/sweb.eval.x86_64.django_1776_django-11099:latest",
+            "--problem-hash",
+            "b" * 64,
+            "--schedule-position",
+            "0",
+            "--condition",
+            "baseline",
+            "--run-dir",
+            "/marginal-output/attempt/runtime",
+        ]
+    )
+
+    assert args.run_dir == Path("/marginal-output/attempt/runtime")
