@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "purpose": "pipeline validation only; excluded from the SWE-bench Lite test score",
+  "dataset": "SWE-bench/SWE-bench_Lite",
+  "dataset_revision": "b0dde1093fe417d83b7184254edf8199c1f0dff5",
+  "split": "dev",
+  "instance_id": "pvlib__pvlib-python-1072",
+  "repo": "pvlib/pvlib-python",
+  "base_commit": "04a523fafbd61bc2e49420963b84ed8e2bd1b3cf",
+  "official_image": "swebench/sweb.eval.x86_64.pvlib_1776_pvlib-python-1072:latest",
+  "problem_hash": "f07d27d56ebb8157d446fe705e1e4c61fc9de31cffb1ebddc2d0b4d1baadc254",
+  "conditions": [
+    "baseline",
+    "marginal"
+  ],
+  "model": "gpt-6-astra",
+  "reasoning_effort": "medium",
+  "codex_version": "0.153.4",
+  "attempts_started": false,
+  "official_grading_complete": false,
+  "result": null
+}

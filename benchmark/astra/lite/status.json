@@ -10,7 +10,9 @@
   "model_predictions_graded": 0,
   "validation": {
     "started": false,
-    "is_included_in_test_score": false
+    "is_included_in_test_score": false,
+    "instance_id": "pvlib__pvlib-python-1072",
+    "split": "dev"
   },
-  "claim": "The 300-task public contract is frozen. No Lite test-split model inference, grading, performance result, or token-saving result exists."
+  "claim": "The 300-task public contract and resumable runner are frozen. No Lite test-split model inference, grading, performance result, or token-saving result exists."
 }
