@@ -214,6 +214,25 @@ def test_export_rejects_even_a_short_authentication_marker(tmp_path: Path) -> No
         )
 
 
+def test_export_prefers_the_runtime_patch_over_the_prelaunch_sentinel(tmp_path: Path) -> None:
+    from benchmark.astra.lite_campaign import export_predictions, initialize_campaign
+
+    task = _task(0, "django__django-11099", ("baseline", "marginal"))
+    initialize_campaign(tmp_path, (task,))
+    lane = tmp_path / "lanes" / "0000-django__django-11099" / "baseline"
+    runtime = lane / "runtime"
+    runtime.mkdir(parents=True)
+    (lane / "attempt.json").write_text('{"state":"started"}', encoding="utf-8")
+    (lane / "model.patch").write_bytes(b"")
+    expected = "diff --git a/runtime.py b/runtime.py\n"
+    (runtime / "model.patch").write_text(expected, encoding="utf-8")
+
+    destination = tmp_path / "baseline.jsonl"
+    export_predictions(tmp_path, "baseline", destination)
+
+    assert json.loads(destination.read_text(encoding="utf-8"))["model_patch"] == expected
+
+
 def test_solver_entrypoint_accepts_a_child_runtime_directory_for_immutable_attempts() -> None:
     from benchmark.astra.lite_lane import _parser
 

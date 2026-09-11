@@ -376,8 +376,8 @@ class CampaignRunner:
 
 
 def _patch_path(lane_dir: Path) -> Path:
-    direct = lane_dir / "model.patch"
-    return direct if direct.exists() else lane_dir / "runtime" / "model.patch"
+    runtime = lane_dir / "runtime" / "model.patch"
+    return runtime if runtime.exists() else lane_dir / "model.patch"
 
 
 def _patch_bytes(lane_dir: Path) -> bytes:
