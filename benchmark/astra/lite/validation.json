@@ -17,11 +17,11 @@
   "reasoning_effort": "medium",
   "codex_version": "0.153.4",
   "attempts_started": true,
-  "official_grading_complete": false,
+  "official_grading_complete": true,
   "result": {
-    "valid_pair": false,
+    "valid_pair": true,
     "test_score_impact": "none",
-    "model_lanes_executed": 4,
+    "model_lanes_executed": 8,
     "pipeline_attempts": [
       {
         "campaign": "campaign",
@@ -41,9 +41,65 @@
         "outcome": "invalid_nested_sandbox_mount_propagation_unavailable",
         "baseline_tokens": 39207,
         "marginal_tokens": 39039
+      },
+      {
+        "campaign": "campaign-v4",
+        "model_lanes": 2,
+        "outcome": "invalid_astra_file_change_hook_accounting",
+        "baseline_run_status": "completed",
+        "marginal_run_status": "integration_failed"
+      },
+      {
+        "campaign": "campaign-v5",
+        "runner_commit": "3babf51c80f7571ad05975cc0addb0031d85fa4e",
+        "model_lanes": 2,
+        "outcome": "valid_pair_officially_graded",
+        "shared_runtime_image": "sha256:7b33bb39114f730ac089b2e7ae9c35c020175e3705cb8e18f2f9832122daac99",
+        "task_image": "swebench/sweb.eval.x86_64.pvlib_1776_pvlib-python-1072@sha256:c8e43bebd10d7d2330820af520361dc6adc9642f98c7b7b7c415cca39852ffdd",
+        "baseline": {
+          "run_status": "completed",
+          "resolved": false,
+          "patch_bytes": 1516,
+          "patch_sha256": "d8c8d5b6cc29c123b35be03b2065972f744c16eaf8cea78c555e28fe639fab50",
+          "input_tokens": 305780,
+          "cached_input_tokens": 280960,
+          "output_tokens": 1531,
+          "reasoning_tokens": 125,
+          "tool_calls": 13,
+          "wall_time_ms": 121565
+        },
+        "marginal": {
+          "run_status": "completed",
+          "resolved": false,
+          "patch_bytes": 1517,
+          "patch_sha256": "81480e5b3246bdf9b28757d51177da896a879416c1f8cea71fbd5a201c67c21a",
+          "input_tokens": 236887,
+          "cached_input_tokens": 192256,
+          "output_tokens": 1324,
+          "reasoning_tokens": 95,
+          "tool_calls": 12,
+          "wall_time_ms": 138062,
+          "governance_latency_ms": 1987.603483,
+          "hook_authorizations": 12,
+          "hook_commits": 12,
+          "pending_reservations": 0
+        },
+        "official_grader": {
+          "evaluator_commit": "02e7a74ffd0b707aab73d203fe87bdc7c76afc8e",
+          "baseline_run_id": "marginal-dev-v5-baseline",
+          "marginal_run_id": "marginal-dev-v5-marginal",
+          "baseline_completed": 1,
+          "baseline_resolved": 0,
+          "marginal_completed": 1,
+          "marginal_resolved": 0,
+          "infrastructure_failures": 0,
+          "empty_patches": 0,
+          "errors": 0
+        }
       }
     ],
-    "latest_fix_commit": "678f880",
-    "next_step": "rerun the dev pair after quota reset; do not start test inference before it passes"
+    "latest_fix_commit": "3babf51",
+    "interpretation": "This one-task dev pair validates the pipeline only. It is excluded from the test score and is too small to support quality, latency, or token-saving claims.",
+    "next_step": "start the frozen 300-task test campaign and resume untouched lanes across quota resets"
   }
 }

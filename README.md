@@ -84,8 +84,10 @@ and what remains before a performance claim is justified.
 
 The full [300-task paired SWE-bench Lite contract](benchmark/astra/lite/protocol.json) is now
 preregistered with a public seed, exact dataset and evaluator revisions, a safe task manifest,
-and an immutable resume controller. Test-split execution remains **0/600 lanes** while the
-separate `dev` pipeline validation is completed. See the machine-readable
+and an immutable resume controller. The separate `dev` pipeline validation is complete: both
+OFF and ON produced non-empty patches and completed official grading without infrastructure
+errors; both were unresolved. This is pipeline evidence, not a performance result. Test-split
+execution remains **0/600 lanes**. See the machine-readable
 [campaign status](benchmark/astra/lite/status.json) and [validation record](benchmark/astra/lite/validation.json).
 
 The [SWE-bench Pro protocol and evidence](benchmark/astra/pro/README.md) include all 731

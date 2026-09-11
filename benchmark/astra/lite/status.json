@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_date": "2026-09-09",
+  "updated_date": "2026-09-11",
   "complete": false,
   "contract_frozen": true,
   "test_split_inference_started": false,
@@ -13,9 +13,11 @@
     "is_included_in_test_score": false,
     "instance_id": "pvlib__pvlib-python-1072",
     "split": "dev",
-    "valid_pair_complete": false,
-    "invalid_model_lanes": 4,
-    "latest_fix_commit": "678f880"
+    "valid_pair_complete": true,
+    "invalid_model_lanes": 6,
+    "valid_model_lanes": 2,
+    "officially_graded_lanes": 2,
+    "latest_fix_commit": "3babf51"
   },
-  "claim": "The 300-task public contract and resumable runner are frozen. Dev validation found and fixed container sandbox defects; a valid dev pair is still required. No Lite test-split inference, grading, performance result, or token-saving result exists."
+  "claim": "The 300-task public contract and resumable runner are frozen, and the dev pipeline gate passed. Both dev patches were officially graded unresolved; the dev pair is excluded from the test score and cannot support a performance claim. No Lite test-split inference, grading, performance result, or token-saving result exists."
 }

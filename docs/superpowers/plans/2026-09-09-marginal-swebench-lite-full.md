@@ -87,12 +87,12 @@ v5 evaluator, paired analysis, public artifact repository, and submission CLI.
 - Create: `benchmark/astra/lite/validation.json`
 - Modify: `benchmark/astra/lite/status.json`
 
-- [ ] Freeze one Lite dev ID and build its exact solver image.
-- [ ] Run one OFF and one ON validation attempt with ChatGPT authentication.
-- [ ] Confirm Codex 0.153.4, Astra identity, token telemetry, trajectory, patch extraction, MARGINAL
+- [x] Freeze one Lite dev ID and build its exact solver image.
+- [x] Run one OFF and one ON validation attempt with ChatGPT authentication.
+- [x] Confirm Codex 0.153.4, Astra identity, token telemetry, trajectory, patch extraction, MARGINAL
   coverage, identical base tree, and absence of auth material.
-- [ ] Grade both validation patches with the pinned official evaluator and record every outcome.
-- [ ] Publish validation evidence as pipeline evidence only; do not tune MARGINAL from task quality.
+- [x] Grade both validation patches with the pinned official evaluator and record every outcome.
+- [x] Publish validation evidence as pipeline evidence only; do not tune MARGINAL from task quality.
 
 ### Task 5: Execute and grade all 600 lanes
 
@@ -123,4 +123,3 @@ v5 evaluator, paired analysis, public artifact repository, and submission CLI.
 - [ ] Publish `SignalLayerLabs/Marginal-SWE-bench-Lite`, then run `submit register` to open the PR.
 - [ ] Update Marginal README only with measured results and direct artifact/submission links.
 - [ ] Run full tests, Ruff, runtime provenance check, and GitHub CI; commit and push.
-
