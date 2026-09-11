@@ -409,6 +409,45 @@ h1 {
 .proof-card h3 { margin: 0 0 8px; }
 .proof-card p, .proof-card li { color: var(--muted); font-size: 12px; line-height: 1.55; }
 .proof-card code { color: #dce6f0; font: 11px var(--mono); }
+.pattern { margin: 0 0 42px; }
+.snippet {
+  margin-top: 14px;
+  border: 1px solid #222d38;
+  border-radius: 12px;
+  background: #05080c;
+  overflow: hidden;
+}
+.snippet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 13px;
+  border-bottom: 1px solid #222d38;
+  color: var(--muted);
+  font: 800 9px var(--mono);
+  letter-spacing: .08em;
+}
+.snippet-copy { padding: 7px 12px; font-size: 9px; }
+.snippet-body {
+  margin: 0;
+  max-height: 340px;
+  overflow: auto;
+  padding: 13px;
+  color: #9eabb7;
+  font: 11px/1.55 var(--mono);
+  white-space: pre;
+  scrollbar-width: thin;
+}
+.snippet-body:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
+.snippet-status {
+  min-height: 15px;
+  margin: 0;
+  padding: 0 13px 11px;
+  color: var(--lime);
+  font: 10px var(--mono);
+}
 .legacy-contract { display: none; }
 .footer {
   display: flex;

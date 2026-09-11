@@ -43,6 +43,9 @@
     stages: $$('[data-stage]'),
     baselineLane: $('[data-lane="baseline"]'),
     marginalLane: $('[data-lane="marginal"]'),
+    copyTrace: $('[data-action="copy-trace"]'),
+    trace: $("#no-progress-trace"),
+    copyStatus: $("#copy-status"),
   };
 
   function metric(lane, name) {
@@ -230,6 +233,51 @@
     dom.pause.disabled = true;
   }
 
+  function announceCopy(message) {
+    if (dom.copyStatus) dom.copyStatus.textContent = message;
+  }
+
+  function copyWithSelection(text) {
+    const restore = document.activeElement;
+    const holder = document.createElement("textarea");
+    holder.value = text;
+    holder.setAttribute("readonly", "");
+    holder.setAttribute("aria-hidden", "true");
+    holder.style.position = "fixed";
+    holder.style.top = "-1000px";
+    holder.style.opacity = "0";
+    document.body.appendChild(holder);
+    holder.select();
+    let copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch (error) {
+      copied = false;
+    }
+    holder.remove();
+    if (restore instanceof HTMLElement) restore.focus();
+    return copied;
+  }
+
+  function copyTrace() {
+    if (!dom.trace) return;
+    announceCopy("");
+    const text = dom.trace.textContent || "";
+    const copied = () => announceCopy("No-progress trace copied.");
+    const blocked = () =>
+      announceCopy("Copy was blocked. Select the trace and copy it manually.");
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(copied, () => {
+        if (copyWithSelection(text)) copied();
+        else blocked();
+      });
+      return;
+    }
+    if (copyWithSelection(text)) copied();
+    else blocked();
+  }
+
+  dom.copyTrace?.addEventListener("click", copyTrace);
   dom.run?.addEventListener("click", playRace);
   dom.pause?.addEventListener("click", pauseRace);
   dom.step?.addEventListener("click", () => {
@@ -244,7 +292,7 @@
 
   document.addEventListener("keydown", (event) => {
     const tag = document.activeElement?.tagName || "";
-    if (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(tag)) return;
+    if (["INPUT", "SELECT", "TEXTAREA", "BUTTON", "PRE"].includes(tag)) return;
     if (event.code === "Space") {
       event.preventDefault();
       state.playing ? pauseRace() : playRace();

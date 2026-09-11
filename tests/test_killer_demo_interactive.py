@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from marginal.controls import ActionOutcomeStatus, NoProgressDetector
 from marginal.killer_demo import (
     build_killer_demo_playback,
+    build_no_progress_trace,
     render_killer_demo_css,
     render_killer_demo_html,
     render_killer_demo_js,
+    render_no_progress_trace,
     run_killer_demo,
 )
 
@@ -89,3 +92,80 @@ def test_committed_interactive_assets_are_generated(tmp_path: Path) -> None:
 
     for name in ("demo.css", "demo.js"):
         assert (committed / name).read_bytes() == (tmp_path / name).read_bytes()
+
+
+def test_no_progress_trace_is_replayed_from_the_shipped_control() -> None:
+    rows = build_no_progress_trace()
+
+    assert [row["reason_code"] for row in rows] == [
+        "NO_PROGRESS_CLEAR",
+        "NO_PROGRESS_CLEAR",
+        "NO_PROGRESS_OBSERVED",
+        "NO_PROGRESS_ENFORCEMENT_ELIGIBLE",
+    ]
+    assert [row["should_recommend_stop"] for row in rows] == [False, False, False, True]
+    assert [row["enforcement_eligible"] for row in rows] == [False, False, False, True]
+
+    assert [row["action"] for row in rows] == [
+        "patch:apply",
+        "verify:targeted",
+        "verify:targeted",
+        "verify:targeted",
+    ]
+
+    detector = NoProgressDetector()
+    for row in rows:
+        signal = detector.evaluate(row["action"], row["state"], row["evidence"])
+        assert signal.reason_code == row["reason_code"]
+        assert signal.reason == row["reason"]
+        detector.observe(
+            row["action"],
+            row["state"],
+            row["evidence"],
+            ActionOutcomeStatus.SUCCESS,
+        )
+
+
+def test_no_progress_snippet_is_labeled_and_keeps_the_authority_boundary() -> None:
+    snippet = render_no_progress_trace()
+
+    assert "illustrative deterministic sequence" in snippet
+    assert "not provider telemetry, not an enforcement benchmark" in snippet
+    assert "max_same_evidence_completions=2" in snippet
+    assert "t2  verify:targeted" in snippet
+    assert "t4  verify:targeted" in snippet
+    assert "Shadow Mode         records the stop recommendation" in snippet
+    assert "Earned Enforcement  is separate." in snippet
+
+
+def test_interactive_html_publishes_a_copyable_no_progress_trace() -> None:
+    rendered = render_killer_demo_html(run_killer_demo())
+
+    required = (
+        'id="no-progress"',
+        'data-action="copy-trace"',
+        'id="no-progress-trace"',
+        'id="copy-status"',
+        'aria-live="polite"',
+        'aria-label="Illustrative no-progress trace"',
+        "tabindex=",
+        "NO_PROGRESS_ENFORCEMENT_ELIGIBLE",
+        "not provider telemetry",
+    )
+    for phrase in required:
+        assert phrase in rendered, phrase
+
+
+def test_copy_affordance_keeps_keyboard_and_reduced_motion_support() -> None:
+    css = render_killer_demo_css()
+    js = render_killer_demo_js()
+
+    assert ".snippet-body" in css
+    assert ".snippet-body:focus-visible" in css
+    assert "prefers-reduced-motion" in css
+
+    assert "function copyTrace" in js
+    assert "restore.focus()" in js
+    assert '"PRE"' in js
+    assert "ArrowRight" in js
+    assert "fetch(" not in js

@@ -42,6 +42,7 @@
       <nav class="navlinks" aria-label="Killer Demo navigation">
         <a href="#race">Race</a>
         <a href="#proof">Proof</a>
+        <a href="#no-progress">Pattern</a>
         <a href="trace.jsonl">Trace</a>
         <a href="https://github.com/SignalLayerLabs/Marginal">GitHub ↗</a>
       </nav>
@@ -224,6 +225,62 @@
           </p>
           <p><code>marginal killer-demo --output killer-demo-output</code></p>
           <p><a href="trace.jsonl">Open decision trace →</a></p>
+        </article>
+      </section>
+
+      <section class="pattern" id="no-progress">
+        <article class="proof-card">
+          <span class="eyebrow">QUOTABLE MECHANISM · ILLUSTRATIVE</span>
+          <h3>The no-progress pattern, in four lines.</h3>
+          <p>
+            Same semantic action, successful outcome, unchanged workspace state, no new evidence.
+            That is the sequence MARGINAL treats as a no-progress repetition candidate. The trace
+            below is replayed from the shipped control over a fixed synthetic observation
+            sequence, so it is an illustration of the mechanism and not provider telemetry,
+            a production run, or an enforcement benchmark.
+          </p>
+          <div class="snippet">
+            <div class="snippet-head">
+              <span>no-progress-trace.txt</span>
+              <button
+                class="control snippet-copy"
+                type="button"
+                data-action="copy-trace"
+                aria-describedby="copy-status"
+              >COPY TRACE</button>
+            </div>
+            <pre
+              class="snippet-body"
+              id="no-progress-trace"
+              tabindex="0"
+              role="region"
+              aria-label="Illustrative no-progress trace"
+            ># MARGINAL no-progress pattern
+# illustrative deterministic sequence, replayed from the shipped control
+# not provider telemetry, not an enforcement benchmark
+# threshold: max_same_evidence_completions=2
+
+t1  patch:apply      outcome=success  state=w#4f2a  evidence=e#91c0  -&gt;  NO_PROGRESS_CLEAR
+      state or completion evidence changed
+t2  verify:targeted  outcome=success  state=w#8b13  evidence=e#2d77  -&gt;  NO_PROGRESS_CLEAR
+      state or completion evidence changed
+t3  verify:targeted  outcome=success  state=w#8b13  evidence=e#2d77  -&gt;  NO_PROGRESS_OBSERVED
+      unchanged completion evidence remains below the stop threshold
+t4  verify:targeted  outcome=success  state=w#8b13  evidence=e#2d77  -&gt;  NO_PROGRESS_ENFORCEMENT_ELIGIBLE
+      successful completions repeated without state or evidence change
+
+Shadow Mode         records the stop recommendation; the action still executes.
+Earned Enforcement  is separate. It requires an adapter with real blocking
+                    capability and sufficient local evidence, and this
+                    illustration grants none of it.
+</pre>
+            <p class="snippet-status" id="copy-status" role="status" aria-live="polite"></p>
+          </div>
+          <p>
+            Shadow Mode records that recommendation and still lets the action execute. Earned
+            Enforcement is a separate authority that an adapter has to earn from local evidence,
+            and nothing on this page grants it.
+          </p>
         </article>
       </section>
 
