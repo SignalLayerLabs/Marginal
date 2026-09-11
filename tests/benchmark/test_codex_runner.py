@@ -214,7 +214,7 @@ def test_on_starts_daemon_and_loads_only_generated_isolated_home_hooks(tmp_path:
     assert ".codex" not in (config.run_dir / "model.patch").read_text(encoding="utf-8")
 
 
-def test_on_hook_coverage_counts_only_cli_tool_types_supported_by_hooks(tmp_path: Path) -> None:
+def test_on_requires_hook_coverage_for_file_change_events(tmp_path: Path) -> None:
     log = tmp_path / "marginal-log.json"
     config = _config(
         tmp_path,
@@ -226,7 +226,8 @@ def test_on_hook_coverage_counts_only_cli_tool_types_supported_by_hooks(tmp_path
 
     assert record["tool_calls"] == 1
     assert record["shell_commands"] == 0
-    assert record["run_status"] == "completed"
+    assert record["run_status"] == "integration_failed"
+    assert record["error_code"] == "HOOK_COVERAGE_MISSING"
 
 
 def test_on_fails_if_codex_reports_tool_use_without_hook_coverage(tmp_path: Path) -> None:

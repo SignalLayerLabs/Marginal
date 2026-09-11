@@ -507,7 +507,7 @@ def run_task(config: RunConfig) -> dict[str, Any]:
     hook_coverage_missing = bool(
         config.condition == "marginal"
         and daemon_summary is not None
-        and int(daemon_summary.get("committed", 0)) != metrics.shell_commands
+        and int(daemon_summary.get("committed", 0)) != metrics.tool_calls
     )
     if security_violation:
         run_status = "security_failed"
