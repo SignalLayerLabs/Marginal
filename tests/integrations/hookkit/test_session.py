@@ -26,12 +26,15 @@ def _session(workspace: Path) -> HookSessionRuntime:
     return HookSessionRuntime(_runtime(), workspace=workspace)
 
 
-def _start(call_id: str, tool: str = "Read", **arguments: object) -> ToolCallStart:
+def _start(
+    call_id: str, tool: str = "Read", *, turn_id: str = "", **arguments: object
+) -> ToolCallStart:
     return ToolCallStart(
         session_id=SESSION,
         call_id=call_id,
         tool_name=tool,
         tool_input=arguments or {"file_path": "/workspace/example.txt"},
+        turn_id=turn_id,
     )
 
 
@@ -42,14 +45,18 @@ def _end(
     outcome: ActionOutcomeStatus = ActionOutcomeStatus.SUCCESS,
     evidence: object = None,
     duration_ms: float | None = None,
+    turn_id: str = "",
+    **arguments: object,
 ) -> ToolCallEnd:
     return ToolCallEnd(
         session_id=SESSION,
         call_id=call_id,
         tool_name=tool,
         outcome=outcome,
+        tool_input=arguments or {"file_path": "/workspace/example.txt"},
         evidence=evidence if evidence is not None else {"content": "hello"},
         duration_ms=duration_ms,
+        turn_id=turn_id,
     )
 
 
@@ -113,6 +120,27 @@ def test_a_completion_for_a_different_tool_is_rejected(tmp_path: Path) -> None:
     session.tool_call_start(_start("call-1", tool="Read"))
     with pytest.raises(HookIntegrationError):
         session.tool_call_end(_end("call-1", tool="Bash"))
+    assert session.pending_action_ids() == ("call-1",)
+
+
+def test_a_cross_wired_completion_cannot_consume_another_action(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    session.tool_call_start(_start("call-1", turn_id="turn-a", file_path="a.txt"))
+    session.tool_call_start(_start("call-2", turn_id="turn-b", file_path="b.txt"))
+
+    with pytest.raises(HookIntegrationError, match="turn identity"):
+        session.tool_call_end(_end("call-1", turn_id="turn-b", file_path="a.txt"))
+
+    assert session.pending_action_ids() == ("call-1", "call-2")
+    assert (
+        session.tool_call_end(_end("call-2", turn_id="turn-b", file_path="b.txt"))
+        is ActionOutcomeStatus.SUCCESS
+    )
+    assert (
+        session.tool_call_end(_end("call-1", turn_id="turn-a", file_path="a.txt"))
+        is ActionOutcomeStatus.SUCCESS
+    )
+    assert session.summary()["successful_observations"] == 2
 
 
 def test_a_completion_without_a_proposal_is_reported_not_settled(tmp_path: Path) -> None:

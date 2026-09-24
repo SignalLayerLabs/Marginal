@@ -102,7 +102,7 @@ class HookSessionRuntime:
 
         self._ensure_open()
         self._validate_session(end.session_id)
-        action = self._pending.pop(end.call_id, None)
+        action = self._pending.get(end.call_id)
         if action is None:
             # A completion without a recorded proposal means hook coverage was
             # incomplete for this call. Report it instead of settling an action
@@ -113,6 +113,14 @@ class HookSessionRuntime:
             raise HookIntegrationError(
                 f"completion tool identity does not match the proposal: {end.call_id}"
             )
+        if str(action.metadata.get("turn_id", "")) != end.turn_id:
+            raise HookIntegrationError(
+                f"completion turn identity does not match the proposal: {end.call_id}"
+            )
+        # Consume the proposal only after every stable identity dimension
+        # matches. Engines may enrich tool_input on completion, so call, tool,
+        # turn, and session identities are the compatible correlation boundary.
+        self._pending.pop(end.call_id)
 
         actual_cost = self._actual_cost(end)
         if end.outcome is ActionOutcomeStatus.SUCCESS:
